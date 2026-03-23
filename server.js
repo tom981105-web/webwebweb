@@ -147,6 +147,15 @@ function getMimeExtension(mimeType) {
     return '.png';
 }
 
+function getMimeTypeFromExtension(fileName) {
+    const ext = String(path.extname(fileName || '') || '').toLowerCase();
+    if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+    if (ext === '.png') return 'image/png';
+    if (ext === '.webp') return 'image/webp';
+    if (ext === '.gif') return 'image/gif';
+    return 'application/octet-stream';
+}
+
 function sanitizeBaseName(value, fallback) {
     return String(value || fallback || 'upload')
         .replace(/\.[^/.]+$/, '')
@@ -164,6 +173,10 @@ function writeImageDataUrl(dataUrl, originalName, dirPath, urlPrefix, fallbackNa
 
     fs.writeFileSync(path.join(dirPath, fileName), Buffer.from(match[2], 'base64'));
     return `${urlPrefix}/${fileName}`;
+}
+
+function bufferToDataUrl(buffer, mimeType) {
+    return `data:${mimeType};base64,${Buffer.from(buffer).toString('base64')}`;
 }
 
 function safeUnlink(filePath) {
@@ -448,6 +461,54 @@ function migrateBannerStorageIfNeeded() {
     const serialized = JSON.stringify(rawDb.site_banners || {});
     if (!serialized.includes('data:image/')) return;
     persistDb();
+}
+
+async function migrateBoardInlineStorageIfNeeded() {
+    const storageStatus = storage.getStorageStatus();
+    if (storageStatus.provider !== 'r2' || !storageStatus.isR2Configured) return;
+
+    let changed = false;
+    const uploadPattern = /(["'])((?:https?:\/\/localhost:\d+)?\/uploads\/board-inline\/([^"' )]+))\1/gi;
+
+    for (const post of state.board.posts) {
+        const originalContent = String(post.content || '');
+        let nextContent = originalContent;
+        let match;
+
+        while ((match = uploadPattern.exec(originalContent)) !== null) {
+            const quote = match[1];
+            const fullMatch = match[0];
+            const storedUrl = match[2];
+            const fileName = decodeURIComponent(match[3] || '');
+            const localFilePath = path.join(BOARD_INLINE_DIR, path.basename(fileName));
+
+            if (!fs.existsSync(localFilePath)) continue;
+
+            try {
+                const mimeType = getMimeTypeFromExtension(localFilePath);
+                const buffer = fs.readFileSync(localFilePath);
+                const remoteUrl = await storage.saveImageDataUrl({
+                    dataUrl: bufferToDataUrl(buffer, mimeType),
+                    originalName: path.basename(localFilePath),
+                    folder: 'board-inline',
+                    fallbackName: 'board-inline',
+                    index: 0
+                });
+
+                if (remoteUrl && remoteUrl !== storedUrl) {
+                    nextContent = nextContent.replace(fullMatch, `${quote}${remoteUrl}${quote}`);
+                    changed = true;
+                }
+            } catch (error) {
+            }
+        }
+
+        if (nextContent !== originalContent) {
+            post.content = nextContent;
+        }
+    }
+
+    if (changed) persistDb();
 }
 
 function reloadDb() {
@@ -937,6 +998,7 @@ async function bootstrap() {
     loadStateFromDisk();
     migrateLoginHeroStorageIfNeeded();
     migrateBannerStorageIfNeeded();
+    await migrateBoardInlineStorageIfNeeded();
 
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
