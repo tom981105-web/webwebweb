@@ -5,8 +5,166 @@ const POINT_STORE_ITEMS = [
     { id: 'sunrise_hiker', title: '새벽 등반가', cost: 20, description: '꾸준히 모은 포인트로 열 수 있는 칭호입니다.' },
     { id: 'campfire_host', title: '캠프파이어 호스트', cost: 35, description: '커뮤니티 활동이 눈에 띄는 멤버를 위한 칭호입니다.' }
 ];
+const RPG_STAT_LABELS = {
+    strength: '힘',
+    agility: '민첩',
+    vitality: '체력',
+    spirit: '정신력'
+};
+const RPG_MONSTERS = [
+    { id: 'slime', name: '이끼 슬라임', reward: [5, 8], damage: [4, 9], xp: 8, requirement: 0 },
+    { id: 'wolf', name: '들개 무리', reward: [9, 14], damage: [8, 16], xp: 14, requirement: 18 },
+    { id: 'golem', name: '낡은 골렘', reward: [14, 22], damage: [12, 23], xp: 22, requirement: 35 }
+];
+const RPG_SHOP_ITEMS = [
+    { id: 'potion', name: '회복약', cost: 6, heal: 35, description: '전투 후 잃은 HP를 회복합니다.' }
+];
 const NOTIFICATION_STORAGE_KEY = 'user_notifications';
 const NOTIFICATION_SEEN_PREFIX = 'seen_notifications_';
+const FILE_PROTOCOL_API_BASE = 'https://webwebweb-production.up.railway.app';
+
+function createDefaultRpgState() {
+    return {
+        level: 1,
+        xp: 0,
+        hp: 100,
+        potions: 0,
+        stats: {
+            strength: 1,
+            agility: 1,
+            vitality: 1,
+            spirit: 1
+        },
+        weaponLevel: 0,
+        armorLevel: 0,
+        monstersDefeated: 0,
+        deaths: 0,
+        battleLog: []
+    };
+}
+
+function sanitizeBattleLog(logs) {
+    if (!Array.isArray(logs)) return [];
+    return logs
+        .filter((entry) => entry && typeof entry === 'object')
+        .slice(-8)
+        .map((entry) => ({
+            message: String(entry.message || ''),
+            type: String(entry.type || 'info'),
+            createdAt: entry.createdAt || new Date().toISOString()
+        }));
+}
+
+function normalizeRpgState(value) {
+    const base = createDefaultRpgState();
+    const rawStats = value && typeof value === 'object' ? value.stats || {} : {};
+    const stats = {
+        strength: Math.max(1, Number(rawStats.strength || base.stats.strength)),
+        agility: Math.max(1, Number(rawStats.agility || base.stats.agility)),
+        vitality: Math.max(1, Number(rawStats.vitality || base.stats.vitality)),
+        spirit: Math.max(1, Number(rawStats.spirit || base.stats.spirit))
+    };
+    const maxHp = 100 + (stats.vitality - 1) * 18 + Number((value && value.armorLevel) || 0) * 8;
+
+    return {
+        level: Math.max(1, Number(value && value.level != null ? value.level : base.level)),
+        xp: Math.max(0, Number(value && value.xp != null ? value.xp : base.xp)),
+        hp: Math.max(0, Math.min(maxHp, Number(value && value.hp != null ? value.hp : base.hp))),
+        potions: Math.max(0, Number(value && value.potions != null ? value.potions : base.potions)),
+        stats,
+        weaponLevel: Math.max(0, Number(value && value.weaponLevel != null ? value.weaponLevel : base.weaponLevel)),
+        armorLevel: Math.max(0, Number(value && value.armorLevel != null ? value.armorLevel : base.armorLevel)),
+        monstersDefeated: Math.max(0, Number(value && value.monstersDefeated != null ? value.monstersDefeated : base.monstersDefeated)),
+        deaths: Math.max(0, Number(value && value.deaths != null ? value.deaths : base.deaths)),
+        battleLog: sanitizeBattleLog(value && value.battleLog)
+    };
+}
+
+function getRpgMaxHp(rpg) {
+    return 100 + (Number(rpg.stats.vitality || 1) - 1) * 18 + Number(rpg.armorLevel || 0) * 8;
+}
+
+function getRpgAttackPower(rpg) {
+    return 8 + Number(rpg.stats.strength || 1) * 4 + Number(rpg.weaponLevel || 0) * 3;
+}
+
+function getRpgDefensePower(rpg) {
+    return 3 + Number(rpg.stats.vitality || 1) * 2 + Number(rpg.armorLevel || 0) * 3 + Number(rpg.stats.agility || 1);
+}
+
+function getRpgDodgeRate(rpg) {
+    return Math.min(0.28, 0.04 + Number(rpg.stats.agility || 1) * 0.018);
+}
+
+function getRpgNextLevelXp(rpg) {
+    return 30 + (Number(rpg.level || 1) - 1) * 22;
+}
+
+function pushRpgBattleLog(rpg, message, type) {
+    const nextLog = {
+        message,
+        type: type || 'info',
+        createdAt: new Date().toISOString()
+    };
+    rpg.battleLog = [...sanitizeBattleLog(rpg.battleLog), nextLog].slice(-8);
+}
+
+function finalizeRpgLevel(rpg) {
+    let leveledUp = 0;
+    let requiredXp = getRpgNextLevelXp(rpg);
+
+    while (rpg.xp >= requiredXp) {
+        rpg.xp -= requiredXp;
+        rpg.level += 1;
+        leveledUp += 1;
+        requiredXp = getRpgNextLevelXp(rpg);
+        pushRpgBattleLog(rpg, `레벨이 ${rpg.level}로 올랐습니다.`, 'level');
+    }
+
+    const maxHp = getRpgMaxHp(rpg);
+    rpg.hp = Math.min(maxHp, rpg.hp + leveledUp * 10);
+    return leveledUp;
+}
+
+function updateCurrentUserWithRpg(mutator, eventName) {
+    const record = getCurrentUserRecord();
+    if (!record) return { ok: false, message: '로그인이 필요합니다.' };
+
+    const { key, user, users } = record;
+    const currentRpg = normalizeRpgState(user.rpg);
+    const result = mutator({
+        key,
+        user,
+        users,
+        rpg: currentRpg
+    });
+
+    if (!result || result.ok === false) {
+        return result || { ok: false, message: '처리에 실패했습니다.' };
+    }
+
+    users[key] = {
+        ...user,
+        ...result.userPatch,
+        rpg: normalizeRpgState(result.rpg || currentRpg)
+    };
+
+    localStorage.setItem('users_db', JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent(eventName || 'rpg:updated', {
+        detail: {
+            userId: key,
+            points: Number(users[key].points || 0),
+            rpg: users[key].rpg,
+            ...(result.eventDetail || {})
+        }
+    }));
+
+    return {
+        ...result,
+        ok: true,
+        profile: getCurrentUserProfile()
+    };
+}
 
 function getNotificationsDb() {
     try {
@@ -18,7 +176,7 @@ function getNotificationsDb() {
 }
 
 function getAuthApiBase() {
-    return window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
+    return window.location.protocol === 'file:' ? FILE_PROTOCOL_API_BASE : '';
 }
 
 function resolveProfileImageUrl(value) {
@@ -335,7 +493,8 @@ function getUsersDb() {
             activeTitleId: users[key].activeTitleId || '',
             profileImage: users[key].profileImage || '',
             profileFocusX: normalizeProfileFocusValue(users[key].profileFocusX),
-            profileFocusY: normalizeProfileFocusValue(users[key].profileFocusY)
+            profileFocusY: normalizeProfileFocusValue(users[key].profileFocusY),
+            rpg: normalizeRpgState(users[key].rpg)
         };
     });
 
@@ -371,6 +530,37 @@ function getCurrentUserRecord() {
     };
 }
 
+function getRpgProfileFromState(rpgState) {
+    const rpg = normalizeRpgState(rpgState);
+    const maxHp = getRpgMaxHp(rpg);
+    const attack = getRpgAttackPower(rpg);
+    const defense = getRpgDefensePower(rpg);
+    const nextLevelXp = getRpgNextLevelXp(rpg);
+
+    return {
+        level: rpg.level,
+        xp: rpg.xp,
+        nextLevelXp,
+        hp: Math.min(maxHp, rpg.hp),
+        maxHp,
+        potions: rpg.potions,
+        weaponLevel: rpg.weaponLevel,
+        armorLevel: rpg.armorLevel,
+        monstersDefeated: rpg.monstersDefeated,
+        deaths: rpg.deaths,
+        attack,
+        defense,
+        dodgeRate: getRpgDodgeRate(rpg),
+        stats: { ...rpg.stats },
+        battleLog: sanitizeBattleLog(rpg.battleLog),
+        monsters: RPG_MONSTERS.map((monster) => ({
+            ...monster,
+            locked: attack < monster.requirement
+        })),
+        shopItems: RPG_SHOP_ITEMS.map((item) => ({ ...item }))
+    };
+}
+
 function getCurrentUserProfile() {
     const record = getCurrentUserRecord();
     if (!record) return null;
@@ -390,7 +580,8 @@ function getCurrentUserProfile() {
         activeTitle: activeTitle ? activeTitle.title : '',
         profileImage: user.profileImage || '',
         profileFocusX: normalizeProfileFocusValue(user.profileFocusX),
-        profileFocusY: normalizeProfileFocusValue(user.profileFocusY)
+        profileFocusY: normalizeProfileFocusValue(user.profileFocusY),
+        rpg: getRpgProfileFromState(user.rpg)
     };
 }
 
@@ -582,6 +773,198 @@ function unequipStoreItem() {
     };
 }
 
+function getRpgProfile() {
+    const record = getCurrentUserRecord();
+    if (!record) return null;
+    return getRpgProfileFromState(record.user.rpg);
+}
+
+function huntRpgMonster(monsterId) {
+    return updateCurrentUserWithRpg(({ user, rpg }) => {
+        const monster = RPG_MONSTERS.find((entry) => entry.id === monsterId);
+        if (!monster) return { ok: false, message: '존재하지 않는 몬스터입니다.' };
+
+        const attack = getRpgAttackPower(rpg);
+        if (attack < monster.requirement) {
+            return { ok: false, message: '전투력이 부족합니다. 먼저 강화해 보세요.' };
+        }
+
+        const dodgeRate = getRpgDodgeRate(rpg);
+        const rawDamage = monster.damage[0] + Math.floor(Math.random() * (monster.damage[1] - monster.damage[0] + 1));
+        const mitigatedDamage = Math.max(0, rawDamage - Math.floor(getRpgDefensePower(rpg) / 4));
+        const dodged = Math.random() < dodgeRate;
+        const damageTaken = dodged ? 0 : mitigatedDamage;
+        const reward = monster.reward[0] + Math.floor(Math.random() * (monster.reward[1] - monster.reward[0] + 1));
+
+        rpg.hp = Math.max(0, rpg.hp - damageTaken);
+
+        if (rpg.hp <= 0) {
+            const lostPoints = Math.min(Number(user.points || 0), Math.max(3, Math.floor(Number(user.points || 0) * 0.15)));
+            rpg.deaths += 1;
+            rpg.hp = Math.max(45, Math.floor(getRpgMaxHp(rpg) * 0.45));
+            pushRpgBattleLog(rpg, `${monster.name}에게 쓰러져 ${lostPoints}pt를 잃었습니다.`, 'danger');
+            return {
+                ok: true,
+                rpg,
+                userPatch: {
+                    points: Math.max(0, Number(user.points || 0) - lostPoints)
+                },
+                eventDetail: {
+                    action: 'death',
+                    lostPoints
+                },
+                message: `전투에서 패배했습니다. ${lostPoints}pt를 잃고 마을로 돌아왔습니다.`
+            };
+        }
+
+        rpg.monstersDefeated += 1;
+        rpg.xp += monster.xp;
+        const leveledUp = finalizeRpgLevel(rpg);
+        pushRpgBattleLog(
+            rpg,
+            `${monster.name} 처치: +${reward}pt, 피해 ${damageTaken}, 경험치 +${monster.xp}`,
+            'success'
+        );
+
+        return {
+            ok: true,
+            rpg,
+            userPatch: {
+                points: Number(user.points || 0) + reward
+            },
+            eventDetail: {
+                action: 'hunt',
+                monsterId,
+                reward,
+                damageTaken,
+                leveledUp
+            },
+            message: `${monster.name} 처치 성공. ${reward}pt를 획득했습니다.`
+        };
+    }, 'rpg:updated');
+}
+
+function upgradeRpgStat(statKey) {
+    return updateCurrentUserWithRpg(({ user, rpg }) => {
+        if (!Object.prototype.hasOwnProperty.call(RPG_STAT_LABELS, statKey)) {
+            return { ok: false, message: '강화할 수 없는 능력치입니다.' };
+        }
+
+        const currentValue = Number(rpg.stats[statKey] || 1);
+        const cost = 8 + (currentValue - 1) * 5;
+        if (Number(user.points || 0) < cost) {
+            return { ok: false, message: `${cost}pt가 필요합니다.` };
+        }
+
+        rpg.stats[statKey] = currentValue + 1;
+        if (statKey === 'vitality') {
+            rpg.hp = Math.min(getRpgMaxHp(rpg), rpg.hp + 18);
+        }
+        pushRpgBattleLog(rpg, `${RPG_STAT_LABELS[statKey]} 강화에 성공했습니다.`, 'info');
+
+        return {
+            ok: true,
+            rpg,
+            userPatch: {
+                points: Number(user.points || 0) - cost
+            },
+            eventDetail: {
+                action: 'upgrade',
+                statKey,
+                cost
+            },
+            message: `${RPG_STAT_LABELS[statKey]}이(가) 강화되었습니다.`
+        };
+    }, 'rpg:updated');
+}
+
+function buyRpgShopItem(itemId) {
+    return updateCurrentUserWithRpg(({ user, rpg }) => {
+        const item = RPG_SHOP_ITEMS.find((entry) => entry.id === itemId);
+        if (!item) return { ok: false, message: '존재하지 않는 아이템입니다.' };
+        if (Number(user.points || 0) < item.cost) {
+            return { ok: false, message: `${item.cost}pt가 필요합니다.` };
+        }
+
+        if (item.id === 'potion') {
+            rpg.potions += 1;
+        }
+        pushRpgBattleLog(rpg, `${item.name}을(를) 구매했습니다.`, 'info');
+
+        return {
+            ok: true,
+            rpg,
+            userPatch: {
+                points: Number(user.points || 0) - item.cost
+            },
+            eventDetail: {
+                action: 'shop',
+                itemId
+            },
+            message: `${item.name} 구매 완료.`
+        };
+    }, 'rpg:updated');
+}
+
+function useRpgPotion() {
+    return updateCurrentUserWithRpg(({ rpg }) => {
+        if (rpg.potions <= 0) {
+            return { ok: false, message: '보유한 회복약이 없습니다.' };
+        }
+
+        const maxHp = getRpgMaxHp(rpg);
+        if (rpg.hp >= maxHp) {
+            return { ok: false, message: '이미 HP가 가득합니다.' };
+        }
+
+        const potion = RPG_SHOP_ITEMS.find((item) => item.id === 'potion');
+        const healAmount = potion ? potion.heal : 35;
+        const beforeHp = rpg.hp;
+        rpg.potions -= 1;
+        rpg.hp = Math.min(maxHp, rpg.hp + healAmount);
+        pushRpgBattleLog(rpg, `회복약을 사용해 HP를 ${rpg.hp - beforeHp} 회복했습니다.`, 'success');
+
+        return {
+            ok: true,
+            rpg,
+            userPatch: {},
+            eventDetail: {
+                action: 'use-potion'
+            },
+            message: '회복약을 사용했습니다.'
+        };
+    }, 'rpg:updated');
+}
+
+function restRpgAtCamp() {
+    return updateCurrentUserWithRpg(({ user, rpg }) => {
+        const maxHp = getRpgMaxHp(rpg);
+        if (rpg.hp >= maxHp) {
+            return { ok: false, message: '이미 충분히 쉬었습니다.' };
+        }
+
+        const cost = 4;
+        if (Number(user.points || 0) < cost) {
+            return { ok: false, message: `${cost}pt가 필요합니다.` };
+        }
+
+        rpg.hp = maxHp;
+        pushRpgBattleLog(rpg, '마을에서 휴식하며 HP를 모두 회복했습니다.', 'info');
+
+        return {
+            ok: true,
+            rpg,
+            userPatch: {
+                points: Number(user.points || 0) - cost
+            },
+            eventDetail: {
+                action: 'rest'
+            },
+            message: '휴식을 마쳤습니다.'
+        };
+    }, 'rpg:updated');
+}
+
 function getInviteCodes() {
     try {
         const codes = JSON.parse(localStorage.getItem('invite_codes') || 'null');
@@ -662,7 +1045,8 @@ function handleSignup(id, pw, code) {
         attendanceStreak: 0,
         maxAttendanceStreak: 0,
         unlockedTitles: [],
-        activeTitleId: ''
+        activeTitleId: '',
+        rpg: createDefaultRpgState()
     };
 
     localStorage.setItem('users_db', JSON.stringify(users));
@@ -841,6 +1225,12 @@ window.purchaseStoreItem = purchaseStoreItem;
 window.equipStoreItem = equipStoreItem;
 window.unequipStoreItem = unequipStoreItem;
 window.getCommunityRanking = getCommunityRanking;
+window.getRpgProfile = getRpgProfile;
+window.huntRpgMonster = huntRpgMonster;
+window.upgradeRpgStat = upgradeRpgStat;
+window.buyRpgShopItem = buyRpgShopItem;
+window.useRpgPotion = useRpgPotion;
+window.restRpgAtCamp = restRpgAtCamp;
 window.getUserNotifications = getUserNotifications;
 window.getUnreadNotificationCount = getUnreadNotificationCount;
 window.createUserNotification = createUserNotification;
