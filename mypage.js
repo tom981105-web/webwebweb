@@ -1,11 +1,54 @@
 ﻿// mypage.js
 (function () {
+    function escapeHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     function getUsersDb() {
         try {
             return JSON.parse(localStorage.getItem('users_db') || '{}');
         } catch (error) {
             return {};
         }
+    }
+
+    function formatNotificationTime(value) {
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return '';
+        return date.toLocaleString('ko-KR');
+    }
+
+    function renderNotifications() {
+        const list = document.getElementById('notificationList');
+        if (!list || typeof window.getUserNotifications !== 'function') return;
+
+        const notifications = window.getUserNotifications();
+        if (!notifications.length) {
+            list.innerHTML = '<div class="notification-empty">아직 도착한 알림이 없습니다.</div>';
+            return;
+        }
+
+        list.innerHTML = notifications.map((item) => `
+            <article class="notification-item${item.read ? '' : ' unread'}">
+                <div class="notification-copy">
+                    <div class="notification-head">
+                        <strong>${escapeHtml(item.title)}</strong>
+                        ${item.read ? '' : '<span class="notification-badge">새 알림</span>'}
+                    </div>
+                    <div class="notification-message">${escapeHtml(item.message)}</div>
+                    <span class="notification-time">${escapeHtml(formatNotificationTime(item.createdAt))}</span>
+                </div>
+                <div class="notification-actions">
+                    ${item.link ? `<button class="btn-save btn-notification-muted" type="button" onclick="openNotificationLink('${escapeHtml(item.id)}', '${escapeHtml(item.link)}')">바로 보기</button>` : ''}
+                    ${item.read ? '' : `<button class="btn-save" type="button" onclick="readNotification('${escapeHtml(item.id)}')">읽음 처리</button>`}
+                </div>
+            </article>
+        `).join('');
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -19,6 +62,16 @@
         const userData = users[currentUser];
         if (userData && userData.nickname) {
             document.getElementById('nicknameInput').value = userData.nickname;
+        }
+
+        renderNotifications();
+        window.addEventListener('notifications:updated', renderNotifications);
+
+        if (window.location.hash === '#notifications') {
+            setTimeout(() => {
+                const target = document.getElementById('notifications');
+                if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 120);
         }
     });
 
@@ -81,5 +134,28 @@
         localStorage.setItem('users_db', JSON.stringify(users));
         alert('비밀번호가 변경되었습니다. 다시 로그인해 주세요.');
         logout();
+    };
+
+    window.readNotification = function (notificationId) {
+        if (typeof window.markNotificationRead === 'function') {
+            window.markNotificationRead(notificationId);
+            renderNotifications();
+        }
+    };
+
+    window.markAllMyNotificationsRead = function () {
+        if (typeof window.markAllNotificationsRead === 'function') {
+            window.markAllNotificationsRead();
+            renderNotifications();
+        }
+    };
+
+    window.openNotificationLink = function (notificationId, link) {
+        if (typeof window.markNotificationRead === 'function') {
+            window.markNotificationRead(notificationId);
+        }
+        if (link) {
+            window.location.href = link;
+        }
     };
 })();

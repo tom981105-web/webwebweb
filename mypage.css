@@ -190,6 +190,127 @@ body {
     margin-top: 18px;
 }
 
+.mypage-notifications {
+    margin-top: 18px;
+    padding: 28px;
+    border-radius: 30px;
+    background: rgba(248, 242, 233, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.64);
+    box-shadow: var(--mypage-shadow);
+    backdrop-filter: blur(16px);
+    animation: mypageFadeUp 0.95s ease both;
+}
+
+.mypage-notification-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 18px;
+}
+
+.mypage-notification-actions .btn-save {
+    width: auto;
+    min-width: 180px;
+    padding: 0 22px;
+}
+
+.notification-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.notification-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 18px 20px;
+    border-radius: 22px;
+    border: 1px solid rgba(109, 64, 38, 0.1);
+    background: rgba(255, 255, 255, 0.76);
+}
+
+.notification-item.unread {
+    border-color: rgba(198, 115, 67, 0.24);
+    box-shadow: 0 14px 28px rgba(166, 84, 47, 0.08);
+}
+
+.notification-copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.notification-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.notification-head strong {
+    color: #2f1f18;
+    font-size: 1rem;
+}
+
+.notification-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(198, 115, 67, 0.12);
+    color: #9f4f2e;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.notification-message {
+    margin-top: 10px;
+    color: rgba(47, 31, 24, 0.72);
+    line-height: 1.68;
+}
+
+.notification-time {
+    display: block;
+    margin-top: 10px;
+    color: rgba(47, 31, 24, 0.52);
+    font-size: 0.88rem;
+}
+
+.notification-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.notification-actions .btn-save {
+    width: auto;
+    min-width: 120px;
+    min-height: 46px;
+    padding: 0 18px;
+}
+
+.btn-notification-muted {
+    background: rgba(109, 64, 38, 0.08);
+    color: #6d4026;
+    box-shadow: none;
+}
+
+.btn-notification-muted:hover {
+    box-shadow: none;
+}
+
+.notification-empty {
+    padding: 34px 20px;
+    text-align: center;
+    color: rgba(47, 31, 24, 0.54);
+    border-radius: 22px;
+    border: 1px dashed rgba(109, 64, 38, 0.16);
+    background: rgba(255, 255, 255, 0.5);
+}
+
 .mypage-card {
     padding: 28px;
     border-radius: 30px;
@@ -345,7 +466,8 @@ body {
     }
 
     .mypage-intro,
-    .mypage-card {
+    .mypage-card,
+    .mypage-notifications {
         padding: 22px 18px;
     }
 
@@ -356,5 +478,19 @@ body {
 
     .mypage-hero-utility {
         justify-content: flex-start;
+    }
+
+    .notification-item {
+        flex-direction: column;
+    }
+
+    .mypage-notification-actions,
+    .notification-actions {
+        justify-content: stretch;
+    }
+
+    .mypage-notification-actions .btn-save,
+    .notification-actions .btn-save {
+        width: 100%;
     }
 }

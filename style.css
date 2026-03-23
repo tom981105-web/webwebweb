@@ -149,6 +149,34 @@ a {
     transform: translateY(-1px);
 }
 
+.hero-notice-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 244, 230, 0.18);
+    color: rgba(255, 244, 230, 0.92);
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.hero-notice-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    height: 22px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: #f2b46f;
+    color: #4d2514;
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
 .hero-user {
     color: rgba(255, 245, 233, 0.92);
     font-size: 0.94rem;

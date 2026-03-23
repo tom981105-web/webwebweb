@@ -78,6 +78,21 @@
                     <button class="btn-save btn-save-accent" onclick="updatePassword()">비밀번호 변경</button>
                 </article>
             </section>
+            <section class="mypage-notifications" id="notifications">
+                <div class="card-header">
+                    <span class="card-kicker">Notifications</span>
+                    <h2>알림함</h2>
+                    <p>승인 상태 변경, 게시글 댓글, 관리자 답글처럼 바로 확인해야 하는 소식을 한곳에서 봅니다.</p>
+                </div>
+
+                <div class="mypage-notification-actions">
+                    <button class="btn-save" type="button" onclick="markAllMyNotificationsRead()">전체 읽음 처리</button>
+                </div>
+
+                <div id="notificationList" class="notification-list">
+                    <div class="notification-empty">아직 도착한 알림이 없습니다.</div>
+                </div>
+            </section>
         </main>
     </div>
 

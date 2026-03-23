@@ -5,6 +5,104 @@ const POINT_STORE_ITEMS = [
     { id: 'sunrise_hiker', title: '새벽 등반가', cost: 20, description: '꾸준히 모은 포인트로 열 수 있는 칭호입니다.' },
     { id: 'campfire_host', title: '캠프파이어 호스트', cost: 35, description: '커뮤니티 활동이 눈에 띄는 멤버를 위한 칭호입니다.' }
 ];
+const NOTIFICATION_STORAGE_KEY = 'user_notifications';
+
+function getNotificationsDb() {
+    try {
+        const notifications = JSON.parse(localStorage.getItem(NOTIFICATION_STORAGE_KEY) || '{}');
+        return notifications && typeof notifications === 'object' ? notifications : {};
+    } catch (error) {
+        return {};
+    }
+}
+
+function saveNotificationsDb(notifications) {
+    localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
+}
+
+function resolveUserKeyCaseInsensitive(targetUserId) {
+    const target = String(targetUserId || '').trim();
+    if (!target) return '';
+    const users = getUsersDb();
+    return Object.keys(users).find((key) => key.toLowerCase() === target.toLowerCase()) || target;
+}
+
+function getUserNotifications(userId) {
+    const targetUserId = resolveUserKeyCaseInsensitive(userId || localStorage.getItem('current_user'));
+    if (!targetUserId) return [];
+    const notifications = getNotificationsDb();
+    const list = Array.isArray(notifications[targetUserId]) ? notifications[targetUserId] : [];
+    return [...list].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+function getUnreadNotificationCount(userId) {
+    return getUserNotifications(userId).filter((item) => !item.read).length;
+}
+
+function dispatchNotificationUpdate(userId) {
+    window.dispatchEvent(new CustomEvent('notifications:updated', {
+        detail: {
+            userId: userId || localStorage.getItem('current_user') || '',
+            unreadCount: getUnreadNotificationCount(userId)
+        }
+    }));
+}
+
+function createUserNotification(userId, payload) {
+    const targetUserId = resolveUserKeyCaseInsensitive(userId);
+    if (!targetUserId) return null;
+
+    const notifications = getNotificationsDb();
+    const currentList = Array.isArray(notifications[targetUserId]) ? notifications[targetUserId] : [];
+    const nextNotification = {
+        id: `noti_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        type: payload && payload.type ? payload.type : 'general',
+        title: payload && payload.title ? payload.title : '새 알림',
+        message: payload && payload.message ? payload.message : '',
+        link: payload && payload.link ? payload.link : '',
+        read: false,
+        createdAt: new Date().toISOString()
+    };
+
+    notifications[targetUserId] = [nextNotification, ...currentList].slice(0, 40);
+    saveNotificationsDb(notifications);
+    dispatchNotificationUpdate(targetUserId);
+    return nextNotification;
+}
+
+function markNotificationRead(notificationId) {
+    const currentUser = localStorage.getItem('current_user');
+    const userKey = resolveUserKeyCaseInsensitive(currentUser);
+    if (!userKey || !notificationId) return false;
+
+    const notifications = getNotificationsDb();
+    const currentList = Array.isArray(notifications[userKey]) ? notifications[userKey] : [];
+    let updated = false;
+
+    notifications[userKey] = currentList.map((item) => {
+        if (item.id !== notificationId) return item;
+        updated = true;
+        return { ...item, read: true };
+    });
+
+    if (!updated) return false;
+    saveNotificationsDb(notifications);
+    dispatchNotificationUpdate(userKey);
+    return true;
+}
+
+function markAllNotificationsRead() {
+    const currentUser = localStorage.getItem('current_user');
+    const userKey = resolveUserKeyCaseInsensitive(currentUser);
+    if (!userKey) return false;
+
+    const notifications = getNotificationsDb();
+    const currentList = Array.isArray(notifications[userKey]) ? notifications[userKey] : [];
+    notifications[userKey] = currentList.map((item) => ({ ...item, read: true }));
+    saveNotificationsDb(notifications);
+    dispatchNotificationUpdate(userKey);
+    return true;
+}
 
 function getUsersDb() {
     let users = {};
@@ -359,6 +457,12 @@ function handleSignup(id, pw, code) {
     };
 
     localStorage.setItem('users_db', JSON.stringify(users));
+    createUserNotification('admin', {
+        type: 'signup',
+        title: '새 회원 가입 신청',
+        message: `${id}님이 가입했고 관리자 승인을 기다리고 있습니다.`,
+        link: 'admin.html'
+    });
 
     if (!reuseCodes) {
         validCodes.splice(codeIndex, 1);
@@ -408,6 +512,8 @@ function injectLogoutButton() {
         const points = Number(userObj.points || 0);
         const activeTitle = POINT_STORE_ITEMS.find((item) => item.id === userObj.activeTitleId);
         const activeTitleHtml = activeTitle ? `<span class="hero-title-badge">${activeTitle.title}</span>` : '';
+        const unreadCount = getUnreadNotificationCount(userKey || currentUser);
+        const notificationHtml = `<a href="mypage.html#notifications" class="hero-notice-link">알림${unreadCount > 0 ? `<span class="hero-notice-badge">${unreadCount}</span>` : ''}</a>`;
         const isBoardPage = pathname.includes('board.html');
         const isAiPage = pathname.includes('ai.html');
         const isMountainPage = pathname.includes('mountain.html');
@@ -459,6 +565,7 @@ function injectLogoutButton() {
             heroUtilityNav.innerHTML = `
                 <a href="patch-notes.html" class="hero-link">패치 노트</a>
                 ${accountLinkHtml}
+                ${notificationHtml}
                 ${activeTitleHtml}
                 <a href="points.html" class="hero-points">${points}pt</a>
                 <span class="hero-user">${displayName}님</span>
@@ -497,6 +604,7 @@ function injectLogoutButton() {
 
         userDiv.innerHTML = `
             ${myPageBtnHtml}
+            <a href="mypage.html#notifications" style="color:#f8efe4; font-size:0.88rem; margin-right:12px; font-weight:700; text-decoration:none; padding:6px 12px; border:1px solid rgba(255,255,255,0.2); border-radius:999px; background:rgba(255,255,255,0.08);">알림${unreadCount > 0 ? ` ${unreadCount}` : ''}</a>
             <a href="points.html" style="color:#fde68a; font-size:0.88rem; margin-right:12px; font-weight:700; text-decoration:none; padding:6px 12px; border:1px solid rgba(253,230,138,0.34); border-radius:999px; background:rgba(253,230,138,0.08);">${points}pt</a>
             <span style="color:#e2e8f0; font-size:0.95rem; margin-right:15px; font-weight:500;">${displayName}님</span>
             <button onclick="logout()" style="background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); padding:6px 16px; border-radius:8px; cursor:pointer; font-weight:600; font-family:inherit; transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.25)'" onmouseout="this.style.background='rgba(239,68,68,0.15)'">로그아웃</button>
@@ -519,7 +627,13 @@ window.purchaseStoreItem = purchaseStoreItem;
 window.equipStoreItem = equipStoreItem;
 window.unequipStoreItem = unequipStoreItem;
 window.getCommunityRanking = getCommunityRanking;
+window.getUserNotifications = getUserNotifications;
+window.getUnreadNotificationCount = getUnreadNotificationCount;
+window.createUserNotification = createUserNotification;
+window.markNotificationRead = markNotificationRead;
+window.markAllNotificationsRead = markAllNotificationsRead;
 
 if (!window.location.pathname.endsWith('login.html')) {
     document.addEventListener('DOMContentLoaded', injectLogoutButton);
+    window.addEventListener('notifications:updated', injectLogoutButton);
 }

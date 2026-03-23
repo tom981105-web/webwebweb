@@ -693,6 +693,15 @@
             date: new Date().toLocaleString('ko-KR')
         };
 
+        if (typeof window.createUserNotification === 'function' && post.comments[index].author && post.comments[index].author !== currentUser) {
+            window.createUserNotification(post.comments[index].author, {
+                type: 'reply',
+                title: '관리자 답글이 도착했습니다.',
+                message: `"${post.title || '게시글'}" 댓글에 관리자 답글이 등록되었습니다.`,
+                link: `board.html?id=${post.id}`
+            });
+        }
+
         savePosts();
         renderComments(post);
         renderBoard(currentSearchType, currentSearchQuery);
@@ -824,6 +833,14 @@
         if (!post) return;
         post.comments = Array.isArray(post.comments) ? post.comments : [];
         post.comments.push({ author: currentUser, text, date: new Date().toLocaleString('ko-KR') });
+        if (typeof window.createUserNotification === 'function' && post.author && post.author !== currentUser) {
+            window.createUserNotification(post.author, {
+                type: 'comment',
+                title: '내 글에 새 댓글이 달렸습니다.',
+                message: `"${post.title || '게시글'}"에 ${getAuthorDisplayName(currentUser)}님이 댓글을 남겼습니다.`,
+                link: `board.html?id=${post.id}`
+            });
+        }
         savePosts();
         renderComments(post);
         input.value = '';
