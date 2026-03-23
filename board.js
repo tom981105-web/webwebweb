@@ -128,14 +128,223 @@
         });
     }
 
-    function escapeHtml(value) {
-        return String(value || '')
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+const COMMENT_STICKERS = [
+    { id: 'basic-1-smile', label: '미소', emoji: '🙂', group: 'basic-1' },
+    { id: 'basic-1-happy', label: '해맑음', emoji: '😄', group: 'basic-1' },
+    { id: 'basic-1-blush', label: '방긋', emoji: '😊', group: 'basic-1' },
+    { id: 'basic-1-kiss', label: '쪽', emoji: '😘', group: 'basic-1' },
+    { id: 'basic-1-love', label: '하트눈', emoji: '😍', group: 'basic-1' },
+    { id: 'basic-1-soft', label: '수줍', emoji: '☺️', group: 'basic-1' },
+    { id: 'basic-1-wink', label: '윙크', emoji: '😉', group: 'basic-1' },
+    { id: 'basic-1-tongue', label: '메롱', emoji: '😛', group: 'basic-1' },
+    { id: 'basic-1-lol', label: '빵터짐', emoji: '😂', group: 'basic-1' },
+    { id: 'basic-1-cool', label: '쿨', emoji: '😎', group: 'basic-1' },
+    { id: 'basic-1-dizzy', label: '멍', emoji: '😵', group: 'basic-1' },
+    { id: 'basic-1-sick', label: '울렁', emoji: '🤢', group: 'basic-1' },
+    { id: 'basic-1-gasp', label: '헉', emoji: '😮', group: 'basic-1' },
+    { id: 'basic-1-worried', label: '걱정', emoji: '😟', group: 'basic-1' },
+    { id: 'basic-1-shock', label: '충격', emoji: '😳', group: 'basic-1' },
+    { id: 'basic-1-sad', label: '시무룩', emoji: '☹️', group: 'basic-1' },
+    { id: 'basic-1-angry', label: '화남', emoji: '😠', group: 'basic-1' },
+    { id: 'basic-1-hurt', label: '다침', emoji: '🤕', group: 'basic-1' },
+    { id: 'basic-1-blue', label: '우울', emoji: '😞', group: 'basic-1' },
+    { id: 'basic-1-cry', label: '엉엉', emoji: '😭', group: 'basic-1' }
+];
+
+const COMMENT_STICKER_TABS = [
+    { id: 'recent', label: '최근사용', icon: '🕘' },
+    { id: 'basic-1', label: '기본-1', icon: '🙂' }
+];
+
+const COMMENT_STICKER_RECENT_KEY = 'comment_recent_stickers';
+
+function getStickerToken(id) {
+    return `[[sticker:${id}]]`;
+}
+
+function getStickerDefinition(id) {
+    return COMMENT_STICKERS.find((item) => item.id === id) || null;
+}
+
+function getRecentStickerIds() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(COMMENT_STICKER_RECENT_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed.filter((id) => getStickerDefinition(id)) : [];
+    } catch (error) {
+        return [];
     }
+}
+
+function pushRecentSticker(stickerId) {
+    const nextRecent = [stickerId, ...getRecentStickerIds().filter((id) => id !== stickerId)].slice(0, 12);
+    localStorage.setItem(COMMENT_STICKER_RECENT_KEY, JSON.stringify(nextRecent));
+}
+
+function getStickerListByTab(tabId) {
+    if (tabId === 'recent') {
+        return getRecentStickerIds().map((id) => getStickerDefinition(id)).filter(Boolean);
+    }
+    return COMMENT_STICKERS.filter((item) => item.group === tabId);
+}
+
+function getStickerAssetUrl(emoji) {
+    const codepoints = Array.from(emoji)
+        .map((char) => char.codePointAt(0).toString(16))
+        .filter((codepoint) => codepoint !== 'fe0f')
+        .join('-');
+    return `https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/${codepoints}.png`;
+}
+
+function renderStickerImage(id, sizeClass = '') {
+    const sticker = getStickerDefinition(id);
+    if (!sticker) return '';
+    const className = ['comment-sticker-image', sizeClass].filter(Boolean).join(' ');
+    return `<img class="${className}" src="${getStickerAssetUrl(sticker.emoji)}" alt="${escapeHtml(sticker.label)}" title="${escapeHtml(sticker.label)}" loading="lazy">`;
+}
+
+function renderCommentRichText(value) {
+    const text = String(value || '');
+    const escaped = escapeHtml(text);
+    return escaped
+        .replace(/\[\[sticker:([a-z0-9_-]+)\]\]/gi, (match, id) => renderStickerImage(id))
+        .replace(/\n/g, '<br>');
+}
+
+function renderStickerPanelBody(tabId) {
+    const stickers = getStickerListByTab(tabId);
+    const tabMeta = COMMENT_STICKER_TABS.find((item) => item.id === tabId) || COMMENT_STICKER_TABS[0];
+    if (!stickers.length) {
+        return `
+            <div class="comment-sticker-section-title">${escapeHtml(tabMeta.label)}</div>
+            <div class="comment-sticker-empty">아직 최근에 사용한 스티커가 없습니다.</div>
+        `;
+    }
+
+    return `
+        <div class="comment-sticker-section-title">${escapeHtml(tabMeta.label)}</div>
+        <div class="comment-sticker-grid">
+            ${stickers.map((sticker) => `
+                <button type="button" class="comment-sticker-option" data-sticker-id="${sticker.id}" title="${escapeHtml(sticker.label)}">
+                    ${renderStickerImage(sticker.id)}
+                </button>
+            `).join('')}
+        </div>
+    `;
+}
+
+function resetPendingCommentStickers() {
+    return;
+}
+
+function closeCommentStickerPanel() {
+    const panel = document.getElementById('commentStickerPanel');
+    const toggle = document.getElementById('commentStickerToggle');
+    if (!panel || !toggle) return;
+    panel.classList.remove('is-open');
+    toggle.classList.remove('is-active');
+    toggle.setAttribute('aria-expanded', 'false');
+}
+
+function openCommentStickerPanel() {
+    const panel = document.getElementById('commentStickerPanel');
+    const toggle = document.getElementById('commentStickerToggle');
+    if (!panel || !toggle) return;
+    panel.classList.add('is-open');
+    toggle.classList.add('is-active');
+    toggle.setAttribute('aria-expanded', 'true');
+}
+
+function setupCommentStickerPicker() {
+    const commentForm = document.getElementById('commentForm');
+    const commentInput = document.getElementById('commentInput');
+    if (!commentForm || !commentInput || document.getElementById('commentStickerToggle')) return;
+
+    commentForm.classList.add('comment-form-has-sticker');
+
+    const input = commentInput;
+    const submitButton = commentForm.querySelector('button[type="submit"]');
+    const stickerButton = document.createElement('button');
+    stickerButton.type = 'button';
+    stickerButton.id = 'commentStickerToggle';
+    stickerButton.className = 'comment-sticker-toggle';
+    stickerButton.setAttribute('aria-expanded', 'false');
+    stickerButton.setAttribute('aria-label', '스티커 선택');
+    stickerButton.innerHTML = '<span aria-hidden="true">😊</span>';
+
+    if (submitButton) {
+        commentForm.insertBefore(stickerButton, submitButton);
+    } else {
+        commentForm.appendChild(stickerButton);
+    }
+
+    const panel = document.createElement('div');
+    panel.id = 'commentStickerPanel';
+    panel.className = 'comment-sticker-panel';
+    panel.innerHTML = `
+        <div class="comment-sticker-tabs">
+            ${COMMENT_STICKER_TABS.map((tab, index) => `
+                <button type="button" class="comment-sticker-tab ${index === 0 ? 'is-active' : ''}" data-sticker-tab="${tab.id}" title="${escapeHtml(tab.label)}">
+                    <span>${tab.icon}</span>
+                </button>
+            `).join('')}
+        </div>
+        <div class="comment-sticker-body" id="commentStickerBody">
+            ${renderStickerPanelBody('basic-1')}
+        </div>
+    `;
+
+    commentForm.appendChild(panel);
+
+    stickerButton.addEventListener('click', () => {
+        if (panel.classList.contains('is-open')) {
+            closeCommentStickerPanel();
+        } else {
+            openCommentStickerPanel();
+        }
+    });
+    const panelBody = panel.querySelector('#commentStickerBody');
+
+    panel.addEventListener('click', (event) => {
+        const tabButton = event.target.closest('[data-sticker-tab]');
+        if (tabButton) {
+            const nextTab = tabButton.getAttribute('data-sticker-tab');
+            panel.querySelectorAll('[data-sticker-tab]').forEach((button) => {
+                button.classList.toggle('is-active', button === tabButton);
+            });
+            if (panelBody) panelBody.innerHTML = renderStickerPanelBody(nextTab);
+            return;
+        }
+
+        const option = event.target.closest('[data-sticker-id]');
+        if (!option) return;
+        const stickerId = option.getAttribute('data-sticker-id');
+        if (!getStickerDefinition(stickerId)) return;
+        pushRecentSticker(stickerId);
+        const token = getStickerToken(stickerId);
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? input.value.length;
+        input.value = `${input.value.slice(0, start)}${token}${input.value.slice(end)}`;
+        const nextCursor = start + token.length;
+        input.setSelectionRange(nextCursor, nextCursor);
+        closeCommentStickerPanel();
+        input.focus();
+    });
+
+    document.addEventListener('click', (event) => {
+        if (!commentForm.contains(event.target)) {
+            closeCommentStickerPanel();
+        }
+    });
+}
 
     function savePosts() {
         localStorage.setItem('board_posts', JSON.stringify(boardPosts));
@@ -155,6 +364,8 @@
             selectedEditorImage.style.boxShadow = '';
         }
         selectedEditorImage = null;
+        const resizeControls = document.getElementById('editorImageResizeControls');
+        if (resizeControls) resizeControls.style.display = 'none';
     }
 
     function selectEditorImage(img) {
@@ -162,6 +373,35 @@
         selectedEditorImage = img;
         selectedEditorImage.style.outline = '2px solid #60a5fa';
         selectedEditorImage.style.boxShadow = '0 0 0 4px rgba(96, 165, 250, 0.2)';
+        const resizeControls = document.getElementById('editorImageResizeControls');
+        if (resizeControls) resizeControls.style.display = 'inline-flex';
+    }
+
+    function adjustSelectedEditorImage(delta) {
+        if (!selectedEditorImage) return;
+        const editorWidth = document.getElementById('richEditor').clientWidth || 520;
+        const currentWidth = selectedEditorImage.getBoundingClientRect().width || 320;
+        const nextWidth = Math.max(140, Math.min(editorWidth, currentWidth + delta));
+        selectedEditorImage.style.width = `${nextWidth}px`;
+        selectedEditorImage.style.maxWidth = '100%';
+        selectedEditorImage.style.height = 'auto';
+    }
+
+    function ensureEditorImageControls() {
+        const toolbar = document.querySelector('.editor-toolbar');
+        if (!toolbar || document.getElementById('editorImageResizeControls')) return;
+        const controls = document.createElement('div');
+        controls.id = 'editorImageResizeControls';
+        controls.style.display = 'none';
+        controls.style.gap = '8px';
+        controls.style.alignItems = 'center';
+        controls.innerHTML = `
+            <button type="button" class="tool-btn" id="shrinkEditorImageBtn" title="이미지 줄이기">-</button>
+            <button type="button" class="tool-btn" id="growEditorImageBtn" title="이미지 키우기">+</button>
+        `;
+        toolbar.appendChild(controls);
+        document.getElementById('shrinkEditorImageBtn').onclick = () => adjustSelectedEditorImage(-60);
+        document.getElementById('growEditorImageBtn').onclick = () => adjustSelectedEditorImage(60);
     }
 
     function bindEditorImages() {
@@ -202,7 +442,7 @@
         const displayUrl = imageUrl.startsWith('/uploads/') && window.location.protocol === 'file:'
             ? `${getApiBase()}${imageUrl}`
             : imageUrl;
-        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 420px); height:auto; border-radius:8px; margin:15px 0; display:block;">`;
+        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 320px); height:auto; border-radius:8px; margin:15px 0; display:block;">`;
         document.execCommand('insertHTML', false, html);
         bindEditorImages();
     }
@@ -663,23 +903,35 @@
         }
         post.comments.forEach((comment, index) => {
             const authorChip = renderAuthorWithAvatar(comment.author);
-            const commentText = escapeHtml(comment.text || '');
+            const commentText = renderCommentRichText(comment.text || '');
             const commentDate = escapeHtml(comment.date || '');
             const hasReply = Boolean(comment.reply && comment.reply.text);
             const canReply = currentUser === 'admin' && !hasReply;
+            const canManageComment = currentUser === 'admin' || currentUser === comment.author;
+            const canManageReply = Boolean(comment.reply) && (currentUser === 'admin' || currentUser === comment.reply.author);
             const item = document.createElement('div');
             item.className = 'comment-item';
             item.innerHTML = `
                 <div class="comment-meta">
                     <div class="c-author">${authorChip}</div>
                     <div>${commentDate}</div>
-                    ${canReply ? `<button type="button" class="btn-reply" onclick="toggleReplyForm(${index})">답글 달기</button>` : ''}
+                    <div class="comment-action-group">
+                        ${canReply ? `<button type="button" class="btn-reply" onclick="toggleReplyForm(${index})">답글 달기</button>` : ''}
+                        ${canManageComment ? `<button type="button" class="btn-reply" onclick="toggleCommentEditForm(${index})">수정</button>` : ''}
+                        ${canManageComment ? `<button type="button" class="btn-reply" onclick="deleteComment(${index})">삭제</button>` : ''}
+                    </div>
                 </div>
                 <div class="comment-body">${commentText}</div>
                 ${canReply ? `
                     <form class="reply-form-container" id="replyForm-${index}" onsubmit="submitReply(event, ${index})">
                         <input type="text" id="replyInput-${index}" placeholder="관리자 답글을 입력해 주세요." autocomplete="off" maxlength="300">
                         <button type="submit">등록</button>
+                    </form>
+                ` : ''}
+                ${canManageComment ? `
+                    <form class="comment-edit-form" id="commentEditForm-${index}" onsubmit="submitCommentEdit(event, ${index})">
+                        <input type="text" id="commentEditInput-${index}" value="${escapeHtml(comment.text || '')}" autocomplete="off" maxlength="300">
+                        <button type="submit">저장</button>
                     </form>
                 ` : ''}
             `;
@@ -691,8 +943,18 @@
                     <div class="comment-meta">
                         <div class="c-author author-marker">${renderAuthorWithAvatar('admin')}</div>
                         <div>${escapeHtml(comment.reply.date || '')}</div>
+                        <div class="comment-action-group">
+                            ${canManageReply ? `<button type="button" class="btn-reply" onclick="toggleReplyEditForm(${index})">수정</button>` : ''}
+                            ${canManageReply ? `<button type="button" class="btn-reply" onclick="deleteReply(${index})">삭제</button>` : ''}
+                        </div>
                     </div>
-                    <div class="comment-body">${escapeHtml(comment.reply.text || '')}</div>
+                    <div class="comment-body">${renderCommentRichText(comment.reply.text || '')}</div>
+                    ${canManageReply ? `
+                        <form class="reply-edit-form" id="replyEditForm-${index}" onsubmit="submitReplyEdit(event, ${index})">
+                            <input type="text" id="replyEditInput-${index}" value="${escapeHtml(comment.reply.text || '')}" autocomplete="off" maxlength="300">
+                            <button type="submit">저장</button>
+                        </form>
+                    ` : ''}
                 `;
                 commentsList.appendChild(reply);
             }
@@ -712,6 +974,32 @@
         targetForm.style.display = targetForm.style.display === 'flex' ? 'none' : 'flex';
         if (targetForm.style.display === 'flex') {
             const input = document.getElementById(`replyInput-${index}`);
+            if (input) input.focus();
+        }
+    };
+
+    window.toggleCommentEditForm = function (index) {
+        const targetForm = document.getElementById(`commentEditForm-${index}`);
+        if (!targetForm) return;
+        document.querySelectorAll('.comment-edit-form').forEach((form) => {
+            if (form !== targetForm) form.style.display = 'none';
+        });
+        targetForm.style.display = targetForm.style.display === 'flex' ? 'none' : 'flex';
+        if (targetForm.style.display === 'flex') {
+            const input = document.getElementById(`commentEditInput-${index}`);
+            if (input) input.focus();
+        }
+    };
+
+    window.toggleReplyEditForm = function (index) {
+        const targetForm = document.getElementById(`replyEditForm-${index}`);
+        if (!targetForm) return;
+        document.querySelectorAll('.reply-edit-form').forEach((form) => {
+            if (form !== targetForm) form.style.display = 'none';
+        });
+        targetForm.style.display = targetForm.style.display === 'flex' ? 'none' : 'flex';
+        if (targetForm.style.display === 'flex') {
+            const input = document.getElementById(`replyEditInput-${index}`);
             if (input) input.focus();
         }
     };
@@ -748,6 +1036,67 @@
         updateDetailNavigation(post.id);
     };
 
+    window.submitCommentEdit = function (event, index) {
+        event.preventDefault();
+        if (!currentOpenPostId) return;
+        const post = boardPosts.find((item) => item.id === currentOpenPostId);
+        if (!post || !post.comments[index]) return;
+        const targetComment = post.comments[index];
+        if (currentUser !== 'admin' && currentUser !== targetComment.author) return;
+        const input = document.getElementById(`commentEditInput-${index}`);
+        const text = input ? input.value.trim() : '';
+        if (!text) return;
+        targetComment.text = text;
+        targetComment.editedAt = new Date().toLocaleString('ko-KR');
+        savePosts();
+        renderComments(post);
+        renderBoard(currentSearchType, currentSearchQuery);
+        updateDetailNavigation(post.id);
+    };
+
+    window.submitReplyEdit = function (event, index) {
+        event.preventDefault();
+        if (!currentOpenPostId) return;
+        const post = boardPosts.find((item) => item.id === currentOpenPostId);
+        if (!post || !post.comments[index] || !post.comments[index].reply) return;
+        if (currentUser !== 'admin' && currentUser !== post.comments[index].reply.author) return;
+        const input = document.getElementById(`replyEditInput-${index}`);
+        const text = input ? input.value.trim() : '';
+        if (!text) return;
+        post.comments[index].reply.text = text;
+        post.comments[index].reply.editedAt = new Date().toLocaleString('ko-KR');
+        savePosts();
+        renderComments(post);
+        renderBoard(currentSearchType, currentSearchQuery);
+        updateDetailNavigation(post.id);
+    };
+
+    window.deleteComment = function (index) {
+        if (!currentOpenPostId) return;
+        const post = boardPosts.find((item) => item.id === currentOpenPostId);
+        if (!post || !post.comments[index]) return;
+        if (currentUser !== 'admin' && currentUser !== post.comments[index].author) return;
+        if (!confirm('이 댓글을 삭제하시겠습니까?')) return;
+        post.comments.splice(index, 1);
+        savePosts();
+        renderComments(post);
+        renderBoard(currentSearchType, currentSearchQuery);
+        updateDetailNavigation(post.id);
+    };
+
+    window.deleteReply = function (index) {
+        if (!currentOpenPostId) return;
+        const post = boardPosts.find((item) => item.id === currentOpenPostId);
+        if (!post || !post.comments[index] || !post.comments[index].reply) return;
+        if (currentUser !== 'admin' && currentUser !== post.comments[index].reply.author) return;
+        if (!confirm('이 답글을 삭제하시겠습니까?')) return;
+        delete post.comments[index].reply;
+        savePosts();
+        renderComments(post);
+        renderBoard(currentSearchType, currentSearchQuery);
+        updateDetailNavigation(post.id);
+    };
+
     window.openPostDetail = function (id) {
         const post = boardPosts.find((item) => item.id === id);
         if (!post || !boardDetailView) return;
@@ -777,15 +1126,17 @@
         boardDetailView.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    window.closeDetailModal = function () {
-        if (boardListView) boardListView.classList.remove('is-hidden');
-        if (boardDetailView) {
-            boardDetailView.style.display = 'none';
-            boardDetailView.classList.remove('is-active');
-        }
-        currentOpenPostId = null;
-        document.getElementById('commentForm').reset();
-    };
+window.closeDetailModal = function () {
+    if (boardListView) boardListView.classList.remove('is-hidden');
+    if (boardDetailView) {
+        boardDetailView.style.display = 'none';
+        boardDetailView.classList.remove('is-active');
+    }
+    currentOpenPostId = null;
+    document.getElementById('commentForm').reset();
+    resetPendingCommentStickers();
+    closeCommentStickerPanel();
+};
 
     window.openAdjacentPost = function (direction) {
         if (!currentOpenPostId) return;
@@ -863,16 +1214,16 @@
         persistVotes();
     };
 
-    document.getElementById('commentForm').onsubmit = function (event) {
-        event.preventDefault();
-        if (!currentOpenPostId) return;
-        const input = document.getElementById('commentInput');
-        const text = input.value.trim();
-        if (!text) return;
-        const post = boardPosts.find((item) => item.id === currentOpenPostId);
-        if (!post) return;
-        post.comments = Array.isArray(post.comments) ? post.comments : [];
-        post.comments.push({ author: currentUser, text, date: new Date().toLocaleString('ko-KR') });
+document.getElementById('commentForm').onsubmit = function (event) {
+    event.preventDefault();
+    if (!currentOpenPostId) return;
+    const input = document.getElementById('commentInput');
+    const text = input.value.trim();
+    if (!text) return;
+    const post = boardPosts.find((item) => item.id === currentOpenPostId);
+    if (!post) return;
+    post.comments = Array.isArray(post.comments) ? post.comments : [];
+    post.comments.push({ author: currentUser, text, date: new Date().toLocaleString('ko-KR') });
         if (typeof window.createUserNotification === 'function' && post.author && post.author !== currentUser) {
             window.createUserNotification(post.author, {
                 type: 'comment',
@@ -881,14 +1232,18 @@
                 link: `board.html?id=${post.id}`
             });
         }
-        savePosts();
-        renderComments(post);
-        input.value = '';
-        renderBoard(currentSearchType, currentSearchQuery);
-        updateDetailNavigation(post.id);
-    };
+    savePosts();
+    renderComments(post);
+    input.value = '';
+    closeCommentStickerPanel();
+    renderBoard(currentSearchType, currentSearchQuery);
+    updateDetailNavigation(post.id);
+};
 
-    document.getElementById('richEditor').addEventListener('click', (event) => {
+setupCommentStickerPicker();
+ensureEditorImageControls();
+
+document.getElementById('richEditor').addEventListener('click', (event) => {
         if (event.target.tagName !== 'IMG') {
             clearSelectedEditorImage();
         }

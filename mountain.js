@@ -192,8 +192,8 @@ window.closeAddModal = function() {
 };
 
 window.onclick = function(event) {
-    if (event.target == modal) {
-        closeAddModal();
+    if (event.target === document.getElementById('mtDetailModal')) {
+        closeMtDetailModal();
     }
 };
 
@@ -233,15 +233,12 @@ const preview = document.getElementById('photoPreview');
 const dropText = document.getElementById('dropText');
 
 photoInput.addEventListener('input', (e) => {
-    if(e.target.value) {
-        preview.src = e.target.value;
-        preview.style.display = 'block';
-        dropText.style.display = 'none';
-    } else {
-        preview.src = '';
-        preview.style.display = 'none';
-        dropText.style.display = 'block';
-    }
+    const values = String(e.target.value || '')
+        .split(/[\n,]+/)
+        .map((value) => value.trim())
+        .filter(Boolean);
+    values.forEach((value) => addMountainPhoto(value));
+    e.target.value = '';
 });
 
 dropZone.addEventListener('dragover', (e) => {
@@ -254,17 +251,15 @@ dropZone.addEventListener('dragleave', () => {
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-        const file = e.dataTransfer.files[0];
+    const files = Array.from(e.dataTransfer.files || []).slice(0, 4);
+    files.forEach((file) => {
+        if (!file.type.startsWith('image/')) return;
         const reader = new FileReader();
         reader.onload = function(evt) {
-            photoInput.value = ''; // clear text URL if dragging photo
-            preview.src = evt.target.result; // Base64 encoding
-            preview.style.display = 'block';
-            dropText.style.display = 'none';
-        }
+            addMountainPhoto(evt.target.result);
+        };
         reader.readAsDataURL(file);
-    }
+    });
 });
 
 // -- Region Masking Logic --
@@ -368,6 +363,9 @@ function escapeHtml(value) {
 
 function normalizeMountainRecord(mountain) {
     const currentUser = localStorage.getItem('current_user') || 'admin';
+    const normalizedPhotos = Array.isArray(mountain.photos)
+        ? mountain.photos.filter(Boolean).slice(0, 4)
+        : (mountain.photo ? [mountain.photo] : []);
     return {
         ...mountain,
         id: mountain.id || `m_${Date.now()}`,
@@ -375,7 +373,8 @@ function normalizeMountainRecord(mountain) {
         author: mountain.author || currentUser,
         createdAt: mountain.createdAt || mountain.date || new Date().toISOString(),
         updatedAt: mountain.updatedAt || mountain.createdAt || mountain.date || new Date().toISOString(),
-        photo: mountain.photo || '',
+        photos: normalizedPhotos,
+        photo: normalizedPhotos[0] || mountain.photo || '',
         desc: mountain.desc || '',
         members: mountain.members || ''
     };
@@ -407,14 +406,73 @@ function getMountainAuthorName(authorId) {
     return (users[trimmedId] && users[trimmedId].nickname) ? users[trimmedId].nickname : trimmedId;
 }
 
+let pendingMountainPhotos = [];
+
+function ensureMountainPhotoPreviewGrid() {
+    const dropZone = document.getElementById('photoDropZone');
+    if (!dropZone) return null;
+    let grid = document.getElementById('photoPreviewGrid');
+    if (!grid) {
+        grid = document.createElement('div');
+        grid.id = 'photoPreviewGrid';
+        grid.style.display = 'grid';
+        grid.style.gridTemplateColumns = 'repeat(2, minmax(0, 1fr))';
+        grid.style.gap = '10px';
+        grid.style.width = '100%';
+        grid.style.marginTop = '10px';
+        dropZone.appendChild(grid);
+    }
+    return grid;
+}
+
+function renderMountainPhotoPreviews() {
+    const grid = ensureMountainPhotoPreviewGrid();
+    const preview = document.getElementById('photoPreview');
+    const dropText = document.getElementById('dropText');
+    if (!grid || !preview || !dropText) return;
+    preview.style.display = 'none';
+    preview.src = '';
+    if (!pendingMountainPhotos.length) {
+        grid.innerHTML = '';
+        dropText.style.display = 'block';
+        return;
+    }
+    dropText.style.display = 'none';
+    grid.innerHTML = pendingMountainPhotos.map((photo, index) => `
+        <div style="position:relative; border-radius:14px; overflow:hidden; background:rgba(255,255,255,0.75); border:1px solid rgba(109, 64, 38, 0.12);">
+            <img src="${photo}" style="width:100%; height:120px; object-fit:cover; display:block;">
+            <button type="button" onclick="removeMountainPhoto(${index})" style="position:absolute; top:8px; right:8px; width:30px; height:30px; border:none; border-radius:50%; background:rgba(47,31,24,0.72); color:#fff; cursor:pointer;">×</button>
+        </div>
+    `).join('');
+}
+
+function addMountainPhoto(photoUrl) {
+    const normalized = String(photoUrl || '').trim();
+    if (!normalized) return;
+    if (pendingMountainPhotos.length >= 4) {
+        alert('산행 사진은 최대 4장까지 추가할 수 있습니다.');
+        return;
+    }
+    pendingMountainPhotos.push(normalized);
+    renderMountainPhotoPreviews();
+}
+
+window.removeMountainPhoto = function(index) {
+    pendingMountainPhotos.splice(index, 1);
+    renderMountainPhotoPreviews();
+};
+
 function resetMountainForm() {
     const form = document.getElementById('mountainForm');
     if (!form) return;
     form.reset();
+    const nameInput = document.getElementById('mName');
+    if (nameInput) nameInput.maxLength = 15;
+    const storyTitleInput = document.getElementById('mtTitle');
+    if (storyTitleInput) storyTitleInput.maxLength = 15;
     document.getElementById('mEditId').value = '';
-    document.getElementById('photoPreview').style.display = 'none';
-    document.getElementById('photoPreview').src = '';
-    document.getElementById('dropText').style.display = 'block';
+    pendingMountainPhotos = [];
+    renderMountainPhotoPreviews();
     const submitButton = document.querySelector('#mountainForm .btn-submit');
     if (submitButton) submitButton.textContent = '기록 저장하기';
     const modalTitle = document.querySelector('#mountainModal .modal-title');
@@ -437,6 +495,7 @@ window.openEditMountain = function(id) {
     if (!mountain || !canManageMountain(mountain)) return;
 
     modal.style.display = 'block';
+    document.getElementById('mName').maxLength = 15;
     document.getElementById('mEditId').value = mountain.id;
     document.getElementById('mName').value = mountain.name || '';
     document.getElementById('mLat').value = mountain.lat || '';
@@ -445,15 +504,19 @@ window.openEditMountain = function(id) {
     document.getElementById('mDate').value = mountain.date || '';
     document.getElementById('mMembers').value = mountain.members || '';
     document.getElementById('mDesc').value = mountain.desc || '';
-    document.getElementById('mPhoto').value = mountain.photo || '';
-    document.getElementById('photoPreview').src = mountain.photo || '';
-    document.getElementById('photoPreview').style.display = mountain.photo ? 'block' : 'none';
-    document.getElementById('dropText').style.display = mountain.photo ? 'none' : 'block';
+    document.getElementById('mPhoto').value = '';
+    pendingMountainPhotos = Array.isArray(mountain.photos) ? mountain.photos.slice(0, 4) : (mountain.photo ? [mountain.photo] : []);
+    renderMountainPhotoPreviews();
     const submitButton = document.querySelector('#mountainForm .btn-submit');
     if (submitButton) submitButton.textContent = '기록 수정하기';
     const modalTitle = document.querySelector('#mountainModal .modal-title');
     if (modalTitle) modalTitle.textContent = '산 기록 수정';
 };
+
+const mountainNameInput = document.getElementById('mName');
+if (mountainNameInput) mountainNameInput.maxLength = 15;
+const mountainStoryTitleInput = document.getElementById('mtTitle');
+if (mountainStoryTitleInput) mountainStoryTitleInput.maxLength = 15;
 
 window.deleteMountain = function(id) {
     const mountain = getMountainById(id);
@@ -477,19 +540,21 @@ document.getElementById('mountainForm').onsubmit = (e) => {
     const mountains = getMountains().map(normalizeMountainRecord);
     const editId = document.getElementById('mEditId').value;
     const currentUser = localStorage.getItem('current_user') || 'admin';
-    const photoValue = document.getElementById('photoPreview').src || document.getElementById('mPhoto').value || '';
+    const titleValue = document.getElementById('mName').value.trim().slice(0, 15);
+    const photoValues = pendingMountainPhotos.slice(0, 4);
 
     const nextRecord = normalizeMountainRecord({
         id: editId || `m_${Date.now()}`,
-        title: document.getElementById('mName').value,
-        name: document.getElementById('mName').value,
+        title: titleValue,
+        name: titleValue,
         lat: document.getElementById('mLat').value,
         lng: document.getElementById('mLng').value,
         alt: document.getElementById('mAlt').value,
         date: document.getElementById('mDate').value,
         members: document.getElementById('mMembers').value,
         desc: document.getElementById('mDesc').value,
-        photo: photoValue,
+        photos: photoValues,
+        photo: photoValues[0] || '',
         author: editId ? (getMountainById(editId)?.author || currentUser) : currentUser,
         createdAt: editId ? (getMountainById(editId)?.createdAt || new Date().toISOString()) : new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -514,22 +579,22 @@ function renderMountainBoard() {
     const grid = document.getElementById('mountainBoardGrid');
     if (!grid) return;
 
-    const mountains = getMountains()
-        .map(normalizeMountainRecord)
-        .sort((a, b) => new Date(b.updatedAt || b.createdAt || b.date) - new Date(a.updatedAt || a.createdAt || a.date));
+      const mountains = getMountains()
+          .map(normalizeMountainRecord)
+          .sort((a, b) => new Date(b.updatedAt || b.createdAt || b.date) - new Date(a.updatedAt || a.createdAt || a.date));
 
     if (!mountains.length) {
         grid.innerHTML = '<div class="mountain-board-empty">첫 산행기를 남겨보세요.</div>';
         return;
     }
 
-    grid.innerHTML = mountains.map((mountain) => `
-        <article class="mountain-post-card" onclick="openMtDetailById('${escapeHtml(mountain.id)}')">
-            ${mountain.photo ? `<img src="${escapeHtml(mountain.photo)}" class="mountain-post-thumb" alt="${escapeHtml(mountain.title)}">` : '<div class="mountain-post-thumb-placeholder">△</div>'}
-            <div class="mountain-post-body">
-                <h3>${escapeHtml(mountain.title)}</h3>
-                <div class="mountain-post-meta">
-                    <span>${escapeHtml(getMountainAuthorName(mountain.author))}</span>
+      grid.innerHTML = mountains.map((mountain) => `
+          <article class="mountain-post-card" onclick="openMtDetailById('${escapeHtml(mountain.id)}')">
+              ${mountain.photo ? `<img src="${escapeHtml(mountain.photo)}" class="mountain-post-thumb" alt="${escapeHtml(mountain.title)}">` : '<div class="mountain-post-thumb-placeholder">△</div>'}
+              <div class="mountain-post-body">
+                  <h3>${escapeHtml(mountain.title)}</h3>
+                  <div class="mountain-post-meta">
+                      <span>${escapeHtml(getMountainAuthorName(mountain.author))}</span>
                     <span>${escapeHtml(formatMountainDate(mountain.date))}</span>
                 </div>
             </div>
@@ -548,6 +613,14 @@ window.openMtDetail = function(mountain) {
     const content = document.getElementById('mtDetailContent');
     const editable = canManageMountain(mountain);
 
+    const photoGallery = (mountain.photos || []).length
+        ? `
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+                ${(mountain.photos || []).map((photo) => `<img src="${escapeHtml(photo)}" class="mountain-detail-image" alt="${escapeHtml(mountain.title)}" style="max-height:260px; border-radius:18px;">`).join('')}
+            </div>
+        `
+        : '';
+
     modalElement.style.display = 'block';
     content.innerHTML = `
         <h2>${escapeHtml(mountain.title)}</h2>
@@ -556,7 +629,7 @@ window.openMtDetail = function(mountain) {
             <span>${escapeHtml(formatMountainDate(mountain.date))}</span>
             <span>고도 ${escapeHtml(mountain.alt)}</span>
         </div>
-        ${mountain.photo ? `<img src="${escapeHtml(mountain.photo)}" class="mountain-detail-image" alt="${escapeHtml(mountain.title)}">` : ''}
+        ${photoGallery}
         <div class="mountain-detail-body">${escapeHtml(mountain.desc).replace(/\n/g, '<br>')}</div>
         <div class="mountain-detail-meta" style="margin-top:20px;">
             <span>위치 ${escapeHtml(String(mountain.lat))}, ${escapeHtml(String(mountain.lng))}</span>

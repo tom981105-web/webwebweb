@@ -123,6 +123,14 @@ function renderLogo(logo) {
     return logo;
 }
 
+function isImageLogoValue(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    return raw.startsWith('data:image/')
+        || /^https?:\/\/.+\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(raw)
+        || /^\/uploads\/.+\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(raw);
+}
+
 function getCategories() {
     // Unique categories from data
     const categories = new Set(aiData.map(ai => ai.category));
@@ -225,11 +233,16 @@ function setupEventListeners() {
     // Form Submit (Save / Update)
     aiForm.onsubmit = (e) => {
         e.preventDefault();
+        const logoValue = document.getElementById('aiLogo').value.trim();
+        if (!isImageLogoValue(logoValue)) {
+            alert('AI 로고는 이미지 주소나 이미지 파일만 사용할 수 있습니다.');
+            return;
+        }
         
         const newAi = {
             id: editingId ? editingId : Date.now(),
             name: document.getElementById('aiName').value,
-            logo: document.getElementById('aiLogo').value,
+            logo: logoValue,
             category: document.getElementById('aiCategory').value,
             url: document.getElementById('aiUrl').value,
             description: document.getElementById('aiDescription').value
@@ -256,7 +269,6 @@ function setupEventListeners() {
     // Click outside modal to close
     window.onclick = (e) => {
         if (e.target === viewModal) closeModal(viewModal);
-        if (e.target === formModal) closeModal(formModal);
     };
 }
 
@@ -313,7 +325,7 @@ function setupDropZone() {
     const logoPreview = document.getElementById('logoPreview');
 
     function updateLogoPreview(val) {
-        logoPreview.innerHTML = val ? renderLogo(val) : '';
+        logoPreview.innerHTML = isImageLogoValue(val) ? renderLogo(val) : '';
     }
 
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -429,6 +441,12 @@ function renderPromptCards() {
 }
 
 function setupPromptEventListeners() {
+    const promptTitleInput = document.getElementById('promptTitle');
+    if (promptTitleInput) {
+        promptTitleInput.maxLength = 20;
+        promptTitleInput.setAttribute('maxlength', '20');
+    }
+
     function renderDynamicAiCheckboxes() {
         const box = document.getElementById('aiCheckboxList');
         if(!box) return;
@@ -536,9 +554,7 @@ function setupPromptEventListeners() {
     
     window.onclick = (e) => {
         if (e.target === viewModal) closeModal(viewModal);
-        if (e.target === formModal) closeModal(formModal);
         if (e.target === document.getElementById('viewPromptModal')) closeModal(document.getElementById('viewPromptModal'));
-        if (e.target === document.getElementById('formPromptModal')) closeModal(document.getElementById('formPromptModal'));
     };
 }
 

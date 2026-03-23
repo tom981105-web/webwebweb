@@ -495,10 +495,14 @@
 }
 
 .prompt-card-title {
+    flex: 1;
+    min-width: 0;
     font-size: 1.12rem;
     font-weight: 800;
     color: #2f1f18;
     line-height: 1.38;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .prompt-card-category,
