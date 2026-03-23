@@ -394,12 +394,20 @@ function createLegacyPayloadFromState(state) {
         login_hero_interval_seconds: state.loginHero.intervalSeconds,
         login_hero_random_order: state.loginHero.randomOrder,
         user_notifications: state.notifications,
-        settings_reuse_code: state.reuseInviteCode
+        settings_reuse_code: state.reuseInviteCode,
+        __meta: {
+            updatedAt: new Date().toISOString()
+        }
     };
 }
 
 let rawDb = {};
 let state = normalizeRawDb({});
+
+function getDbUpdatedAt(db) {
+    const value = db && db.__meta && db.__meta.updatedAt ? Date.parse(db.__meta.updatedAt) : NaN;
+    return Number.isFinite(value) ? value : 0;
+}
 
 async function hydrateDatabaseFromRemote() {
     const storageStatus = storage.getStorageStatus();
@@ -413,6 +421,16 @@ async function hydrateDatabaseFromRemote() {
 
         const remoteDb = safeParseJson(remoteText, null);
         if (!remoteDb || typeof remoteDb !== 'object') return false;
+
+        const localDb = fs.existsSync(DB_FILE)
+            ? safeParseJson(fs.readFileSync(DB_FILE, 'utf8'), {})
+            : {};
+        const localUpdatedAt = getDbUpdatedAt(localDb);
+        const remoteUpdatedAt = getDbUpdatedAt(remoteDb);
+
+        if (localUpdatedAt && localUpdatedAt >= remoteUpdatedAt) {
+            return false;
+        }
 
         fs.writeFileSync(DB_FILE, JSON.stringify(remoteDb, null, 2));
         return true;
@@ -444,10 +462,10 @@ function loadStateFromDisk() {
     state = normalizeRawDb(rawDb);
 }
 
-function persistDb() {
+async function persistDb() {
     rawDb = createLegacyPayloadFromState(state);
     fs.writeFileSync(DB_FILE, JSON.stringify(rawDb, null, 2));
-    mirrorDatabaseToRemote();
+    await mirrorDatabaseToRemote();
 }
 
 function migrateLoginHeroStorageIfNeeded() {
@@ -599,7 +617,7 @@ app.get('/api/sync', (req, res) => {
     }
 });
 
-app.post('/api/sync', (req, res) => {
+app.post('/api/sync', async (req, res) => {
     const { key, value } = req.body || {};
 
     if (key) {
@@ -613,13 +631,13 @@ app.post('/api/sync', (req, res) => {
             applyLegacySyncWrite(key, value);
         }
 
-        persistDb();
+        await persistDb();
     }
 
     res.json({ success: true });
 });
 
-app.post('/api/auth/signup', (req, res) => {
+app.post('/api/auth/signup', async (req, res) => {
     reloadDb();
 
     const id = String(req.body && req.body.id ? req.body.id : '').trim();
@@ -664,7 +682,7 @@ app.post('/api/auth/signup', (req, res) => {
         state.inviteCodes.splice(codeIndex, 1);
     }
 
-    persistDb();
+    await persistDb();
     res.json({
         success: true,
         userId: id,
@@ -673,7 +691,7 @@ app.post('/api/auth/signup', (req, res) => {
     });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
     reloadDb();
 
     const id = String(req.body && req.body.id ? req.body.id : '').trim();
@@ -690,7 +708,7 @@ app.post('/api/auth/login', (req, res) => {
     };
     state.users = normalizeUsers(state.users);
     state.currentUser = userKey;
-    persistDb();
+    await persistDb();
 
     res.json({
         success: true,
@@ -734,7 +752,7 @@ app.post('/api/login-hero', async (req, res) => {
         state.loginHero.randomOrder = Boolean(req.body.randomOrder);
     }
 
-    persistDb();
+    await persistDb();
     res.json({
         success: true,
         images: state.loginHero.images,
@@ -748,7 +766,7 @@ app.delete('/api/login-hero', async (req, res) => {
     state.loginHero.images = [];
     state.loginHero.intervalSeconds = 10;
     state.loginHero.randomOrder = false;
-    persistDb();
+    await persistDb();
     res.json({ success: true });
 });
 
@@ -884,7 +902,7 @@ app.get('/api/board/posts/:id', (req, res) => {
     res.json({ post });
 });
 
-app.post('/api/board/posts', (req, res) => {
+app.post('/api/board/posts', async (req, res) => {
     reloadDb();
     const payload = req.body || {};
     const nextId = state.board.posts.length ? Math.max(...state.board.posts.map((post) => Number(post.id || 0))) + 1 : 1;
@@ -904,11 +922,11 @@ app.post('/api/board/posts', (req, res) => {
     }], state.board.categories)[0];
 
     state.board.posts.push(post);
-    persistDb();
+    await persistDb();
     res.json({ success: true, post });
 });
 
-app.put('/api/board/posts/:id', (req, res) => {
+app.put('/api/board/posts/:id', async (req, res) => {
     reloadDb();
     const id = Number(req.params.id);
     const index = state.board.posts.findIndex((item) => Number(item.id) === id);
@@ -922,15 +940,15 @@ app.put('/api/board/posts/:id', (req, res) => {
         id
     }], state.board.categories)[0];
 
-    persistDb();
+    await persistDb();
     res.json({ success: true, post: state.board.posts[index] });
 });
 
-app.delete('/api/board/posts/:id', (req, res) => {
+app.delete('/api/board/posts/:id', async (req, res) => {
     reloadDb();
     const id = Number(req.params.id);
     state.board.posts = state.board.posts.filter((item) => Number(item.id) !== id);
-    persistDb();
+    await persistDb();
     res.json({ success: true });
 });
 
@@ -949,7 +967,7 @@ app.get('/api/users/:id', (req, res) => {
     res.json({ userId: key, user: state.users[key] });
 });
 
-app.patch('/api/users/:id', (req, res) => {
+app.patch('/api/users/:id', async (req, res) => {
     reloadDb();
     const id = String(req.params.id || '');
     const key = Object.keys(state.users).find((entry) => entry.toLowerCase() === id.toLowerCase());
@@ -962,11 +980,11 @@ app.patch('/api/users/:id', (req, res) => {
         ...req.body
     };
     state.users = normalizeUsers(state.users);
-    persistDb();
+    await persistDb();
     res.json({ success: true, userId: key, user: state.users[key] });
 });
 
-app.delete('/api/users/:id', (req, res) => {
+app.delete('/api/users/:id', async (req, res) => {
     reloadDb();
     const id = String(req.params.id || '');
     const key = Object.keys(state.users).find((entry) => entry.toLowerCase() === id.toLowerCase());
@@ -979,7 +997,7 @@ app.delete('/api/users/:id', (req, res) => {
     }
 
     delete state.users[key];
-    persistDb();
+    await persistDb();
     res.json({ success: true });
 });
 
