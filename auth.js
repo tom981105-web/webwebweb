@@ -275,6 +275,43 @@ function unequipStoreItem() {
     };
 }
 
+function playPointRoulette() {
+    const record = getCurrentUserRecord();
+    if (!record) return { ok: false, message: '로그인이 필요합니다.' };
+
+    const { key, user, users } = record;
+    const currentPoints = Number(user.points || 0);
+    if (currentPoints < 1) {
+        return { ok: false, message: '룰렛을 돌리려면 최소 1pt가 필요합니다.' };
+    }
+
+    const rewards = [0, 1, 2, 3];
+    const reward = rewards[Math.floor(Math.random() * rewards.length)];
+    const nextPoints = currentPoints - 1 + reward;
+
+    users[key] = {
+        ...user,
+        points: nextPoints
+    };
+
+    localStorage.setItem('users_db', JSON.stringify(users));
+    window.dispatchEvent(new CustomEvent('points:updated', {
+        detail: {
+            userId: key,
+            points: nextPoints,
+            rouletteReward: reward
+        }
+    }));
+
+    return {
+        ok: true,
+        cost: 1,
+        reward,
+        delta: reward - 1,
+        totalPoints: nextPoints
+    };
+}
+
 function getInviteCodes() {
     try {
         const codes = JSON.parse(localStorage.getItem('invite_codes') || 'null');
@@ -519,6 +556,7 @@ window.purchaseStoreItem = purchaseStoreItem;
 window.equipStoreItem = equipStoreItem;
 window.unequipStoreItem = unequipStoreItem;
 window.getCommunityRanking = getCommunityRanking;
+window.playPointRoulette = playPointRoulette;
 
 if (!window.location.pathname.endsWith('login.html')) {
     document.addEventListener('DOMContentLoaded', injectLogoutButton);

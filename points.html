@@ -112,6 +112,118 @@
             margin-bottom: 22px;
         }
 
+        .roulette-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1.05fr) minmax(220px, 320px);
+            gap: 22px;
+            align-items: stretch;
+            padding: 26px 28px;
+            border-radius: 28px;
+            background: linear-gradient(135deg, rgba(255, 248, 239, 0.94), rgba(247, 235, 220, 0.9));
+            border: 1px solid rgba(88, 60, 28, 0.1);
+            box-shadow: 0 18px 42px rgba(67, 38, 17, 0.08);
+        }
+
+        .roulette-copy h2 {
+            margin: 0;
+        }
+
+        .roulette-copy p {
+            margin: 12px 0 0;
+            color: var(--text-secondary);
+            line-height: 1.68;
+        }
+
+        .roulette-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .roulette-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 9px 14px;
+            border-radius: 999px;
+            background: rgba(159, 79, 46, 0.08);
+            border: 1px solid rgba(159, 79, 46, 0.12);
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .roulette-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 22px 18px;
+            border-radius: 24px;
+            background: rgba(255, 255, 255, 0.66);
+            border: 1px solid rgba(88, 60, 28, 0.08);
+            text-align: center;
+        }
+
+        .roulette-wheel {
+            width: min(220px, 100%);
+            aspect-ratio: 1;
+            border-radius: 50%;
+            background:
+                conic-gradient(
+                    #c06b3e 0deg 90deg,
+                    #f0d4a5 90deg 180deg,
+                    #8aa062 180deg 270deg,
+                    #b94738 270deg 360deg
+                );
+            border: 10px solid rgba(255, 250, 243, 0.9);
+            box-shadow: 0 16px 32px rgba(67, 38, 17, 0.14);
+            position: relative;
+            transition: transform 3.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .roulette-wheel::before {
+            content: '';
+            position: absolute;
+            inset: 50%;
+            width: 32px;
+            height: 32px;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            background: rgba(255, 248, 239, 0.95);
+            border: 4px solid rgba(88, 60, 28, 0.12);
+        }
+
+        .roulette-pointer {
+            width: 0;
+            height: 0;
+            margin-bottom: -10px;
+            border-left: 14px solid transparent;
+            border-right: 14px solid transparent;
+            border-top: 24px solid #fff4e7;
+            filter: drop-shadow(0 8px 10px rgba(67, 38, 17, 0.14));
+            z-index: 1;
+        }
+
+        .roulette-result {
+            margin-top: 18px;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .roulette-meta {
+            margin-top: 8px;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .roulette-button {
+            margin-top: 18px;
+            min-width: 180px;
+        }
+
         @media (max-width: 980px) {
             .points-page {
                 padding: 14px;
@@ -129,6 +241,10 @@
             .points-shell {
                 width: calc(100% - 8px);
             }
+
+            .roulette-card {
+                grid-template-columns: 1fr;
+            }
         }
 
         @media (max-width: 760px) {
@@ -143,6 +259,11 @@
 
             .points-hero-copy h1 {
                 font-size: clamp(2.6rem, 14vw, 4rem);
+            }
+
+            .roulette-card {
+                padding: 22px 18px;
+                border-radius: 24px;
             }
         }
     </style>
@@ -183,6 +304,28 @@
                     <div id="attendancePoints" class="attendance-points">0pt</div>
                     <p id="attendanceSummaryText">출석을 시작하면 누적 기록과 연속 출석 현황이 여기에 표시됩니다.</p>
                 </aside>
+            </section>
+
+            <section class="roulette-card">
+                <div class="roulette-copy">
+                    <span class="attendance-kicker">Point Roulette</span>
+                    <h2>1pt 룰렛</h2>
+                    <p>1pt를 넣고 룰렛을 돌리면 `0pt / 1pt / 2pt / 3pt` 중 하나가 나옵니다. 운이 좋으면 이득이고, 아니면 그대로 손해를 보는 간단한 도박형 미니게임입니다.</p>
+                    <div class="roulette-legend">
+                        <span class="roulette-chip">0pt</span>
+                        <span class="roulette-chip">1pt</span>
+                        <span class="roulette-chip">2pt</span>
+                        <span class="roulette-chip">3pt</span>
+                    </div>
+                </div>
+
+                <div class="roulette-panel">
+                    <div class="roulette-pointer"></div>
+                    <div id="rouletteWheel" class="roulette-wheel" aria-hidden="true"></div>
+                    <button id="rouletteButton" class="attendance-button roulette-button" type="button">1pt로 룰렛 돌리기</button>
+                    <div id="rouletteResult" class="roulette-result">아직 결과가 없습니다.</div>
+                    <div id="rouletteMeta" class="roulette-meta">결과에 따라 보유 포인트가 바로 반영됩니다.</div>
+                </div>
             </section>
 
             <section class="game-grid">
@@ -365,17 +508,92 @@
             });
         }
 
+        function renderRoulettePanel() {
+            const profile = typeof window.getCurrentUserProfile === 'function' ? window.getCurrentUserProfile() : null;
+            const button = document.getElementById('rouletteButton');
+            const result = document.getElementById('rouletteResult');
+            const meta = document.getElementById('rouletteMeta');
+
+            if (!button || !result || !meta) return;
+
+            if (!profile) {
+                button.disabled = true;
+                result.textContent = '로그인 후 이용할 수 있습니다.';
+                meta.textContent = '현재 로그인 정보가 없어 룰렛을 준비하지 못했습니다.';
+                return;
+            }
+
+            if (profile.points < 1) {
+                button.disabled = true;
+                result.textContent = '포인트가 부족합니다.';
+                meta.textContent = '룰렛은 최소 1pt가 있어야 돌릴 수 있습니다.';
+                return;
+            }
+
+            button.disabled = false;
+            result.textContent = '1pt를 넣고 결과를 확인해 보세요.';
+            meta.textContent = `현재 보유 포인트는 ${profile.points}pt입니다.`;
+        }
+
+        function setupRouletteButton() {
+            const button = document.getElementById('rouletteButton');
+            const wheel = document.getElementById('rouletteWheel');
+            const result = document.getElementById('rouletteResult');
+            const meta = document.getElementById('rouletteMeta');
+            if (!button || !wheel || !result || !meta) return;
+
+            let currentRotation = 0;
+            let isSpinning = false;
+
+            button.addEventListener('click', () => {
+                if (isSpinning || typeof window.playPointRoulette !== 'function') return;
+
+                const playResult = window.playPointRoulette();
+                if (!playResult || !playResult.ok) {
+                    alert(playResult && playResult.message ? playResult.message : '룰렛 실행에 실패했습니다.');
+                    renderRoulettePanel();
+                    return;
+                }
+
+                isSpinning = true;
+                button.disabled = true;
+
+                const rewardIndex = [0, 1, 2, 3].indexOf(playResult.reward);
+                const segmentAngle = 90;
+                const stopAngle = rewardIndex >= 0 ? rewardIndex * segmentAngle + 45 : 45;
+                currentRotation += 1800 + (360 - stopAngle);
+                wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+                window.setTimeout(() => {
+                    isSpinning = false;
+                    const deltaLabel = playResult.delta >= 0 ? `+${playResult.delta}` : `${playResult.delta}`;
+                    result.textContent = `${playResult.reward}pt 당첨`;
+                    meta.textContent = `참가비 1pt 포함 순변동 ${deltaLabel}pt, 현재 ${playResult.totalPoints}pt입니다.`;
+                    renderAttendancePanel();
+                    renderRankingPanel();
+                    renderStorePanel();
+                    renderRoulettePanel();
+                    if (typeof window.injectLogoutButton === 'function') {
+                        window.injectLogoutButton();
+                    }
+                }, 3250);
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             renderAttendancePanel();
             renderRankingPanel();
             renderStorePanel();
+            renderRoulettePanel();
             setupAttendanceButton();
             setupStoreButtons();
+            setupRouletteButton();
 
             window.addEventListener('attendance:updated', () => {
                 renderAttendancePanel();
                 renderRankingPanel();
                 renderStorePanel();
+                renderRoulettePanel();
                 if (typeof window.injectLogoutButton === 'function') {
                     window.injectLogoutButton();
                 }
@@ -385,6 +603,7 @@
                 renderAttendancePanel();
                 renderRankingPanel();
                 renderStorePanel();
+                renderRoulettePanel();
                 if (typeof window.injectLogoutButton === 'function') {
                     window.injectLogoutButton();
                 }
