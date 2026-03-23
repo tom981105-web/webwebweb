@@ -6,6 +6,7 @@ const POINT_STORE_ITEMS = [
     { id: 'campfire_host', title: '캠프파이어 호스트', cost: 35, description: '커뮤니티 활동이 눈에 띄는 멤버를 위한 칭호입니다.' }
 ];
 const NOTIFICATION_STORAGE_KEY = 'user_notifications';
+const NOTIFICATION_SEEN_PREFIX = 'seen_notifications_';
 
 function getNotificationsDb() {
     try {
@@ -40,10 +41,12 @@ function getUnreadNotificationCount(userId) {
 }
 
 function dispatchNotificationUpdate(userId) {
+    const notifications = getUserNotifications(userId);
     window.dispatchEvent(new CustomEvent('notifications:updated', {
         detail: {
             userId: userId || localStorage.getItem('current_user') || '',
-            unreadCount: getUnreadNotificationCount(userId)
+            unreadCount: getUnreadNotificationCount(userId),
+            latestNotification: notifications[0] || null
         }
     }));
 }
@@ -102,6 +105,179 @@ function markAllNotificationsRead() {
     saveNotificationsDb(notifications);
     dispatchNotificationUpdate(userKey);
     return true;
+}
+
+function getSeenNotificationIds(userId) {
+    const targetUserId = resolveUserKeyCaseInsensitive(userId || localStorage.getItem('current_user'));
+    if (!targetUserId) return [];
+    try {
+        const stored = JSON.parse(sessionStorage.getItem(`${NOTIFICATION_SEEN_PREFIX}${targetUserId}`) || '[]');
+        return Array.isArray(stored) ? stored : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function setSeenNotificationIds(userId, ids) {
+    const targetUserId = resolveUserKeyCaseInsensitive(userId || localStorage.getItem('current_user'));
+    if (!targetUserId) return;
+    sessionStorage.setItem(`${NOTIFICATION_SEEN_PREFIX}${targetUserId}`, JSON.stringify(ids.slice(-50)));
+}
+
+function markNotificationSeen(userId, notificationId) {
+    if (!notificationId) return;
+    const seenIds = getSeenNotificationIds(userId);
+    if (seenIds.includes(notificationId)) return;
+    seenIds.push(notificationId);
+    setSeenNotificationIds(userId, seenIds);
+}
+
+function escapeNotificationHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function ensureNotificationToastHost() {
+    if (document.getElementById('notificationToastHost')) {
+        return document.getElementById('notificationToastHost');
+    }
+
+    const host = document.createElement('div');
+    host.id = 'notificationToastHost';
+    host.className = 'notification-toast-host';
+    document.body.appendChild(host);
+    return host;
+}
+
+function showNotificationToast(notification, userId) {
+    if (!notification || !notification.id) return;
+    const currentUser = resolveUserKeyCaseInsensitive(localStorage.getItem('current_user'));
+    const targetUser = resolveUserKeyCaseInsensitive(userId || currentUser);
+    if (!currentUser || currentUser !== targetUser) return;
+
+    const host = ensureNotificationToastHost();
+    const toast = document.createElement('button');
+    toast.type = 'button';
+    toast.className = 'notification-toast';
+    toast.innerHTML = `
+        <span class="notification-toast-label">새 알림</span>
+        <strong>${escapeNotificationHtml(notification.title || '새 알림')}</strong>
+        <span>${escapeNotificationHtml(notification.message || '')}</span>
+    `;
+    toast.onclick = function () {
+        markNotificationSeen(currentUser, notification.id);
+        if (notification.link) {
+            window.location.href = notification.link;
+            return;
+        }
+        toggleNotificationPanel(true);
+    };
+
+    host.appendChild(toast);
+    markNotificationSeen(currentUser, notification.id);
+    requestAnimationFrame(() => toast.classList.add('is-visible'));
+
+    window.setTimeout(() => {
+        toast.classList.remove('is-visible');
+        window.setTimeout(() => {
+            if (toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 260);
+    }, 4200);
+}
+
+function surfaceUnreadNotifications() {
+    const currentUser = resolveUserKeyCaseInsensitive(localStorage.getItem('current_user'));
+    if (!currentUser) return;
+
+    const notifications = getUserNotifications(currentUser).filter((item) => !item.read);
+    const seenIds = getSeenNotificationIds(currentUser);
+    notifications
+        .filter((item) => !seenIds.includes(item.id))
+        .slice(0, 2)
+        .reverse()
+        .forEach((item) => showNotificationToast(item, currentUser));
+}
+
+function ensureNotificationPanel() {
+    if (document.getElementById('notificationPanel')) {
+        return document.getElementById('notificationPanel');
+    }
+
+    const panel = document.createElement('div');
+    panel.id = 'notificationPanel';
+    panel.className = 'notification-panel';
+    panel.innerHTML = `
+        <div class="notification-panel-head">
+            <div>
+                <strong>알림</strong>
+                <span>최근 소식을 바로 확인합니다.</span>
+            </div>
+            <button type="button" class="notification-panel-close" onclick="toggleNotificationPanel(false)">닫기</button>
+        </div>
+        <div id="notificationPanelList" class="notification-panel-list"></div>
+        <div class="notification-panel-actions">
+            <button type="button" class="notification-panel-action" onclick="markAllNotificationsRead(); renderNotificationPanel();">전체 읽음 처리</button>
+        </div>
+    `;
+    document.body.appendChild(panel);
+    document.addEventListener('click', (event) => {
+        const panelEl = document.getElementById('notificationPanel');
+        if (!panelEl || !panelEl.classList.contains('is-open')) return;
+        const trigger = event.target.closest('.hero-notice-link, [data-notification-toggle]');
+        if (trigger || panelEl.contains(event.target)) return;
+        toggleNotificationPanel(false);
+    });
+    return panel;
+}
+
+function renderNotificationPanel() {
+    const list = document.getElementById('notificationPanelList');
+    if (!list) return;
+
+    const notifications = getUserNotifications();
+    if (!notifications.length) {
+        list.innerHTML = '<div class="notification-panel-empty">아직 도착한 알림이 없습니다.</div>';
+        return;
+    }
+
+    list.innerHTML = notifications.map((item) => `
+        <article class="notification-panel-item${item.read ? '' : ' unread'}">
+            <div class="notification-panel-copy">
+                <div class="notification-panel-title-row">
+                    <strong>${escapeNotificationHtml(item.title)}</strong>
+                    ${item.read ? '' : '<span class="notification-panel-badge">새 알림</span>'}
+                </div>
+                <p>${escapeNotificationHtml(item.message)}</p>
+                <span>${escapeNotificationHtml(new Date(item.createdAt).toLocaleString('ko-KR'))}</span>
+            </div>
+            <div class="notification-panel-buttons">
+                ${item.link ? `<button type="button" class="notification-inline-button" onclick="openNotificationItem('${escapeNotificationHtml(item.id)}', '${escapeNotificationHtml(item.link)}')">바로 보기</button>` : ''}
+                ${item.read ? '' : `<button type="button" class="notification-inline-button primary" onclick="markNotificationRead('${escapeNotificationHtml(item.id)}'); renderNotificationPanel();">읽음</button>`}
+            </div>
+        </article>
+    `).join('');
+}
+
+function toggleNotificationPanel(forceOpen) {
+    const panel = ensureNotificationPanel();
+    const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !panel.classList.contains('is-open');
+    panel.classList.toggle('is-open', shouldOpen);
+    if (shouldOpen) {
+        renderNotificationPanel();
+    }
+}
+
+function openNotificationItem(notificationId, link) {
+    markNotificationRead(notificationId);
+    renderNotificationPanel();
+    toggleNotificationPanel(false);
+    if (link) {
+        window.location.href = link;
+    }
 }
 
 function getUsersDb() {
@@ -513,7 +689,7 @@ function injectLogoutButton() {
         const activeTitle = POINT_STORE_ITEMS.find((item) => item.id === userObj.activeTitleId);
         const activeTitleHtml = activeTitle ? `<span class="hero-title-badge">${activeTitle.title}</span>` : '';
         const unreadCount = getUnreadNotificationCount(userKey || currentUser);
-        const notificationHtml = `<a href="mypage.html#notifications" class="hero-notice-link">알림${unreadCount > 0 ? `<span class="hero-notice-badge">${unreadCount}</span>` : ''}</a>`;
+        const notificationHtml = `<button type="button" class="hero-notice-link" data-notification-toggle onclick="toggleNotificationPanel()"><span>알림</span>${unreadCount > 0 ? `<span class="hero-notice-badge">${unreadCount}</span>` : ''}</button>`;
         const isBoardPage = pathname.includes('board.html');
         const isAiPage = pathname.includes('ai.html');
         const isMountainPage = pathname.includes('mountain.html');
@@ -604,7 +780,7 @@ function injectLogoutButton() {
 
         userDiv.innerHTML = `
             ${myPageBtnHtml}
-            <a href="mypage.html#notifications" style="color:#f8efe4; font-size:0.88rem; margin-right:12px; font-weight:700; text-decoration:none; padding:6px 12px; border:1px solid rgba(255,255,255,0.2); border-radius:999px; background:rgba(255,255,255,0.08);">알림${unreadCount > 0 ? ` ${unreadCount}` : ''}</a>
+            <button onclick="toggleNotificationPanel()" type="button" style="color:#f8efe4; font-size:0.88rem; margin-right:12px; font-weight:700; text-decoration:none; padding:6px 12px; border:1px solid rgba(255,255,255,0.2); border-radius:999px; background:rgba(255,255,255,0.08); cursor:pointer;">알림${unreadCount > 0 ? ` ${unreadCount}` : ''}</button>
             <a href="points.html" style="color:#fde68a; font-size:0.88rem; margin-right:12px; font-weight:700; text-decoration:none; padding:6px 12px; border:1px solid rgba(253,230,138,0.34); border-radius:999px; background:rgba(253,230,138,0.08);">${points}pt</a>
             <span style="color:#e2e8f0; font-size:0.95rem; margin-right:15px; font-weight:500;">${displayName}님</span>
             <button onclick="logout()" style="background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); padding:6px 16px; border-radius:8px; cursor:pointer; font-weight:600; font-family:inherit; transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.25)'" onmouseout="this.style.background='rgba(239,68,68,0.15)'">로그아웃</button>
@@ -632,8 +808,21 @@ window.getUnreadNotificationCount = getUnreadNotificationCount;
 window.createUserNotification = createUserNotification;
 window.markNotificationRead = markNotificationRead;
 window.markAllNotificationsRead = markAllNotificationsRead;
+window.toggleNotificationPanel = toggleNotificationPanel;
+window.renderNotificationPanel = renderNotificationPanel;
+window.openNotificationItem = openNotificationItem;
 
 if (!window.location.pathname.endsWith('login.html')) {
-    document.addEventListener('DOMContentLoaded', injectLogoutButton);
-    window.addEventListener('notifications:updated', injectLogoutButton);
+    document.addEventListener('DOMContentLoaded', () => {
+        injectLogoutButton();
+        surfaceUnreadNotifications();
+    });
+    window.addEventListener('notifications:updated', (event) => {
+        injectLogoutButton();
+        const detail = event && event.detail ? event.detail : {};
+        const currentUser = resolveUserKeyCaseInsensitive(localStorage.getItem('current_user'));
+        if (detail.latestNotification && currentUser && currentUser === resolveUserKeyCaseInsensitive(detail.userId)) {
+            showNotificationToast(detail.latestNotification, detail.userId);
+        }
+    });
 }
