@@ -21,7 +21,6 @@ const RPG_SHOP_ITEMS = [
 ];
 const NOTIFICATION_STORAGE_KEY = 'user_notifications';
 const NOTIFICATION_SEEN_PREFIX = 'seen_notifications_';
-const FILE_PROTOCOL_API_BASE = 'https://webwebweb-production.up.railway.app';
 
 function createDefaultRpgState() {
     return {
@@ -176,7 +175,7 @@ function getNotificationsDb() {
 }
 
 function getAuthApiBase() {
-    return window.location.protocol === 'file:' ? FILE_PROTOCOL_API_BASE : '';
+    return window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
 }
 
 function resolveProfileImageUrl(value) {

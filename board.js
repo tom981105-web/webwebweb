@@ -1,10 +1,8 @@
 ﻿// board.js
 (function () {
-    const FILE_PROTOCOL_API_BASE = 'https://webwebweb-production.up.railway.app';
-
     function getApiBase() {
         if (window.location.protocol === 'file:') {
-            return FILE_PROTOCOL_API_BASE;
+            return 'http://localhost:3000';
         }
         return '';
     }

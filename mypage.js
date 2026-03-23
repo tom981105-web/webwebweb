@@ -1,6 +1,5 @@
 // mypage.js
 (function () {
-    const FILE_PROTOCOL_API_BASE = 'https://webwebweb-production.up.railway.app';
     let isDraggingFocus = false;
 
     function getUsersDb() {
@@ -16,7 +15,7 @@
     }
 
     function getApiBase() {
-        return window.location.protocol === 'file:' ? FILE_PROTOCOL_API_BASE : '';
+        return window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
     }
 
     function getApiUrl(path) {
