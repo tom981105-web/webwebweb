@@ -83,7 +83,7 @@
                         <h2>전국 산행기 & 사진첩</h2>
                         <p>사진과 후기를 카드 형태로 정리해 두고, 기억에 남는 산행을 다시 펼쳐볼 수 있게 구성했습니다.</p>
                     </div>
-                    <button class="btn-add-story" onclick="openMountainWriteModal()">+ 산행기 작성</button>
+                    <button class="btn-add-story" onclick="openAddModal()">+ 산행 기록 작성</button>
                 </div>
 
                 <div id="mountainBoardGrid" class="mountain-board-grid">
@@ -102,6 +102,7 @@
             <span class="close-btn" onclick="closeAddModal()">&times;</span>
             <h2 class="modal-title">새 산 기록 추가</h2>
             <form id="mountainForm">
+                <input type="hidden" id="mEditId">
                 <div class="form-group">
                     <label>산 이름</label>
                     <input type="text" id="mName" required placeholder="예: 한라산 백록담">
