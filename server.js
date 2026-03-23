@@ -67,6 +67,8 @@ function normalizeUsers(value) {
     };
 
     Object.keys(normalized).forEach((key) => {
+        const focusX = Number(normalized[key].profileFocusX);
+        const focusY = Number(normalized[key].profileFocusY);
         normalized[key] = {
             ...normalized[key],
             points: Number(normalized[key].points || 0),
@@ -75,7 +77,9 @@ function normalizeUsers(value) {
             maxAttendanceStreak: Number(normalized[key].maxAttendanceStreak || 0),
             unlockedTitles: Array.isArray(normalized[key].unlockedTitles) ? normalized[key].unlockedTitles : [],
             activeTitleId: normalized[key].activeTitleId || '',
-            profileImage: normalized[key].profileImage || ''
+            profileImage: normalized[key].profileImage || '',
+            profileFocusX: Number.isFinite(focusX) ? Math.min(100, Math.max(0, focusX)) : 50,
+            profileFocusY: Number.isFinite(focusY) ? Math.min(100, Math.max(0, focusY)) : 50
         };
     });
 

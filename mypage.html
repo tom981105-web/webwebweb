@@ -32,8 +32,8 @@
         <main class="mypage-shell">
             <section class="mypage-intro">
                 <div>
-                    <h2>바로 수정하고 바로 반영</h2>
-                    <p>프로필 이미지를 올리고 닉네임을 저장하면 상단 사용자 영역에도 바로 반영됩니다. 꼭 필요한 항목만 보이도록 간단하게 정리했습니다.</p>
+                    <h2>보이는 영역까지 직접 지정</h2>
+                    <p>프로필 이미지를 올린 뒤 아래 편집 영역에서 얼굴이 보일 위치를 직접 맞출 수 있습니다. 저장하면 상단과 게시판 아바타에 같은 위치가 반영됩니다.</p>
                 </div>
             </section>
 
@@ -42,15 +42,25 @@
                     <div class="card-header">
                         <span class="card-kicker">Profile</span>
                         <h2>프로필 설정</h2>
-                        <p>닉네임과 프로필 이미지를 수정해 나만의 프로필을 관리할 수 있습니다.</p>
+                        <p>닉네임과 프로필 이미지를 수정하고, 원형 프로필에 보일 중심 영역까지 직접 정할 수 있습니다.</p>
                     </div>
 
                     <div class="profile-image-block">
                         <div id="profileImagePreviewWrap" class="profile-image-placeholder">미리보기</div>
+
+                        <div id="profileFocusEditor" class="profile-focus-editor is-empty">
+                            <img id="profileFocusImage" alt="프로필 영역 편집">
+                            <div class="profile-focus-ring"></div>
+                            <div id="profileFocusMarker" class="profile-focus-marker"></div>
+                            <div class="profile-focus-caption">이미지를 눌러 원형 안에서 중심 위치를 정해 주세요.</div>
+                        </div>
+
                         <div class="profile-image-controls">
                             <input id="profileImageInput" type="file" accept="image/*">
                             <button class="btn-secondary" type="button" id="clearProfileImageButton">프로필 이미지 제거</button>
                             <input type="hidden" id="profileImageValue">
+                            <input type="hidden" id="profileFocusXValue" value="50">
+                            <input type="hidden" id="profileFocusYValue" value="50">
                         </div>
                     </div>
 

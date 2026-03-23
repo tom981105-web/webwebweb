@@ -33,6 +33,17 @@ function resolveProfileImageUrl(value) {
     return /^https?:\/\//i.test(normalized) ? normalized : '';
 }
 
+function normalizeProfileFocusValue(value) {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? Math.min(100, Math.max(0, numericValue)) : 50;
+}
+
+function getProfileObjectPosition(user) {
+    const focusX = normalizeProfileFocusValue(user && user.profileFocusX);
+    const focusY = normalizeProfileFocusValue(user && user.profileFocusY);
+    return `${focusX}% ${focusY}%`;
+}
+
 function saveNotificationsDb(notifications) {
     localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
 }
@@ -322,7 +333,9 @@ function getUsersDb() {
             maxAttendanceStreak: Number(users[key].maxAttendanceStreak || 0),
             unlockedTitles: Array.isArray(users[key].unlockedTitles) ? users[key].unlockedTitles : [],
             activeTitleId: users[key].activeTitleId || '',
-            profileImage: users[key].profileImage || ''
+            profileImage: users[key].profileImage || '',
+            profileFocusX: normalizeProfileFocusValue(users[key].profileFocusX),
+            profileFocusY: normalizeProfileFocusValue(users[key].profileFocusY)
         };
     });
 
@@ -375,7 +388,9 @@ function getCurrentUserProfile() {
         unlockedTitles: Array.isArray(user.unlockedTitles) ? user.unlockedTitles : [],
         activeTitleId: user.activeTitleId || '',
         activeTitle: activeTitle ? activeTitle.title : '',
-        profileImage: user.profileImage || ''
+        profileImage: user.profileImage || '',
+        profileFocusX: normalizeProfileFocusValue(user.profileFocusX),
+        profileFocusY: normalizeProfileFocusValue(user.profileFocusY)
     };
 }
 
@@ -704,7 +719,8 @@ function injectLogoutButton() {
         const isRegular = isAdmin || userObj.status === 'regular';
         const displayName = userObj.nickname ? userObj.nickname : currentUser;
         const profileImageUrl = resolveProfileImageUrl(userObj.profileImage || '');
-        const avatarHtml = profileImageUrl ? `<img src="${profileImageUrl}" alt="${displayName}" class="hero-avatar">` : '';
+        const profileObjectPosition = getProfileObjectPosition(userObj);
+        const avatarHtml = profileImageUrl ? `<img src="${profileImageUrl}" alt="${displayName}" class="hero-avatar" style="object-position:${profileObjectPosition};">` : '';
         const points = Number(userObj.points || 0);
         const activeTitle = POINT_STORE_ITEMS.find((item) => item.id === userObj.activeTitleId);
         const activeTitleHtml = activeTitle ? `<span class="hero-title-badge">${activeTitle.title}</span>` : '';
@@ -803,7 +819,7 @@ function injectLogoutButton() {
             ${myPageBtnHtml}
             <button onclick="toggleNotificationPanel()" type="button" style="color:#f8efe4; font-size:0.88rem; margin-right:12px; font-weight:700; text-decoration:none; padding:6px 12px; border:1px solid rgba(255,255,255,0.2); border-radius:999px; background:rgba(255,255,255,0.08); cursor:pointer;">알림${unreadCount > 0 ? ` ${unreadCount}` : ''}</button>
             <a href="points.html" style="color:#fde68a; font-size:0.88rem; margin-right:12px; font-weight:700; text-decoration:none; padding:6px 12px; border:1px solid rgba(253,230,138,0.34); border-radius:999px; background:rgba(253,230,138,0.08);">${points}pt</a>
-            ${profileImageUrl ? `<img src="${profileImageUrl}" alt="${displayName}" style="width:34px; height:34px; object-fit:cover; border-radius:999px; margin-right:10px; border:1px solid rgba(255,255,255,0.24);">` : ''}
+            ${profileImageUrl ? `<img src="${profileImageUrl}" alt="${displayName}" style="width:34px; height:34px; object-fit:cover; object-position:${profileObjectPosition}; border-radius:999px; margin-right:10px; border:1px solid rgba(255,255,255,0.24);">` : ''}
             <span style="color:#e2e8f0; font-size:0.95rem; margin-right:15px; font-weight:500;">${displayName}님</span>
             <button onclick="logout()" style="background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); padding:6px 16px; border-radius:8px; cursor:pointer; font-weight:600; font-family:inherit; transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.25)'" onmouseout="this.style.background='rgba(239,68,68,0.15)'">로그아웃</button>
         `;

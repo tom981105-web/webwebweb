@@ -40,6 +40,34 @@
         return safeParse(localStorage.getItem('users_db') || '{}', {});
     }
 
+    function normalizeProfileImageUrl(value) {
+        const rawValue = String(value || '').trim();
+        if (!rawValue) return '';
+        const localhostMatch = rawValue.match(/^https?:\/\/localhost:\d+(\/uploads\/.+)$/i);
+        const normalized = localhostMatch ? localhostMatch[1] : rawValue;
+        if (/^\/uploads\//i.test(normalized)) {
+            return window.location.protocol === 'file:' ? `${getApiBase()}${normalized}` : normalized;
+        }
+        return /^https?:\/\//i.test(normalized) ? normalized : '';
+    }
+
+    function normalizeProfileFocusValue(value) {
+        const numericValue = Number(value);
+        return Number.isFinite(numericValue) ? Math.min(100, Math.max(0, numericValue)) : 50;
+    }
+
+    function getUserProfileMeta(userId) {
+        const users = getUsersDb();
+        const author = String(userId || '').trim();
+        const user = users[author] || {};
+        return {
+            name: user.nickname || author || '익명',
+            image: normalizeProfileImageUrl(user.profileImage || ''),
+            focusX: normalizeProfileFocusValue(user.profileFocusX),
+            focusY: normalizeProfileFocusValue(user.profileFocusY)
+        };
+    }
+
     function loadBoardCategories() {
         const saved = safeParse(localStorage.getItem('board_categories') || '[]', []);
         if (Array.isArray(saved) && saved.length === 4) {
@@ -267,9 +295,21 @@
     }
 
     function getAuthorDisplayName(authorId) {
-        const users = getUsersDb();
-        const author = (authorId || '').trim();
-        return users[author] && users[author].nickname ? users[author].nickname : author || '익명';
+        return getUserProfileMeta(authorId).name;
+    }
+
+    function renderAuthorWithAvatar(authorId) {
+        const meta = getUserProfileMeta(authorId);
+        const avatarHtml = meta.image
+            ? `<img src="${meta.image}" alt="${escapeHtml(meta.name)}" class="board-avatar-image" style="object-position:${meta.focusX}% ${meta.focusY}%;">`
+            : `<span class="board-avatar-fallback">${escapeHtml((meta.name || '익명').slice(0, 1))}</span>`;
+
+        return `
+            <span class="board-author-chip">
+                <span class="board-avatar">${avatarHtml}</span>
+                <span class="board-author-name">${escapeHtml(meta.name)}</span>
+            </span>
+        `;
     }
 
     function getSortedPosts() {
@@ -432,7 +472,7 @@
                 <td>${post.id}</td>
                 <td class="title-cell" onclick="openPostDetail(${post.id})">${hotTag}${post.title || '제목 없음'} ${imageIcon} ${commentBadge}</td>
                 <td><span class="post-category-badge">${escapeHtml(post.category || boardCategories[0])}</span></td>
-                <td>${getAuthorDisplayName(post.author)}</td>
+                <td>${renderAuthorWithAvatar(post.author)}</td>
                 <td>${formatDate(post.date)}</td>
                 <td>${post.views || 0}</td>
                 <td>${post.likes || 0}</td>
@@ -622,7 +662,7 @@
             return;
         }
         post.comments.forEach((comment, index) => {
-            const authorName = escapeHtml(getAuthorDisplayName(comment.author));
+            const authorChip = renderAuthorWithAvatar(comment.author);
             const commentText = escapeHtml(comment.text || '');
             const commentDate = escapeHtml(comment.date || '');
             const hasReply = Boolean(comment.reply && comment.reply.text);
@@ -631,7 +671,7 @@
             item.className = 'comment-item';
             item.innerHTML = `
                 <div class="comment-meta">
-                    <div class="c-author">${authorName}</div>
+                    <div class="c-author">${authorChip}</div>
                     <div>${commentDate}</div>
                     ${canReply ? `<button type="button" class="btn-reply" onclick="toggleReplyForm(${index})">답글 달기</button>` : ''}
                 </div>
@@ -649,7 +689,7 @@
                 reply.className = 'comment-reply';
                 reply.innerHTML = `
                     <div class="comment-meta">
-                        <div class="c-author author-marker">관리자 답글</div>
+                        <div class="c-author author-marker">${renderAuthorWithAvatar('admin')}</div>
                         <div>${escapeHtml(comment.reply.date || '')}</div>
                     </div>
                     <div class="comment-body">${escapeHtml(comment.reply.text || '')}</div>
@@ -719,7 +759,7 @@
         document.getElementById('detailCategory').innerText = post.category || boardCategories[0];
         document.getElementById('detailPostType').innerText = post.isNotice ? '공지글' : '일반글';
         document.getElementById('detailCommentMeta').innerText = `댓글 ${getCommentCount(post)}`;
-        document.getElementById('detailAuthor').innerText = getAuthorDisplayName(post.author);
+        document.getElementById('detailAuthor').innerHTML = renderAuthorWithAvatar(post.author);
         document.getElementById('detailTime').innerText = formatDate(post.date);
         document.getElementById('detailViews').innerText = post.views || 0;
         document.getElementById('detailContent').innerHTML = post.isRich
