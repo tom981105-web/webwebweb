@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>우리들의 아지트</title>
+    <meta name="description" content="친구들과 함께 머무는 프라이빗 커뮤니티 공간">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; img-src 'self' https: data:; font-src 'self' https: data:;">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap">
+    <script src="sync.js"></script>
+    <script src="auth.js"></script>
+</head>
+<body>
+    <div class="site-shell">
+        <header class="banner" id="mainBanner">
+            <div class="banner-gradient"></div>
+            <div class="hero-nav">
+                <div class="brand-lockup">
+                    <span class="brand-name">우리들의 아지트</span>
+                    <span class="brand-sub">Private Community Retreat</span>
+                </div>
+                <div class="hero-links" id="heroUtilityNav"></div>
+            </div>
+
+            <div class="banner-content">
+                <span class="hero-kicker">관심과 취향, 대화가 모이는 곳</span>
+                <h1 id="bannerTitle">우리들의 아지트</h1>
+                <p id="bannerDesc">우리끼리 모여 자유롭게 이야기하는 공간</p>
+                <div class="hero-actions">
+                    <a href="board.html" class="hero-action primary">이야기 보러가기</a>
+                    <a href="#menuSection" class="hero-action secondary">메뉴 둘러보기</a>
+                </div>
+            </div>
+
+            <div class="hero-foot">
+                <p class="hero-foot-copy">조용한 배경 위에 대화가 쌓이는 작은 커뮤니티. 화면이 길어져도 첫 화면의 분위기와 동선이 자연스럽게 이어지도록 정리했습니다.</p>
+                <span class="hero-scroll">Scroll to Explore</span>
+            </div>
+        </header>
+
+        <main class="container">
+            <div id="leftBanner" class="side-banner side-banner-left"></div>
+            <div id="rightBanner" class="side-banner side-banner-right"></div>
+
+            <section class="content-section">
+                <div class="section-header">
+                    <div class="section-copy">
+                        <h2>지금 올라온 이야기</h2>
+                        <p>최근 등록된 글만 가볍게 훑어보고 바로 들어갈 수 있게 정리했습니다.</p>
+                    </div>
+                    <a href="board.html" class="view-all">전체보기</a>
+                </div>
+                <div class="posts-list" id="recentPostsList">
+                    <div style="padding:20px 0; color:#6f5a47; text-align:center;">게시글을 불러오는 중입니다...</div>
+                </div>
+            </section>
+
+            <section class="content-section" id="menuSection">
+                <div class="section-header">
+                    <div class="section-copy">
+                        <h2>머무를 곳과 공간</h2>
+                        <p>각 메뉴가 어떤 분위기인지 먼저 살펴보고 바로 들어갈 수 있도록 정리했습니다.</p>
+                    </div>
+                </div>
+                <div class="menu-grid">
+                    <a href="mountain.html" class="menu-card">
+                        <div class="card-icon">산</div>
+                        <div class="menu-copy">
+                            <h3>등산</h3>
+                            <p>코스와 사진, 기록을 차분하게 모아보는 공간</p>
+                        </div>
+                    </a>
+                    <a href="ai.html" class="menu-card">
+                        <div class="card-icon">AI</div>
+                        <div class="menu-copy">
+                            <h3>AI</h3>
+                            <p>자주 쓰는 도구와 프롬프트를 가볍게 둘러볼 수 있는 공간</p>
+                        </div>
+                    </a>
+                    <a href="board.html" class="menu-card">
+                        <div class="card-icon">글</div>
+                        <div class="menu-copy">
+                            <h3>자유게시판</h3>
+                            <p>일상 이야기부터 짧은 잡담까지 편하게 머무는 메인 라운지</p>
+                        </div>
+                    </a>
+                    <div class="menu-card disabled">
+                        <div class="card-icon">준비</div>
+                        <div class="menu-copy">
+                            <h3>공사중</h3>
+                            <p>다음 업데이트에서 새로운 공간을 준비하고 있습니다</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        function safeParse(value, fallback) {
+            try {
+                return JSON.parse(value);
+            } catch (error) {
+                return fallback;
+            }
+        }
+
+        function getUsersDbLocal() {
+            return safeParse(localStorage.getItem('users_db') || '{}', {});
+        }
+
+        function formatPostDate(dateString) {
+            if (!dateString) return '-';
+            const [datePart, timePart] = String(dateString).split(' ');
+            const today = new Date().toISOString().split('T')[0];
+            if (datePart === today && timePart) return timePart;
+            return datePart || dateString;
+        }
+
+        function getCommentCount(post) {
+            if (!Array.isArray(post.comments)) return 0;
+            return post.comments.reduce((total, comment) => total + 1 + (comment.reply ? 1 : 0), 0, 0);
+        }
+
+        function normalizeStoredImage(url) {
+            const value = String(url || '').trim();
+            if (!value) return '';
+            if (value.startsWith('data:image/')) return value;
+            const localhostUploadMatch = value.match(/^https?:\/\/localhost:\d+(\/uploads\/.+)$/i);
+            if (localhostUploadMatch) return localhostUploadMatch[1];
+            if (/^\/uploads\//i.test(value)) return value;
+            return value;
+        }
+
+        function getDisplayName(authorId) {
+            const users = getUsersDbLocal();
+            const author = (authorId || '').trim();
+            return users[author] && users[author].nickname ? users[author].nickname : author || '익명';
+        }
+
+        function renderRecentPosts() {
+            const postsList = document.getElementById('recentPostsList');
+            const posts = safeParse(localStorage.getItem('board_posts') || '[]', []);
+
+            if (!Array.isArray(posts) || posts.length === 0) {
+                postsList.innerHTML = '<div style="padding:20px 0; color:#6f5a47; text-align:center;">최근 등록된 게시글이 없습니다. 첫 글을 남겨보세요.</div>';
+                return;
+            }
+
+            const sorted = [...posts].sort((a, b) => {
+                if (a.isNotice && !b.isNotice) return -1;
+                if (!a.isNotice && b.isNotice) return 1;
+                return (b.id || 0) - (a.id || 0);
+            }).slice(0, 5);
+
+            postsList.innerHTML = '';
+            sorted.forEach((post) => {
+                const isNotice = Boolean(post.isNotice);
+                const isHot = Number(post.likes || 0) >= 10 && !isNotice;
+                const commentCount = getCommentCount(post);
+                const comments = commentCount > 0 ? `<span style="color:#9f4f2e; font-size:0.85rem; margin-left:6px; font-weight:700;">[${commentCount}]</span>` : '';
+                const tagText = isNotice ? '공지' : (isHot ? '인기' : '자유');
+                const item = document.createElement('div');
+                item.className = 'post-item';
+                item.innerHTML = `
+                    <span class="post-tag">${tagText}</span>
+                    <a href="board.html?id=${post.id}" class="post-title">${post.title || '제목 없음'}${comments}</a>
+                    <span class="post-date"><span style="color:#8f755d; margin-right:8px;">${getDisplayName(post.author)}</span>${formatPostDate(post.date)}</span>
+                `;
+                postsList.appendChild(item);
+            });
+        }
+
+        function getBannerState() {
+            const defaults = {
+                top: { title: '우리들의 아지트', desc: '우리끼리 모여 자유롭게 이야기하는 공간', bg: '' },
+                left: { url: '', link: '#' },
+                right: { url: '', link: '#' }
+            };
+            const saved = safeParse(localStorage.getItem('site_banners') || '{}', {});
+            return {
+                top: { ...defaults.top, posX: 4, posY: 50, ...(saved.top || {}), bg: normalizeStoredImage(saved.top && saved.top.bg) },
+                left: { ...defaults.left, ...(saved.left || {}), url: normalizeStoredImage(saved.left && saved.left.url) },
+                right: { ...defaults.right, ...(saved.right || {}), url: normalizeStoredImage(saved.right && saved.right.url) }
+            };
+        }
+
+        function setSideBanner(id, data) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (data && data.url) {
+                el.innerHTML = `<a href="${data.link || '#'}" target="_blank" rel="noopener noreferrer"><img src="${data.url}" alt="banner"></a>`;
+                el.style.display = 'block';
+            } else {
+                el.innerHTML = '';
+                el.style.display = 'none';
+            }
+        }
+
+        function applyBanners() {
+            const banners = getBannerState();
+            document.getElementById('bannerTitle').innerText = banners.top.title || '우리들의 아지트';
+            document.getElementById('bannerDesc').innerText = banners.top.desc || '우리끼리 모여 자유롭게 이야기하는 공간';
+
+            const bannerEl = document.getElementById('mainBanner');
+            if (banners.top.bg) {
+                bannerEl.style.backgroundImage = `url('${banners.top.bg}')`;
+            } else {
+                bannerEl.style.backgroundImage = "linear-gradient(135deg, rgba(120, 87, 54, 0.25), rgba(47, 29, 15, 0.1)), url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1600&auto=format&fit=crop')";
+            }
+
+            const contentEl = bannerEl.querySelector('.banner-content');
+            if (contentEl && banners.top.posX !== undefined && banners.top.posY !== undefined) {
+                contentEl.style.position = 'absolute';
+                contentEl.style.left = banners.top.posX + '%';
+                contentEl.style.top = banners.top.posY + '%';
+                contentEl.style.transform = 'translate(-50%, -50%)';
+                contentEl.style.textAlign = 'left';
+            } else if (contentEl) {
+                contentEl.style.position = 'relative';
+                contentEl.style.left = '';
+                contentEl.style.top = '';
+                contentEl.style.transform = '';
+                contentEl.style.textAlign = '';
+            }
+
+            setSideBanner('leftBanner', banners.left);
+            setSideBanner('rightBanner', banners.right);
+        }
+
+        function applyMenuIcons() {
+            const menuIcons = safeParse(localStorage.getItem('menu_icons') || '{}', {});
+            const cards = document.querySelectorAll('.menu-card');
+            const keys = ['mountain', 'ai', 'board'];
+
+            keys.forEach((key, index) => {
+                const icon = menuIcons[key];
+                if (!icon || !cards[index]) return;
+                const target = cards[index].querySelector('.card-icon');
+                if (!target) return;
+                target.innerHTML = String(icon).startsWith('data:')
+                    ? `<img src="${icon}" style="width:100%; height:100%; object-fit:cover;">`
+                    : icon;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderRecentPosts();
+            applyBanners();
+            applyMenuIcons();
+        });
+    </script>
+</body>
+</html>

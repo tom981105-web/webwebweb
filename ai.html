@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 아카이브 - 우리들의 아지트</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="ai.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap">
+    <script src="sync.js"></script>
+    <script src="auth.js"></script>
+</head>
+<body>
+    <div class="ai-page">
+        <header class="page-header ai-hero">
+            <div class="ai-hero-nav">
+                <a href="index.html" class="ai-brand">
+                    <span class="ai-brand-name">우리들의 아지트</span>
+                    <span class="ai-brand-sub">AI Archive Lounge</span>
+                </a>
+                <div class="ai-hero-utility" id="heroUtilityNav"></div>
+            </div>
+
+            <div class="header-content ai-hero-copy">
+                <span class="ai-kicker">Curated Tools & Prompts</span>
+                <h1>AI 아카이브</h1>
+                <p>자주 쓰는 AI 서비스와 바로 가져다 쓸 프롬프트를 한 화면 안에서 정리해 두는 개인 라운지입니다.</p>
+            </div>
+
+            <div class="ai-hero-panels">
+                <div class="hero-panel">
+                    <strong>AI 컬렉션</strong>
+                    <span>텍스트, 이미지, 코딩 도구를 카테고리별로 빠르게 모아봅니다.</span>
+                </div>
+                <div class="hero-panel">
+                    <strong>프롬프트 보관함</strong>
+                    <span>자주 쓰는 문장을 검색하고 추천 AI까지 함께 기억합니다.</span>
+                </div>
+                <div class="hero-panel">
+                    <strong>개인화 관리</strong>
+                    <span>새 도구 추가, 수정, 삭제까지 지금 흐름 안에서 바로 정리할 수 있습니다.</span>
+                </div>
+            </div>
+        </header>
+
+        <main class="container ai-container">
+            <section class="ai-surface">
+                <div class="section-lead">
+                    <div class="section-copy">
+                        <span class="section-eyebrow">Tool Shelf</span>
+                        <h2>자주 쓰는 AI 모음</h2>
+                        <p>필터로 가볍게 좁혀 보고, 카드에서 분위기를 먼저 확인한 뒤 필요한 도구로 바로 이동할 수 있게 정리했습니다.</p>
+                    </div>
+                </div>
+
+                <div class="controls-bar">
+                    <div class="filter-group" id="filterGroup">
+                        <!-- Filters injected by JS -->
+                    </div>
+                    <button class="btn-primary" id="addAiBtn">+ 새 AI 추가</button>
+                </div>
+
+                <div class="ai-grid" id="aiGrid">
+                    <!-- Cards injected by JS -->
+                </div>
+            </section>
+
+            <section class="prompt-section ai-surface" id="promptSection">
+                <div class="section-lead">
+                    <div class="section-copy">
+                        <span class="section-eyebrow">Prompt Library</span>
+                        <h2>프롬프트 모음</h2>
+                        <p>상황별 프롬프트를 검색하고 정렬해 두고, 어떤 AI와 잘 맞는지도 같이 기록할 수 있도록 묶어 두었습니다.</p>
+                    </div>
+                </div>
+
+                <div class="controls-bar prompt-controls">
+                    <div class="search-sort-group">
+                        <input type="text" id="promptSearch" placeholder="프롬프트 제목이나 설명 검색" class="search-input">
+                        <select id="promptFilter" class="sort-select">
+                            <option value="전체">전체 카테고리</option>
+                        </select>
+                        <select id="promptSort" class="sort-select">
+                            <option value="latest">최신순</option>
+                            <option value="name">이름순</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary btn-prompt" id="addPromptBtn">+ 새 프롬프트</button>
+                </div>
+
+                <div class="prompt-grid" id="promptGrid">
+                    <!-- Prompt cards injected by JS -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <div class="modal" id="viewModal">
+        <div class="modal-content">
+            <button class="close-btn" id="closeViewModal">&times;</button>
+            <div class="modal-header">
+                <div class="modal-logo" id="viewLogo"></div>
+                <h2 id="viewTitle">AI 이름</h2>
+                <span class="badge" id="viewCategory">카테고리</span>
+            </div>
+            <div class="modal-body">
+                <p id="viewDescription">AI 설명이 여기에 표시됩니다.</p>
+                <a href="#" target="_blank" id="viewUrl" class="btn-link">방문하기</a>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="editAiBtn">수정</button>
+                <button class="btn-danger" id="deleteAiBtn">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="formModal">
+        <div class="modal-content">
+            <button class="close-btn" id="closeFormModal">&times;</button>
+            <h2 id="formModalTitle" class="modal-form-title">AI 추가</h2>
+            <form id="aiForm">
+                <input type="hidden" id="aiId">
+                <div class="form-group">
+                    <label for="aiName">AI 이름</label>
+                    <input type="text" id="aiName" required placeholder="예: ChatGPT">
+                </div>
+                <div class="form-group">
+                    <label for="aiLogo">로고</label>
+                    <div id="logoDropZone" class="drop-zone">
+                        <div id="logoPreview" class="logo-preview"></div>
+                        <span class="drop-zone-text">이미지를 드래그해 넣거나, 아래 입력칸에 이모지 또는 이미지 주소를 넣어 주세요.</span>
+                    </div>
+                    <input type="text" id="aiLogo" required placeholder="예: 🤖">
+                </div>
+                <div class="form-group">
+                    <label for="aiCategory">카테고리</label>
+                    <select id="aiCategory" required>
+                        <option value="텍스트">텍스트</option>
+                        <option value="이미지">이미지</option>
+                        <option value="오디오">오디오</option>
+                        <option value="비디오">비디오</option>
+                        <option value="코딩">코딩</option>
+                        <option value="기타">기타</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="aiUrl">사이트 주소</label>
+                    <input type="url" id="aiUrl" required placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label for="aiDescription">간단한 설명</label>
+                    <textarea id="aiDescription" rows="4" required placeholder="이 AI가 어떤 역할을 하는지 짧게 정리해 주세요."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelFormBtn">취소</button>
+                    <button type="submit" class="btn-primary" id="saveAiBtn">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="viewPromptModal">
+        <div class="modal-content prompt-view-content">
+            <button class="close-btn" id="closeViewPromptModal">&times;</button>
+            <div class="modal-header prompt-modal-header">
+                <h2 id="viewPromptTitle">프롬프트 제목</h2>
+                <div class="prompt-badges">
+                    <span class="badge badge-prompt" id="viewPromptCategory">카테고리</span>
+                    <span class="badge badge-ai" id="viewPromptRecommendedAi" style="display:none;">추천 AI</span>
+                </div>
+            </div>
+            <div class="modal-body">
+                <p id="viewPromptDesc" class="prompt-desc-text">설명</p>
+                <div class="prompt-code-block">
+                    <button class="copy-btn" id="copyPromptBtn">복사</button>
+                    <pre><code id="viewPromptText">프롬프트 내용...</code></pre>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="editPromptBtn">수정</button>
+                <button class="btn-danger" id="deletePromptBtn">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="formPromptModal">
+        <div class="modal-content">
+            <button class="close-btn" id="closeFormPromptModal">&times;</button>
+            <h2 id="formPromptModalTitle" class="modal-form-title">프롬프트 추가</h2>
+            <form id="promptForm">
+                <input type="hidden" id="promptId">
+                <div class="form-group">
+                    <label for="promptTitle">제목</label>
+                    <input type="text" id="promptTitle" required placeholder="예: SEO 최적화 블로그 초안">
+                </div>
+                <div class="form-group">
+                    <label for="promptCategory">카테고리</label>
+                    <select id="promptCategory" required>
+                        <option value="블로그">블로그</option>
+                        <option value="코딩">코딩</option>
+                        <option value="이미지">이미지</option>
+                        <option value="업무">업무</option>
+                        <option value="기타">기타</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>추천 AI</label>
+                    <div id="aiCheckboxList" class="ai-checkbox-list">
+                        <!-- JS injected Checkboxes -->
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="promptDescription">간단한 설명</label>
+                    <input type="text" id="promptDescription" required placeholder="어떤 상황에서 쓰는 프롬프트인지 적어 주세요.">
+                </div>
+                <div class="form-group">
+                    <label for="promptText">프롬프트 내용</label>
+                    <textarea id="promptText" rows="6" required placeholder="복사해서 바로 쓸 프롬프트 문장을 입력해 주세요."></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" id="cancelPromptFormBtn">취소</button>
+                    <button type="submit" class="btn-primary btn-prompt" id="savePromptBtn">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="ai.js"></script>
+</body>
+</html>

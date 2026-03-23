@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>마이페이지 - 우리들의 아지트</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="mypage.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap">
+    <script src="sync.js"></script>
+    <script src="auth.js"></script>
+</head>
+<body>
+    <div class="mypage-view">
+        <header class="mypage-hero">
+            <div class="mypage-nav">
+                <a href="index.html" class="mypage-brand">
+                    <span class="mypage-brand-name">우리들의 아지트</span>
+                    <span class="mypage-brand-sub">Member Profile Space</span>
+                </a>
+                <div class="mypage-hero-utility" id="heroUtilityNav"></div>
+            </div>
+
+            <div class="mypage-hero-copy">
+                <span class="mypage-kicker">My Page</span>
+                <h1>내 정보를 정리하는 공간</h1>
+                <p>자주 바꾸는 계정 정보만 남겨, 바로 수정하고 바로 저장할 수 있게 정리했습니다.</p>
+            </div>
+        </header>
+
+        <main class="mypage-shell">
+            <section class="mypage-intro">
+                <div>
+                    <h2>바로 수정할 수 있게</h2>
+                    <p>닉네임과 비밀번호 변경만 먼저 보이도록 정리해, 마이페이지가 과하게 길어지지 않게 맞췄습니다.</p>
+                </div>
+            </section>
+
+            <section class="mypage-grid">
+                <article class="mypage-card">
+                    <div class="card-header">
+                        <span class="card-kicker">Profile</span>
+                        <h2>닉네임 변경</h2>
+                        <p>지금 보여지는 이름을 새 닉네임으로 바꿀 수 있습니다.</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="nicknameInput">새 닉네임</label>
+                        <input type="text" id="nicknameInput" placeholder="닉네임을 입력해 주세요" autocomplete="nickname">
+                    </div>
+
+                    <button class="btn-save" onclick="updateNickname()">닉네임 저장</button>
+                </article>
+
+                <article class="mypage-card">
+                    <div class="card-header">
+                        <span class="card-kicker">Security</span>
+                        <h2>비밀번호 변경</h2>
+                        <p>현재 비밀번호를 확인한 뒤 새 비밀번호로 안전하게 변경합니다.</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="currentPw">현재 비밀번호</label>
+                        <input type="password" id="currentPw" placeholder="현재 비밀번호를 입력해 주세요" autocomplete="current-password">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newPw">새 비밀번호</label>
+                        <input type="password" id="newPw" placeholder="최소 4자 이상 입력해 주세요" autocomplete="new-password">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="confirmNewPw">새 비밀번호 확인</label>
+                        <input type="password" id="confirmNewPw" placeholder="새 비밀번호를 다시 입력해 주세요" autocomplete="new-password">
+                    </div>
+
+                    <button class="btn-save btn-save-accent" onclick="updatePassword()">비밀번호 변경</button>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <script src="mypage.js"></script>
+</body>
+</html>

@@ -1,0 +1,522 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>로그인 / 회원가입 - 우리들의 아지트</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap">
+    <script src="sync.js"></script>
+    <script src="auth.js"></script>
+    <style>
+        .login-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: stretch;
+            justify-content: center;
+            padding: 22px;
+        }
+
+        .login-shell {
+            width: min(1220px, 100%);
+            min-height: calc(100vh - 44px);
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(380px, 460px);
+            border-radius: 34px;
+            overflow: hidden;
+            box-shadow: 0 30px 90px rgba(67, 38, 17, 0.18);
+            background: rgba(255, 248, 237, 0.56);
+            border: 1px solid rgba(88, 60, 28, 0.08);
+        }
+
+        .brand-panel {
+            position: relative;
+            padding: 34px clamp(24px, 4vw, 46px) 42px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background:
+                linear-gradient(140deg, rgba(70, 41, 22, 0.64), rgba(18, 12, 9, 0.24)),
+                url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop') center/cover;
+        }
+
+        .brand-panel::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 240, 221, 0.06), rgba(15, 10, 8, 0.16));
+        }
+
+        .brand-top,
+        .brand-copy,
+        .brand-foot {
+            position: relative;
+            z-index: 1;
+        }
+
+        .brand-top {
+            display: flex;
+            align-items: center;
+        }
+
+        .brand-lockup {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .brand-name {
+            font-family: 'Marcellus', 'Cormorant Garamond', serif;
+            font-size: clamp(2.4rem, 5vw, 4.4rem);
+            line-height: 0.92;
+            letter-spacing: -0.05em;
+            color: #fff5e8;
+            font-weight: 400;
+        }
+
+        .brand-sub {
+            color: rgba(255, 241, 223, 0.74);
+            font-size: 0.82rem;
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+        }
+
+        .brand-copy {
+            max-width: 360px;
+            padding: 8px 0 22px;
+        }
+
+        .brand-kicker {
+            display: block;
+            margin-bottom: 18px;
+            color: rgba(255, 241, 223, 0.82);
+            font-size: 0.86rem;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .brand-title {
+            font-family: 'Marcellus', 'Cormorant Garamond', serif;
+            font-size: clamp(2.05rem, 4vw, 3.1rem);
+            line-height: 1.02;
+            letter-spacing: -0.05em;
+            color: #fff5e8;
+            font-weight: 400;
+        }
+
+        .brand-title .line {
+            display: block;
+        }
+
+        .brand-desc {
+            margin-top: 14px;
+            max-width: 320px;
+            color: rgba(255, 244, 231, 0.86);
+            font-size: 0.96rem;
+            line-height: 1.7;
+        }
+
+        .brand-foot {
+            max-width: 340px;
+            color: rgba(255, 244, 231, 0.78);
+            line-height: 1.72;
+            font-size: 0.9rem;
+        }
+
+        .form-panel {
+            background: rgba(255, 249, 241, 0.92);
+            padding: 40px 34px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-left: 1px solid rgba(88, 60, 28, 0.08);
+        }
+
+        .panel-head {
+            margin-bottom: 22px;
+        }
+
+        .panel-head h1 {
+            font-family: 'Marcellus', 'Cormorant Garamond', serif;
+            font-size: 2.4rem;
+            line-height: 0.96;
+            letter-spacing: -0.04em;
+            font-weight: 400;
+            color: var(--text-primary);
+        }
+
+        .panel-head p {
+            margin-top: 8px;
+            color: var(--text-secondary);
+            line-height: 1.65;
+        }
+
+        .auth-tabs {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 22px;
+            padding: 6px;
+            border-radius: 18px;
+            background: rgba(88, 60, 28, 0.05);
+            border: 1px solid rgba(88, 60, 28, 0.08);
+        }
+
+        .auth-tab {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
+            border-radius: 14px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-weight: 700;
+            transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+        }
+
+        .auth-tab.active {
+            background: rgba(255, 255, 255, 0.86);
+            color: var(--accent);
+            box-shadow: 0 10px 25px rgba(67, 38, 17, 0.08);
+        }
+
+        .auth-form {
+            display: none;
+            animation: fadeIn 0.28s ease;
+            padding: 2px 0 0;
+        }
+
+        .auth-form.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .auth-form .form-group {
+            margin-bottom: 16px;
+        }
+
+        .auth-form label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        .auth-form input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.88);
+            border: 1px solid rgba(88, 60, 28, 0.14);
+            padding: 15px 16px;
+            border-radius: 16px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            font-family: inherit;
+        }
+
+        .auth-form input:focus {
+            border-color: rgba(159, 79, 46, 0.48);
+            box-shadow: 0 0 0 4px rgba(159, 79, 46, 0.08);
+        }
+
+        .btn-submit {
+            width: 100%;
+            background: linear-gradient(135deg, #9f4f2e, #c17349);
+            color: #fff8f0;
+            border: none;
+            padding: 16px;
+            border-radius: 999px;
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin-top: 14px;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 16px 28px rgba(159, 79, 46, 0.2);
+        }
+
+        .invite-notice {
+            font-size: 0.84rem;
+            color: #9f4f2e;
+            margin-top: 8px;
+            display: block;
+            line-height: 1.6;
+        }
+
+        .pw-hint {
+            font-size: 0.85rem;
+            margin-top: 8px;
+            display: block;
+        }
+
+        @media (max-width: 980px) {
+            .login-shell {
+                grid-template-columns: 1fr;
+                min-height: auto;
+            }
+
+            .brand-panel {
+                min-height: 52vh;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .login-page {
+                padding: 12px;
+            }
+
+            .login-shell {
+                border-radius: 24px;
+            }
+
+            .brand-panel,
+            .form-panel {
+                padding: 22px 18px 26px;
+            }
+
+            .brand-copy {
+                padding: 28px 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="login-page">
+        <div class="login-shell">
+            <section class="brand-panel">
+                <div class="brand-top">
+                    <div class="brand-lockup">
+                        <span class="brand-name">우리들의 아지트</span>
+                        <span class="brand-sub">Private Community Retreat</span>
+                    </div>
+                </div>
+
+                <div class="brand-copy">
+                    <span class="brand-kicker">Welcome Back</span>
+                    <h2 class="brand-title"><span class="line">다시 이어가는</span><span class="line">우리들의 이야기</span></h2>
+                    <p class="brand-desc">자유게시판, 등산 기록, AI를 한곳에서 이어갑니다.</p>
+                </div>
+
+                <div class="brand-foot">
+                    처음이라면 초대 코드로 회원가입을 진행하면 됩니다.
+                </div>
+            </section>
+
+            <section class="form-panel">
+                <div class="panel-head">
+                    <h1>입장하기</h1>
+                    <p>계정이 있으면 로그인, 처음이라면 초대 코드로 가입해 주세요.</p>
+                </div>
+
+                <div class="auth-tabs">
+                    <div class="auth-tab active" id="tabLogin" onclick="switchTab('login')">로그인</div>
+                    <div class="auth-tab" id="tabSignup" onclick="switchTab('signup')">회원가입</div>
+                </div>
+
+                <form id="loginForm" class="auth-form active">
+                    <div class="form-group">
+                        <label for="loginId">아이디</label>
+                        <input type="text" id="loginId" required placeholder="아이디를 입력해 주세요">
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPw">비밀번호</label>
+                        <input type="password" id="loginPw" required placeholder="비밀번호를 입력해 주세요">
+                    </div>
+                    <button type="submit" class="btn-submit">로그인</button>
+                </form>
+
+                <form id="signupForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="signupId">아이디</label>
+                        <input type="text" id="signupId" required placeholder="새 아이디를 입력해 주세요">
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPw">비밀번호</label>
+                        <input type="password" id="signupPw" required placeholder="비밀번호를 입력해 주세요">
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPwConfirm">비밀번호 확인</label>
+                        <input type="password" id="signupPwConfirm" required placeholder="비밀번호를 다시 입력해 주세요">
+                        <span id="pwMatchMessage" class="pw-hint"></span>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupCode">초대 코드</label>
+                        <input type="text" id="signupCode" required placeholder="초대 코드를 입력해 주세요">
+                        <span class="invite-notice">초대 코드가 있어야 가입할 수 있습니다.</span>
+                    </div>
+                    <button type="submit" class="btn-submit">회원가입</button>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        function getApiBase() {
+            return window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
+        }
+
+        function getApiUrl(path) {
+            return getApiBase() + path;
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tabLogin').classList.remove('active');
+            document.getElementById('tabSignup').classList.remove('active');
+            document.getElementById('loginForm').classList.remove('active');
+            document.getElementById('signupForm').classList.remove('active');
+
+            if (tab === 'login') {
+                document.getElementById('tabLogin').classList.add('active');
+                document.getElementById('loginForm').classList.add('active');
+            } else {
+                document.getElementById('tabSignup').classList.add('active');
+                document.getElementById('signupForm').classList.add('active');
+            }
+        }
+
+        const signupPw = document.getElementById('signupPw');
+        const signupPwConfirm = document.getElementById('signupPwConfirm');
+        const pwMatchMessage = document.getElementById('pwMatchMessage');
+
+        function checkPasswordMatch() {
+            const pw = signupPw.value;
+            const confirm = signupPwConfirm.value;
+
+            if (!confirm) {
+                pwMatchMessage.textContent = '';
+                return;
+            }
+
+            if (pw !== confirm) {
+                pwMatchMessage.textContent = '비밀번호가 일치하지 않습니다.';
+                pwMatchMessage.style.color = '#b94738';
+            } else {
+                pwMatchMessage.textContent = '비밀번호가 일치합니다.';
+                pwMatchMessage.style.color = '#5f7d42';
+            }
+        }
+
+        signupPw.addEventListener('input', checkPasswordMatch);
+        signupPwConfirm.addEventListener('input', checkPasswordMatch);
+
+        document.getElementById('loginForm').onsubmit = (e) => {
+            e.preventDefault();
+            handleLogin(document.getElementById('loginId').value, document.getElementById('loginPw').value);
+        };
+
+        document.getElementById('signupForm').onsubmit = (e) => {
+            e.preventDefault();
+
+            const pw = document.getElementById('signupPw').value;
+            const pwConfirm = document.getElementById('signupPwConfirm').value;
+
+            if (pw !== pwConfirm) {
+                alert('비밀번호가 일치하지 않습니다. 다시 확인해 주세요.');
+                return;
+            }
+
+            const success = handleSignup(
+                document.getElementById('signupId').value,
+                pw,
+                document.getElementById('signupCode').value
+            );
+
+            if (success) {
+                document.getElementById('signupForm').reset();
+                pwMatchMessage.textContent = '';
+                switchTab('login');
+            }
+        };
+
+        (function setupLoginHeroRotation() {
+            const panel = document.querySelector('.brand-panel');
+            if (!panel) return;
+
+            let heroImages = [];
+            let currentImageIndex = 0;
+            let intervalSeconds = 10;
+            let randomOrder = false;
+            let rotationTimer = null;
+
+            function applyHeroImage(url) {
+                const fallbackLayer = "linear-gradient(140deg, rgba(70, 41, 22, 0.64), rgba(18, 12, 9, 0.24))";
+                const imageLayer = url
+                    ? `url('${url}') center/cover`
+                    : "url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop') center/cover";
+                panel.style.background = `${fallbackLayer}, ${imageLayer}`;
+            }
+
+            function normalizeHeroImageUrl(value) {
+                const rawValue = String(value || '').trim();
+                if (!rawValue) return '';
+                if (rawValue.startsWith('data:image/')) return rawValue;
+
+                const localhostMatch = rawValue.match(/^https?:\/\/localhost:\d+(\/uploads\/.+)$/i);
+                const uploadPath = localhostMatch ? localhostMatch[1] : rawValue;
+
+                if (/^\/uploads\//i.test(uploadPath)) {
+                    return window.location.protocol === 'file:' ? `${getApiBase()}${uploadPath}` : uploadPath;
+                }
+
+                return /^https?:\/\//i.test(rawValue) ? rawValue : '';
+            }
+
+            function getNextImageIndex() {
+                if (heroImages.length <= 1) return 0;
+                if (!randomOrder) return (currentImageIndex + 1) % heroImages.length;
+
+                let nextIndex = currentImageIndex;
+                while (nextIndex === currentImageIndex) {
+                    nextIndex = Math.floor(Math.random() * heroImages.length);
+                }
+                return nextIndex;
+            }
+
+            function restartRotation() {
+                if (rotationTimer) {
+                    clearInterval(rotationTimer);
+                    rotationTimer = null;
+                }
+                if (heroImages.length <= 1) return;
+                rotationTimer = setInterval(() => {
+                    currentImageIndex = getNextImageIndex();
+                    applyHeroImage(heroImages[currentImageIndex]);
+                }, intervalSeconds * 1000);
+            }
+
+            async function refreshHeroImages() {
+                let data = { images: [], intervalSeconds: 10, randomOrder: false };
+                try {
+                    const response = await fetch(getApiUrl('/api/login-hero'));
+                    if (response.ok) {
+                        data = await response.json();
+                    }
+                } catch (error) {
+                }
+
+                heroImages = Array.isArray(data.images)
+                    ? data.images.map(normalizeHeroImageUrl).filter(Boolean)
+                    : [];
+                intervalSeconds = Number.isFinite(Number(data.intervalSeconds)) ? Math.min(120, Math.max(3, Number(data.intervalSeconds))) : 10;
+                randomOrder = Boolean(data.randomOrder);
+                currentImageIndex = 0;
+                applyHeroImage(heroImages[0] || '');
+                restartRotation();
+            }
+
+            refreshHeroImages();
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>자유게시판 - 우리들의 아지트</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https: 'unsafe-inline' 'unsafe-eval'; img-src 'self' https: data:; font-src 'self' https: data:;">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="board.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap">
+    <script src="sync.js"></script>
+    <script src="auth.js"></script>
+</head>
+<body>
+    <div class="board-page">
+        <header class="page-header board-hero">
+            <div class="board-hero-nav">
+                <a href="index.html" class="board-brand">
+                    <span class="board-brand-name">우리들의 아지트</span>
+                    <span class="board-brand-sub">Free Board Lounge</span>
+                </a>
+                <div class="board-hero-utility" id="heroUtilityNav"></div>
+            </div>
+
+            <div class="header-content board-hero-copy">
+                <span class="board-kicker">Community Board</span>
+                <h1>자유게시판</h1>
+                <p>카페처럼 카테고리를 나눠 둘러보고, 원하는 글을 같은 화면 안에서 바로 읽을 수 있게 정리했습니다.</p>
+            </div>
+        </header>
+
+        <main class="board-shell board-frame">
+            <aside class="board-sidebar">
+                <section class="sidebar-card sidebar-intro">
+                    <span class="sidebar-kicker">Board Guide</span>
+                    <h2>게시판 둘러보기</h2>
+                    <p>카테고리를 고르면 해당 게시판 글만 모아보고, 공지와 인기 글도 같은 흐름에서 바로 확인할 수 있습니다.</p>
+                </section>
+
+                <section class="sidebar-card">
+                    <div class="sidebar-title-row">
+                        <h3>게시판 메뉴</h3>
+                    </div>
+                    <nav class="board-menu" id="boardCategoryMenu">
+                    </nav>
+                </section>
+
+                <section class="sidebar-card">
+                    <div class="sidebar-title-row">
+                        <h3>게시판 현황</h3>
+                    </div>
+                    <div class="board-stat-grid">
+                        <div class="board-stat-card">
+                            <strong id="boardTotalCount">0</strong>
+                            <span>현재 카테고리 글</span>
+                        </div>
+                        <div class="board-stat-card">
+                            <strong id="boardNoticeCount">0</strong>
+                            <span>고정 공지</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="sidebar-card">
+                    <div class="sidebar-title-row">
+                        <h3>공지 모아보기</h3>
+                    </div>
+                    <div class="sidebar-link-list" id="boardNoticeList"></div>
+                </section>
+
+                <section class="sidebar-card">
+                    <div class="sidebar-title-row">
+                        <h3>인기 글</h3>
+                    </div>
+                    <div class="sidebar-link-list" id="boardPopularList"></div>
+                </section>
+            </aside>
+
+            <section class="board-main">
+                <section class="board-toolbar">
+                    <div class="toolbar-copy">
+                        <span class="toolbar-eyebrow">Cafe Style Feed</span>
+                        <h2 id="boardCategoryTitle">카테고리 1</h2>
+                        <p id="boardCategoryDescription">선택한 카테고리의 공지와 최신 글을 한 흐름으로 보고, 검색과 글쓰기까지 바로 이어갈 수 있게 구성했습니다.</p>
+                    </div>
+
+                    <div class="board-header-actions">
+                        <div class="search-box">
+                            <select id="sortType">
+                                <option value="latest">최신순</option>
+                                <option value="likes">추천순</option>
+                                <option value="views">조회순</option>
+                            </select>
+                            <select id="searchType">
+                                <option value="title">제목</option>
+                                <option value="author">작성자</option>
+                            </select>
+                            <input type="text" id="searchInput" placeholder="검색어를 입력해 주세요">
+                            <button type="button" onclick="searchPosts()">검색</button>
+                        </div>
+                        <button class="btn-write" onclick="openWriteModal()">글쓰기</button>
+                    </div>
+                </section>
+
+                <section class="board-surface">
+                    <div class="board-surface-head">
+                        <div>
+                            <span class="surface-kicker">Recent Posts</span>
+                            <h3>게시글 목록</h3>
+                        </div>
+                    </div>
+
+                    <div id="boardPinnedNotice" class="board-pinned-notice" style="display:none;"></div>
+
+                    <div id="boardListView" class="board-list-view">
+                        <table class="board-table">
+                            <thead>
+                                <tr>
+                                    <th width="8%">번호</th>
+                                    <th width="48%">제목</th>
+                                    <th width="12%">카테고리</th>
+                                    <th width="12%">작성자</th>
+                                    <th width="12%">작성일</th>
+                                    <th width="4%">조회</th>
+                                    <th width="4%">추천</th>
+                                </tr>
+                            </thead>
+                            <tbody id="boardBody"></tbody>
+                        </table>
+                    </div>
+
+                    <section id="boardDetailView" class="board-detail-view" style="display:none;">
+                        <div class="inline-detail-top">
+                            <button type="button" class="board-back-button" onclick="closeDetailModal()">목록으로</button>
+                            <span class="surface-kicker">Post View</span>
+                        </div>
+
+                        <div class="detail-info-bar">
+                            <span class="detail-category" id="detailCategory">카테고리 1</span>
+                            <span class="detail-info-chip" id="detailPostType">일반글</span>
+                            <span class="detail-info-chip" id="detailCommentMeta">댓글 0</span>
+                        </div>
+
+                        <div class="post-detail-header">
+                            <h2 id="detailTitle">제목</h2>
+                            <div class="post-meta">
+                                <span id="detailAuthor" class="author">작성자</span>
+                                <span class="divider">|</span>
+                                <span id="detailTime">시간</span>
+                                <span class="divider">|</span>
+                                <span>조회 <b id="detailViews">0</b></span>
+                                <span class="divider">|</span>
+                                <span>추천 <b id="detailLikes">0</b></span>
+                                <span class="divider">|</span>
+                                <span>비추천 <b id="detailDislikes">0</b></span>
+                            </div>
+                        </div>
+
+                        <div class="post-detail-body" id="detailContent">내용</div>
+
+                        <div class="post-detail-actions">
+                            <div class="vote-actions">
+                                <button class="btn-like" id="likeBtn" onclick="toggleLike()">추천 <span id="btnLikeCount">0</span></button>
+                                <button class="btn-dislike" id="dislikeBtn" onclick="toggleDislike()">비추천 <span id="btnDislikeCount">0</span></button>
+                            </div>
+                            <div id="authorActions" style="display:none;">
+                                <button class="btn-secondary" onclick="editCurrentPost()">게시글 수정</button>
+                                <button class="btn-delete" onclick="deleteCurrentPost()">게시글 삭제</button>
+                            </div>
+                        </div>
+
+                        <div class="comments-section">
+                            <h3>댓글 <span id="commentCount">0</span></h3>
+                            <div id="commentsList" class="comments-list"></div>
+                            <form id="commentForm" class="comment-form">
+                                <input type="text" id="commentInput" placeholder="댓글을 자유롭게 남겨보세요" required autocomplete="off">
+                                <button type="submit">등록</button>
+                            </form>
+                        </div>
+
+                        <div class="detail-pagination">
+                            <button type="button" id="prevPostButton" class="detail-page-button" onclick="openAdjacentPost('prev')">이전글</button>
+                            <button type="button" id="nextPostButton" class="detail-page-button" onclick="openAdjacentPost('next')">다음글</button>
+                        </div>
+
+                        <section class="related-posts-section">
+                            <div class="sidebar-title-row">
+                                <h3>다른 게시글</h3>
+                            </div>
+                            <div id="relatedPostsList" class="related-posts-list"></div>
+                        </section>
+                    </section>
+                </section>
+            </section>
+        </main>
+    </div>
+
+    <div id="writeModal" class="modal">
+        <div class="modal-content write-modal-shell">
+            <span class="close-btn" onclick="closeWriteModal()">&times;</span>
+            <h2 class="modal-title">새 글 작성</h2>
+
+            <form id="writeForm" class="write-form-shell">
+                <div class="form-group title-row">
+                    <input type="text" id="postTitle" placeholder="제목을 입력해 주세요" required autocomplete="off" class="title-input">
+                    <label id="noticeToggleContainer" class="notice-toggle" style="display:none;">
+                        <input type="checkbox" id="isNotice"> 공지로 등록
+                    </label>
+                </div>
+
+                <div class="form-group category-row">
+                    <label for="postCategory" class="category-label">카테고리</label>
+                    <select id="postCategory" class="category-select">
+                        <option value="카테고리 1">카테고리 1</option>
+                        <option value="카테고리 2">카테고리 2</option>
+                        <option value="카테고리 3">카테고리 3</option>
+                        <option value="카테고리 4">카테고리 4</option>
+                    </select>
+                </div>
+
+                <div class="editor-toolbar">
+                    <button type="button" onclick="execCommand('bold')" title="굵게" class="tool-btn emphasis">B</button>
+                    <button type="button" onclick="execCommand('italic')" title="기울임" class="tool-btn italic">I</button>
+                    <button type="button" onclick="execCommand('underline')" title="밑줄" class="tool-btn underline">U</button>
+                    <div class="tool-divider"></div>
+                    <button type="button" onclick="insertYoutubePrompt()" title="유튜브 링크 삽입" class="tool-btn">유튜브</button>
+                    <button type="button" onclick="insertImageTrigger()" title="이미지 삽입" class="tool-btn">이미지</button>
+                    <input type="file" id="inlineImageInput" accept="image/*" style="display:none;" onchange="handleInlineImage(this)">
+                </div>
+
+                <div id="richEditor" contenteditable="true" class="rich-editor"><p><br></p></div>
+
+                <div class="modal-actions">
+                    <button type="button" onclick="closeWriteModal()" class="btn-secondary">취소</button>
+                    <button type="submit" class="btn-submit board-submit">등록하기</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="board.js"></script>
+</body>
+</html>

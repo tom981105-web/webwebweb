@@ -1,0 +1,1098 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>관리자 페이지 - 우리들의 아지트</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="sync.js"></script>
+    <script src="auth.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; }
+        .admin-page { min-height: 100vh; padding: 28px 20px 88px; }
+        .admin-shell { width: min(1180px, 100%); margin: 0 auto; }
+        .admin-top { position: relative; overflow: hidden; padding: 24px clamp(22px, 4vw, 38px) 32px; border-radius: 34px; background: linear-gradient(140deg, rgba(76, 45, 24, 0.78), rgba(19, 13, 10, 0.46)), url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?q=80&w=1600&auto=format&fit=crop') center/cover; box-shadow: 0 28px 80px rgba(64, 34, 13, 0.18); margin-bottom: 30px; }
+        .admin-top::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(255, 239, 220, 0.08), rgba(11, 8, 7, 0.18)); }
+        .admin-top > * { position: relative; z-index: 1; }
+        .admin-top-brand { display: flex; flex-direction: column; gap: 2px; text-decoration: none; }
+        .admin-top-brand strong { font-family: 'Marcellus', 'Cormorant Garamond', serif; font-size: clamp(1.9rem, 4vw, 3rem); line-height: 0.95; letter-spacing: -0.04em; color: #fff4e6; font-weight: 400; }
+        .admin-top-brand span { color: rgba(255, 241, 223, 0.72); font-size: 0.8rem; letter-spacing: 0.22em; text-transform: uppercase; }
+        .admin-top-copy { position: relative; z-index: 1; max-width: 680px; padding-top: 42px; }
+        .admin-title { margin: 0 0 8px; font-size: clamp(3rem, 6vw, 5rem); line-height: 0.92; letter-spacing: -0.05em; color: #fff5e8; font-family: 'Marcellus', 'Cormorant Garamond', serif; font-weight: 400; }
+        .admin-subtitle { margin: 0; max-width: 560px; color: rgba(255, 244, 231, 0.86); font-size: 1.05rem; }
+        .admin-kicker { display: block; margin-top: 14px; margin-bottom: 16px; color: rgba(255, 241, 223, 0.8); font-size: 0.86rem; letter-spacing: 0.16em; text-transform: uppercase; }
+        .overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 0 0 18px; }
+        .overview-item { padding: 18px 18px 16px; border-radius: 22px; background: rgba(255, 250, 244, 0.72); border: 1px solid rgba(88, 60, 28, 0.1); box-shadow: 0 18px 40px rgba(70, 40, 15, 0.08); }
+        .overview-item strong { display: block; color: var(--accent); font-size: 0.82rem; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 10px; }
+        .overview-item p { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.7; }
+        .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+        .card { background: rgba(255, 248, 237, 0.76); border: 1px solid rgba(88, 60, 28, 0.1); border-radius: 28px; padding: 26px; box-shadow: 0 20px 48px rgba(70, 40, 15, 0.08); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+        .card.full { grid-column: 1 / -1; }
+        .card h2 { margin: 0; color: var(--text-primary); font-size: 2rem; line-height: 0.98; letter-spacing: -0.04em; font-family: 'Marcellus', 'Cormorant Garamond', serif; font-weight: 400; }
+        .card p.meta { margin: 10px 0 20px; color: var(--text-secondary); font-size: 0.96rem; }
+        .stack { display: flex; flex-direction: column; gap: 12px; }
+        .row { display: flex; gap: 10px; align-items: center; }
+        .row.wrap { flex-wrap: wrap; }
+        .row.stretch { align-items: stretch; }
+        input[type="text"], input[type="url"], textarea { width: 100%; box-sizing: border-box; border: 1px solid rgba(88, 60, 28, 0.14); background: rgba(255, 252, 248, 0.82); color: var(--text-primary); border-radius: 16px; padding: 14px 16px; font: inherit; outline: none; }
+        textarea { min-height: 110px; resize: vertical; }
+        input:focus, textarea:focus { border-color: rgba(159, 79, 46, 0.5); box-shadow: 0 0 0 4px rgba(159, 79, 46, 0.08); }
+        button { border: 0; border-radius: 999px; padding: 12px 18px; font: inherit; font-weight: 700; cursor: pointer; transition: transform 0.15s ease, opacity 0.15s ease; white-space: nowrap; flex-shrink: 0; }
+        button:hover { transform: translateY(-1px); }
+        .btn-primary { background: linear-gradient(135deg, #9f4f2e, #c17349); color: #fff8f0; }
+        .btn-green { background: linear-gradient(135deg, #5f7d42, #7d9b5b); color: #fffef8; }
+        .btn-red { background: rgba(189, 73, 56, 0.1); color: #9f3f32; border: 1px solid rgba(189, 73, 56, 0.18); }
+        .btn-muted { background: rgba(88, 60, 28, 0.06); color: var(--text-secondary); border: 1px solid rgba(88, 60, 28, 0.12); }
+        .list { display: flex; flex-direction: column; gap: 12px; }
+        .list-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; padding: 16px 18px; border-radius: 20px; background: rgba(255, 252, 248, 0.76); border: 1px solid rgba(88, 60, 28, 0.1); }
+        .list-item strong { color: var(--text-primary); display: block; margin-bottom: 4px; }
+        .list-item .sub { color: var(--text-secondary); font-size: 0.92rem; line-height: 1.7; }
+        .list-item-main { min-width: 0; flex: 1; word-break: keep-all; overflow-wrap: anywhere; }
+        .action-group { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; min-width: 210px; }
+        .action-group button { min-width: 62px; }
+        .user-list-item { flex-direction: column; align-items: stretch; }
+        .user-list-item .list-item-main { width: 100%; max-width: 100%; }
+        .user-list-item .sub { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+        .user-list-item .action-group { width: 100%; min-width: 0; justify-content: flex-start; }
+        .point-control { display: flex; align-items: center; gap: 8px; width: 100%; justify-content: flex-end; margin-top: 2px; }
+        .point-input { width: 92px; max-width: 100%; border: 1px solid rgba(88, 60, 28, 0.14); background: rgba(255, 252, 248, 0.82); color: var(--text-primary); border-radius: 12px; padding: 10px 12px; font: inherit; }
+        .point-value { color: var(--accent); font-weight: 800; }
+        .badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; }
+        .badge.admin { background: rgba(215, 167, 63, 0.16); color: #9a6a00; }
+        .badge.regular { background: rgba(95, 125, 66, 0.16); color: #557138; }
+        .badge.pending { background: rgba(88, 60, 28, 0.08); color: #7a6554; }
+        .upload-box { border: 1px dashed rgba(88, 60, 28, 0.2); border-radius: 24px; padding: 18px; background: rgba(253, 249, 243, 0.72); }
+        .upload-box.dragover { border-color: rgba(159, 79, 46, 0.46); background: rgba(159, 79, 46, 0.08); }
+        .preview { width: 100%; border-radius: 18px; display: none; margin-top: 12px; object-fit: cover; background: rgba(230, 219, 205, 0.7); }
+        .preview.top { max-height: 240px; }
+        .preview.side { max-height: 320px; object-fit: contain; }
+        .preview.login { max-height: 220px; }
+        .hint { color: var(--text-secondary); font-size: 0.92rem; }
+        .login-zip-status { margin-top: 10px; color: var(--text-secondary); font-size: 0.92rem; line-height: 1.6; }
+        .setting-box { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+        .setting-box label { color: var(--text-secondary); font-size: 0.92rem; }
+        .setting-box input[type="number"] { width: 110px; max-width: 100%; }
+        .setting-check { display: inline-flex; align-items: center; gap: 8px; color: var(--text-secondary); }
+        .banner-positioner { position: relative; min-height: 280px; margin-top: 16px; border-radius: 24px; overflow: hidden; background: linear-gradient(135deg, rgba(142, 111, 82, 0.9), rgba(79, 54, 36, 0.98)); border: 1px solid rgba(255, 255, 255, 0.16); }
+        .banner-positioner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(22, 14, 10, 0.12), rgba(22, 14, 10, 0.48)); pointer-events: none; }
+        .banner-bg { position: absolute; inset: 0; background-size: cover; background-position: center; background-repeat: no-repeat; }
+        .banner-copy { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); max-width: min(88%, 520px); padding: 20px 22px; border-radius: 22px; background: rgba(255, 248, 240, 0.18); border: 1px solid rgba(255, 255, 255, 0.16); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); cursor: grab; user-select: none; z-index: 1; }
+        .banner-copy.dragging { cursor: grabbing; box-shadow: 0 18px 45px rgba(15, 23, 42, 0.2); }
+        .banner-copy h3 { margin: 0 0 8px; color: #fff7ee; font-size: 1.8rem; line-height: 1.15; font-family: 'Marcellus', 'Cormorant Garamond', serif; font-weight: 400; }
+        .banner-copy p { margin: 0; color: rgba(255, 244, 231, 0.92); line-height: 1.6; }
+        .position-row { justify-content: space-between; align-items: center; color: var(--text-secondary); font-size: 0.9rem; margin-top: 14px; }
+        .position-fields { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .mini-field { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+        .mini-field input { width: 80px; padding: 10px 12px; border-radius: 12px; }
+        .save-row { display: flex; justify-content: space-between; align-items: center; gap: 18px; flex-wrap: wrap; }
+        .save-copy { color: var(--text-secondary); max-width: 520px; line-height: 1.7; }
+        .status-list { display: flex; flex-direction: column; gap: 12px; }
+        .status-item { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 18px; background: rgba(255, 252, 248, 0.76); border: 1px solid rgba(88, 60, 28, 0.1); }
+        .status-item strong { color: var(--text-primary); font-size: 0.95rem; }
+        .status-item span { color: var(--text-secondary); font-size: 0.9rem; text-align: right; }
+        .status-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 78px; padding: 7px 12px; border-radius: 999px; font-size: 0.82rem; font-weight: 700; }
+        .status-pill.ready { background: rgba(95, 125, 66, 0.16); color: #557138; }
+        .status-pill.pending { background: rgba(215, 167, 63, 0.14); color: #946500; }
+        .status-pill.offline { background: rgba(189, 73, 56, 0.1); color: #9f3f32; }
+        .status-note { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; }
+        @media (max-width: 960px) {
+            .overview, .grid { grid-template-columns: 1fr; }
+            .card.full { grid-column: auto; }
+            .card { padding: 24px 22px; }
+            .banner-positioner { min-height: 240px; }
+            .list-item { flex-direction: column; align-items: stretch; }
+            .action-group { width: 100%; justify-content: flex-start; min-width: 0; }
+            .point-control { justify-content: flex-start; }
+            .status-item { align-items: flex-start; flex-direction: column; }
+            .status-item span { text-align: left; }
+        }
+        @media (max-width: 720px) {
+            .admin-page { padding: 18px 14px 70px; }
+            .admin-top { border-radius: 26px; padding: 22px 18px 28px; }
+            .admin-top-copy { padding-top: 30px; }
+            .admin-title { font-size: clamp(2.5rem, 12vw, 3.6rem); }
+            .admin-subtitle { font-size: 0.96rem; line-height: 1.65; }
+            .overview { gap: 12px; margin-bottom: 14px; }
+            .overview-item { padding: 16px; border-radius: 18px; }
+            .card { padding: 20px 18px; border-radius: 24px; }
+            .card h2 { font-size: 1.72rem; }
+            .card p.meta { margin-bottom: 16px; }
+            .row { gap: 8px; }
+            .row.stretch { flex-direction: column; }
+            input[type="text"], input[type="url"], textarea { padding: 13px 14px; border-radius: 14px; }
+            button { width: 100%; min-height: 46px; }
+            .list-item { padding: 14px 15px; border-radius: 18px; }
+            .action-group button { flex: 1 1 100%; }
+            .point-control { justify-content: stretch; flex-wrap: wrap; }
+            .point-input { width: 100%; }
+            .upload-box { padding: 16px; border-radius: 20px; }
+            .banner-positioner { min-height: 200px; border-radius: 20px; }
+            .banner-copy { width: min(90%, 280px); padding: 16px; border-radius: 18px; }
+            .banner-copy h3 { font-size: 1.45rem; }
+            .banner-copy p { font-size: 0.92rem; line-height: 1.55; }
+            .position-row { gap: 12px; align-items: flex-start; }
+            .position-fields { width: 100%; }
+            .mini-field { flex: 1 1 120px; }
+            .mini-field input { width: 100%; }
+            .save-row { align-items: flex-start; }
+        }
+        @media (max-width: 480px) {
+            .admin-page { padding-inline: 12px; }
+            .admin-top { padding: 20px 16px 24px; }
+            .admin-kicker { margin-top: 6px; margin-bottom: 12px; letter-spacing: 0.13em; }
+            .overview-item p,
+            .save-copy,
+            .hint,
+            .list-item .sub { font-size: 0.88rem; line-height: 1.6; }
+            .banner-positioner { min-height: 184px; }
+            .position-fields { flex-direction: column; align-items: stretch; }
+        }
+    </style>
+</head>
+<body>
+    <main class="admin-page">
+    <div class="admin-shell">
+        <div class="admin-top">
+            <a href="index.html" class="admin-top-brand">
+                <strong>우리들의 아지트</strong>
+                <span>Management Hub</span>
+            </a>
+            <div class="admin-top-copy">
+                <span class="admin-kicker">Management Hub</span>
+                <h1 class="admin-title">관리자 페이지</h1>
+                <p class="admin-subtitle">초대 코드, 회원 승인, 배너 편집을 한 흐름 안에서 정리해 빠르게 관리할 수 있도록 재구성했습니다.</p>
+            </div>
+        </div>
+
+        <section class="overview">
+            <div class="overview-item">
+                <strong>초대 코드</strong>
+                <p>가입 접근을 통제하는 코드를 만들고, 재사용 허용 여부까지 바로 관리합니다.</p>
+            </div>
+            <div class="overview-item">
+                <strong>회원 관리</strong>
+                <p>승인, 대기, 삭제 흐름을 한눈에 보고 즉시 처리할 수 있도록 정리했습니다.</p>
+            </div>
+            <div class="overview-item">
+                <strong>배너 편집</strong>
+                <p>메인 배너 이미지와 문구 위치, 좌우 배너까지 같은 톤 안에서 다룹니다.</p>
+            </div>
+        </section>
+
+        <div class="grid">
+            <section class="card">
+                <h2>초대 코드</h2>
+                <p class="meta">가입 초대 코드를 만들고 삭제할 수 있습니다.</p>
+                <div class="row stretch wrap">
+                    <input id="newCodeInput" type="text" placeholder="비워두면 자동 생성">
+                    <button class="btn-green" id="createCodeButton" type="button">코드 생성</button>
+                </div>
+                <div class="stack" style="margin-top: 12px;">
+                    <label class="hint">
+                        <input id="reuseCodeToggle" type="checkbox">
+                        초대 코드 재사용 허용
+                    </label>
+                </div>
+                <div class="list" id="codeList" style="margin-top: 18px;"></div>
+            </section>
+
+            <section class="card">
+                <h2>회원 관리</h2>
+                <p class="meta">가입한 회원 상태를 승인/대기/삭제로 관리합니다.</p>
+                <div class="list" id="userList"></div>
+            </section>
+
+            <section class="card">
+                <h2>게시판 카테고리</h2>
+                <p class="meta">자유게시판에서 사용할 카테고리 이름 4개를 관리합니다.</p>
+                <div class="stack" id="boardCategoryFields">
+                    <input type="text" id="boardCategory1" placeholder="카테고리 1">
+                    <input type="text" id="boardCategory2" placeholder="카테고리 2">
+                    <input type="text" id="boardCategory3" placeholder="카테고리 3">
+                    <input type="text" id="boardCategory4" placeholder="카테고리 4">
+                </div>
+                <div class="row wrap" style="margin-top: 16px;">
+                    <button class="btn-primary" id="saveBoardCategoriesButton" type="button">카테고리 저장</button>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>클라우드 상태</h2>
+                <p class="meta">Railway 배포 전에 저장소와 백업 연결 준비 상태를 이곳에서 바로 확인합니다.</p>
+                <div class="status-list" id="cloudStatusList">
+                    <div class="status-item">
+                        <strong>저장소 공급자</strong>
+                        <span id="storageProviderLabel">확인 중...</span>
+                    </div>
+                    <div class="status-item">
+                        <strong>R2 연결 준비</strong>
+                        <span id="r2StatusBadge" class="status-pill pending">확인 중</span>
+                    </div>
+                    <div class="status-item">
+                        <strong>백업 저장소</strong>
+                        <span id="backupStatusBadge" class="status-pill pending">확인 중</span>
+                    </div>
+                    <div class="status-item">
+                        <strong>최근 백업</strong>
+                        <span id="latestBackupLabel">확인 중...</span>
+                    </div>
+                </div>
+                <div class="row wrap" style="margin-top: 16px;">
+                    <button class="btn-muted" id="refreshCloudStatusButton" type="button">상태 새로고침</button>
+                    <button class="btn-primary" id="runR2BackupButton" type="button">R2 백업 실행</button>
+                </div>
+                <div id="cloudStatusMessage" class="status-note" style="margin-top: 14px;">아직 확인되지 않았습니다.</div>
+            </section>
+
+            <section class="card full">
+                <h2>상단 배너</h2>
+                <p class="meta">메인 상단 배너의 제목, 설명, 배경 이미지를 관리합니다.</p>
+                <div class="stack">
+                    <input id="topBannerTitle" type="text" placeholder="배너 제목">
+                    <textarea id="topBannerDesc" placeholder="배너 설명"></textarea>
+                    <div class="upload-box" id="topUploadBox">
+                        <div class="row wrap">
+                            <input id="topFileInput" type="file" accept="image/*">
+                            <button class="btn-muted" type="button" id="clearTopBannerButton">상단 이미지 제거</button>
+                        </div>
+                        <input id="topBannerBg" type="hidden">
+                        <input id="topBannerX" type="hidden" value="4">
+                        <input id="topBannerY" type="hidden" value="50">
+                        <div id="topBannerPositioner" class="banner-positioner">
+                            <div id="topBannerPreviewBg" class="banner-bg"></div>
+                            <div id="topBannerCopy" class="banner-copy">
+                                <h3 id="topBannerPreviewTitle">우리들의 아지트</h3>
+                                <p id="topBannerPreviewDesc">우리끼리 모여 자유롭게 이야기하는 공간</p>
+                            </div>
+                        </div>
+                        <div class="row wrap position-row">
+                            <span>문구를 직접 끌어서 위치를 정할 수 있습니다.</span>
+                            <div class="position-fields">
+                                <label class="mini-field">X <input id="topBannerXField" type="number" min="0" max="100" step="1" value="4"></label>
+                                <label class="mini-field">Y <input id="topBannerYField" type="number" min="0" max="100" step="1" value="50"></label>
+                            </div>
+                        </div>
+                        <p class="meta" style="margin: 14px 0 0;">기본 좌표는 메인 화면 기준 추천 위치인 `X 4 / Y 50`으로 맞춰져 있습니다. 초기화하거나 새 배너를 만들면 이 구도를 기본값으로 사용합니다.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>좌측 배너</h2>
+                <p class="meta">사이드 배너 이미지와 링크를 설정합니다.</p>
+                <div class="stack">
+                    <input id="leftBannerLink" type="url" placeholder="https://example.com">
+                    <div class="upload-box" id="leftUploadBox">
+                        <div class="row wrap">
+                            <input id="leftFileInput" type="file" accept="image/*">
+                            <button class="btn-muted" type="button" data-clear-side="left">좌측 이미지 제거</button>
+                        </div>
+                        <input id="leftBannerUrl" type="hidden">
+                        <img id="leftPreview" class="preview side" alt="좌측 배너 미리보기">
+                    </div>
+                </div>
+            </section>
+
+            <section class="card">
+                <h2>우측 배너</h2>
+                <p class="meta">사이드 배너 이미지와 링크를 설정합니다.</p>
+                <div class="stack">
+                    <input id="rightBannerLink" type="url" placeholder="https://example.com">
+                    <div class="upload-box" id="rightUploadBox">
+                        <div class="row wrap">
+                            <input id="rightFileInput" type="file" accept="image/*">
+                            <button class="btn-muted" type="button" data-clear-side="right">우측 이미지 제거</button>
+                        </div>
+                        <input id="rightBannerUrl" type="hidden">
+                        <img id="rightPreview" class="preview side" alt="우측 배너 미리보기">
+                    </div>
+                </div>
+            </section>
+
+            <section class="card full">
+                <h2>배너 저장</h2>
+                <p class="meta">현재 입력한 배너 설정을 즉시 저장합니다.</p>
+                <div class="save-row">
+                    <div class="save-copy">배너 배경, 문구 위치, 좌우 사이드 배너까지 현재 화면 기준으로 저장됩니다. 메인과 같은 분위기를 유지하면서 편집할 수 있게 구성했습니다.</div>
+                    <button class="btn-primary" id="saveBannerButton" type="button">배너 저장</button>
+                </div>
+            </section>
+
+            <section class="card full">
+                <h2>로그인 화면 이미지</h2>
+                <p class="meta">`zip` 안의 이미지들을 로그인 화면 배경으로 저장하고, 순환 시간과 랜덤 재생 여부를 함께 관리합니다.</p>
+                <div class="stack">
+                    <div class="upload-box" id="loginZipUploadBox">
+                        <div class="row wrap">
+                            <input id="loginZipInput" type="file" accept=".zip,application/zip">
+                            <button class="btn-muted" type="button" id="clearLoginZipButton">로그인 이미지 제거</button>
+                        </div>
+                        <div class="setting-box">
+                            <label for="loginRotationSeconds">순환 시간(초)</label>
+                            <input id="loginRotationSeconds" type="number" min="3" max="120" step="1" value="10">
+                            <label class="setting-check">
+                                <input id="loginRandomOrder" type="checkbox">
+                                랜덤 순서로 재생
+                            </label>
+                            <button class="btn-primary" type="button" id="saveLoginSettingsButton">설정 저장</button>
+                        </div>
+                        <div id="loginZipStatus" class="login-zip-status">아직 저장된 로그인 배경 이미지가 없습니다.</div>
+                        <img id="loginZipPreview" class="preview login" alt="로그인 화면 미리보기">
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+    </main>
+
+    <script>
+        function getApiBase() {
+            return window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
+        }
+
+        function getApiUrl(path) {
+            return getApiBase() + path;
+        }
+
+        function getUsersDbSafe() {
+            try {
+                return JSON.parse(localStorage.getItem('users_db') || '{}');
+            } catch (error) {
+                return {};
+            }
+        }
+
+        function assertAdmin() {
+            const usersDb = getUsersDbSafe();
+            const currentUser = localStorage.getItem('current_user') || '';
+            const userKey = Object.keys(usersDb).find((key) => key.toLowerCase() === currentUser.toLowerCase());
+            const user = userKey ? usersDb[userKey] : null;
+            const isAdmin = currentUser.toLowerCase() === 'admin' || Boolean(user && user.isAdmin);
+
+            if (!isAdmin) {
+                alert('관리자만 접근할 수 있습니다.');
+                window.location.href = 'index.html';
+            }
+        }
+
+        function getInviteCodesSafe() {
+            try {
+                return JSON.parse(localStorage.getItem('invite_codes') || '[]');
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function getBoardCategoriesSafe() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('board_categories') || '[]');
+                if (Array.isArray(saved) && saved.length === 4) {
+                    return saved.map((item, index) => String(item || '').trim() || `카테고리 ${index + 1}`);
+                }
+            } catch (error) {
+            }
+            return ['카테고리 1', '카테고리 2', '카테고리 3', '카테고리 4'];
+        }
+
+        function renderBoardCategoryFields() {
+            const categories = getBoardCategoriesSafe();
+            categories.forEach((name, index) => {
+                const input = document.getElementById(`boardCategory${index + 1}`);
+                if (input) input.value = name;
+            });
+        }
+
+        function saveBoardCategories() {
+            const categories = Array.from({ length: 4 }, (_, index) => {
+                const input = document.getElementById(`boardCategory${index + 1}`);
+                return String(input && input.value ? input.value : '').trim() || `카테고리 ${index + 1}`;
+            });
+            localStorage.setItem('board_categories', JSON.stringify(categories));
+            alert('게시판 카테고리를 저장했습니다.');
+        }
+
+        function setCloudBadge(id, mode, text) {
+            const badge = document.getElementById(id);
+            if (!badge) return;
+            badge.className = `status-pill ${mode}`;
+            badge.textContent = text;
+        }
+
+        async function refreshCloudStatus() {
+            const providerLabel = document.getElementById('storageProviderLabel');
+            const statusMessage = document.getElementById('cloudStatusMessage');
+            const latestBackupLabel = document.getElementById('latestBackupLabel');
+
+            if (providerLabel) providerLabel.textContent = '확인 중...';
+            if (latestBackupLabel) latestBackupLabel.textContent = '확인 중...';
+            setCloudBadge('r2StatusBadge', 'pending', '확인 중');
+            setCloudBadge('backupStatusBadge', 'pending', '확인 중');
+            if (statusMessage) statusMessage.textContent = '서버 상태를 불러오는 중입니다.';
+
+            try {
+                const response = await fetch(getApiUrl('/api/admin/storage-status'));
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || data.success === false) {
+                    throw new Error(data.message || '클라우드 상태를 불러오지 못했습니다.');
+                }
+
+                const provider = data.storage && data.storage.provider ? data.storage.provider : 'local';
+                const r2Ready = Boolean(data.storage && data.storage.isR2Configured);
+                const backupReady = Boolean(data.backup && data.backup.configured);
+                const backupProvider = data.backup && data.backup.provider ? data.backup.provider : 'local';
+                const latestBackup = data.backup && data.backup.latest ? data.backup.latest : null;
+
+                if (providerLabel) providerLabel.textContent = provider === 'r2' ? 'r2' : 'local';
+                if (latestBackupLabel) {
+                    latestBackupLabel.textContent = latestBackup
+                        ? `${latestBackup.name} · ${formatBackupDate(latestBackup.lastModified)}`
+                        : '아직 백업 없음';
+                }
+                setCloudBadge('r2StatusBadge', r2Ready ? 'ready' : 'pending', r2Ready ? '준비됨' : '미설정');
+                setCloudBadge('backupStatusBadge', backupReady ? 'ready' : 'pending', backupReady ? `${backupProvider} 준비됨` : '미설정');
+
+                if (statusMessage) {
+                    statusMessage.textContent = r2Ready
+                        ? `R2 업로드와 백업 저장소가 준비되었습니다. 백업은 최근 ${data.backup && data.backup.retainCount ? data.backup.retainCount : 2}개만 유지됩니다.`
+                        : '.env 또는 Railway Variables에 R2 값을 넣어야 다음 단계 테스트가 가능합니다.';
+                }
+            } catch (error) {
+                if (providerLabel) providerLabel.textContent = '오프라인';
+                if (latestBackupLabel) latestBackupLabel.textContent = '확인 실패';
+                setCloudBadge('r2StatusBadge', 'offline', '연결 실패');
+                setCloudBadge('backupStatusBadge', 'offline', '연결 실패');
+                if (statusMessage) statusMessage.textContent = error.message || '서버에 연결하지 못했습니다.';
+            }
+        }
+
+        function formatBackupDate(value) {
+            if (!value) return '';
+            const date = new Date(value);
+            if (Number.isNaN(date.getTime())) return value;
+            return date.toLocaleString('ko-KR');
+        }
+
+        async function runR2Backup() {
+            const statusMessage = document.getElementById('cloudStatusMessage');
+            if (statusMessage) statusMessage.textContent = 'R2 백업을 실행하는 중입니다.';
+
+            try {
+                const response = await fetch(getApiUrl('/api/admin/backup/r2'), {
+                    method: 'POST'
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.success === false) {
+                    throw new Error(result.message || 'R2 백업 실행에 실패했습니다.');
+                }
+
+                const backupName = result.backup && result.backup.name ? result.backup.name : '백업 파일';
+                const removedCount = result.backup && Array.isArray(result.backup.removedKeys) ? result.backup.removedKeys.length : 0;
+                if (statusMessage) {
+                    statusMessage.textContent = removedCount > 0
+                        ? `${backupName} 백업을 저장했고 오래된 ${removedCount}개 백업을 정리했습니다.`
+                        : `${backupName} 백업을 R2에 저장했습니다.`;
+                }
+                setCloudBadge('backupStatusBadge', 'ready', 'r2 준비됨');
+                alert('R2 백업이 완료되었습니다.');
+            } catch (error) {
+                setCloudBadge('backupStatusBadge', 'pending', '미설정');
+                if (statusMessage) statusMessage.textContent = error.message || 'R2 백업에 실패했습니다.';
+                alert(error.message || 'R2 백업에 실패했습니다.');
+            }
+        }
+
+        function saveInviteCodes(codes) {
+            localStorage.setItem('invite_codes', JSON.stringify(codes));
+        }
+
+        function renderCodes() {
+            const list = document.getElementById('codeList');
+            const codes = getInviteCodesSafe();
+            list.innerHTML = '';
+
+            if (!codes.length) {
+                list.innerHTML = '<div class="list-item"><div><strong>발급된 코드가 없습니다.</strong><div class="sub">새 코드를 생성해 주세요.</div></div></div>';
+                return;
+            }
+
+            codes.forEach((code, index) => {
+                const item = document.createElement('div');
+                item.className = 'list-item';
+                item.innerHTML = `
+                    <div>
+                        <strong>${code}</strong>
+                        <div class="sub">초대 코드</div>
+                    </div>
+                    <button class="btn-red" type="button" data-delete-code="${index}">삭제</button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function createCode() {
+            const input = document.getElementById('newCodeInput');
+            const manualValue = input.value.trim();
+            const code = manualValue || `VIP-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
+            const codes = getInviteCodesSafe();
+
+            if (codes.includes(code)) {
+                alert('이미 존재하는 초대 코드입니다.');
+                return;
+            }
+
+            codes.push(code);
+            saveInviteCodes(codes);
+            input.value = '';
+            renderCodes();
+        }
+
+        function deleteCode(index) {
+            const codes = getInviteCodesSafe();
+            codes.splice(index, 1);
+            saveInviteCodes(codes);
+            renderCodes();
+        }
+
+        function getStatusBadge(status, isAdmin) {
+            if (isAdmin) return '<span class="badge admin">관리자</span>';
+            if (status === 'regular') return '<span class="badge regular">승인됨</span>';
+            return '<span class="badge pending">대기중</span>';
+        }
+
+        function renderUsers() {
+            const list = document.getElementById('userList');
+            const usersDb = getUsersDbSafe();
+            list.innerHTML = '';
+
+            const entries = Object.entries(usersDb);
+            if (!entries.length) {
+                list.innerHTML = '<div class="list-item"><div><strong>가입한 회원이 없습니다.</strong></div></div>';
+                return;
+            }
+
+            entries.forEach(([id, user]) => {
+                const item = document.createElement('div');
+                item.className = 'list-item user-list-item';
+                const isAdmin = id.toLowerCase() === 'admin' || user.isAdmin === true;
+                const status = isAdmin ? 'regular' : (user.status || 'pending');
+                item.innerHTML = `
+                    <div class="list-item-main">
+                        <strong>${id}</strong>
+                        <div class="sub">가입일: ${user.signupDate || '-'}</div>
+                        <div class="sub">최근 로그인: ${user.lastLogin || '-'}</div>
+                        <div class="sub">보유 포인트: <span class="point-value">${Number(user.points || 0)}pt</span></div>
+                        <div style="margin-top: 8px;">${getStatusBadge(status, isAdmin)}</div>
+                    </div>
+                    <div class="action-group">
+                        <div class="point-control">
+                            <input class="point-input" type="number" min="1" step="1" value="1" data-point-input="${id}">
+                            <button class="btn-primary" type="button" data-grant-points="${id}">지급</button>
+                            <button class="btn-muted" type="button" data-deduct-points="${id}">차감</button>
+                        </div>
+                        ${isAdmin ? '' : `<button class="btn-green" type="button" data-approve="${id}">승인</button>`}
+                        ${isAdmin ? '' : `<button class="btn-muted" type="button" data-pending="${id}">대기</button>`}
+                        ${isAdmin ? '' : `<button class="btn-red" type="button" data-delete-user="${id}">삭제</button>`}
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function updateUserStatus(id, status) {
+            const usersDb = getUsersDbSafe();
+            if (!usersDb[id]) return;
+            usersDb[id].status = status;
+            localStorage.setItem('users_db', JSON.stringify(usersDb));
+            renderUsers();
+        }
+
+        function deleteUser(id) {
+            const usersDb = getUsersDbSafe();
+            if (!usersDb[id]) return;
+            delete usersDb[id];
+            localStorage.setItem('users_db', JSON.stringify(usersDb));
+            renderUsers();
+        }
+
+        function adjustUserPoints(id, direction) {
+            const usersDb = getUsersDbSafe();
+            const input = document.querySelector(`[data-point-input="${id}"]`);
+            const amount = Number(input && input.value);
+
+            if (!usersDb[id]) return;
+            if (!Number.isFinite(amount) || amount <= 0) {
+                alert('1 이상 숫자를 입력해 주세요.');
+                return;
+            }
+
+            const currentPoints = Number(usersDb[id].points || 0);
+            const nextPoints = direction === 'deduct'
+                ? Math.max(0, currentPoints - amount)
+                : currentPoints + amount;
+
+            usersDb[id].points = nextPoints;
+            localStorage.setItem('users_db', JSON.stringify(usersDb));
+            renderUsers();
+        }
+
+        function normalizeStoredImage(url) {
+            const value = String(url || '').trim();
+            if (!value) return '';
+            if (value.startsWith('data:image/')) return value;
+            const localhostUploadMatch = value.match(/^https?:\/\/localhost:\d+(\/uploads\/.+)$/i);
+            if (localhostUploadMatch) return localhostUploadMatch[1];
+            if (/^\/uploads\//i.test(value)) return value;
+            return value;
+        }
+
+        function resolveDisplayImageUrl(url) {
+            const normalized = normalizeStoredImage(url);
+            if (!normalized) return '';
+            if (/^\/uploads\//i.test(normalized)) {
+                return window.location.protocol === 'file:' ? `${getApiBase()}${normalized}` : normalized;
+            }
+            return normalized;
+        }
+
+        function getBannerState() {
+            const defaults = {
+                top: { title: '우리들의 아지트', desc: '우리끼리 모여 자유롭게 이야기하는 공간', bg: '' },
+                left: { url: '', link: '#' },
+                right: { url: '', link: '#' }
+            };
+
+            try {
+                const saved = JSON.parse(localStorage.getItem('site_banners') || '{}');
+                return {
+                    top: { ...defaults.top, ...(saved.top || {}), bg: normalizeStoredImage(saved.top && saved.top.bg) },
+                    left: { ...defaults.left, ...(saved.left || {}), url: normalizeStoredImage(saved.left && saved.left.url) },
+                    right: { ...defaults.right, ...(saved.right || {}), url: normalizeStoredImage(saved.right && saved.right.url) }
+                };
+            } catch (error) {
+                return defaults;
+            }
+        }
+
+        function loadBanners() {
+            const banners = getBannerState();
+            document.getElementById('topBannerTitle').value = banners.top.title || '';
+            document.getElementById('topBannerDesc').value = banners.top.desc || '';
+            document.getElementById('topBannerBg').value = banners.top.bg || '';
+            document.getElementById('topBannerX').value = Number.isFinite(Number(banners.top.posX)) ? Number(banners.top.posX) : 4;
+            document.getElementById('topBannerY').value = Number.isFinite(Number(banners.top.posY)) ? Number(banners.top.posY) : 50;
+            document.getElementById('topBannerXField').value = document.getElementById('topBannerX').value;
+            document.getElementById('topBannerYField').value = document.getElementById('topBannerY').value;
+            document.getElementById('leftBannerLink').value = banners.left.link || '#';
+            document.getElementById('leftBannerUrl').value = banners.left.url || '';
+            document.getElementById('rightBannerLink').value = banners.right.link || '#';
+            document.getElementById('rightBannerUrl').value = banners.right.url || '';
+
+            updatePreview('topPreview', banners.top.bg, 'top');
+            updatePreview('leftPreview', banners.left.url, 'side');
+            updatePreview('rightPreview', banners.right.url, 'side');
+            syncTopBannerPreview();
+        }
+
+        function updatePreview(id, url, type) {
+            const image = document.getElementById(id);
+            const previewUrl = resolveDisplayImageUrl(url);
+            if (image) {
+                if (previewUrl) {
+                    image.src = previewUrl;
+                    image.style.display = 'block';
+                } else {
+                    image.removeAttribute('src');
+                    image.style.display = 'none';
+                }
+                image.className = `preview ${type}`;
+            }
+
+            if (id === 'topPreview') {
+                const bg = document.getElementById('topBannerPreviewBg');
+                bg.style.backgroundImage = previewUrl ? `url('${previewUrl}')` : '';
+            }
+        }
+
+        function clamp(value, min, max) {
+            return Math.min(max, Math.max(min, value));
+        }
+
+        function syncTopBannerPreview() {
+            const title = document.getElementById('topBannerTitle').value.trim() || '우리들의 아지트';
+            const desc = document.getElementById('topBannerDesc').value.trim() || '우리끼리 모여 자유롭게 이야기하는 공간';
+            const x = clamp(Number(document.getElementById('topBannerX').value || 4), 0, 100);
+            const y = clamp(Number(document.getElementById('topBannerY').value || 50), 0, 100);
+            const copy = document.getElementById('topBannerCopy');
+
+            document.getElementById('topBannerPreviewTitle').innerText = title;
+            document.getElementById('topBannerPreviewDesc').innerText = desc;
+            document.getElementById('topBannerX').value = x;
+            document.getElementById('topBannerY').value = y;
+            document.getElementById('topBannerXField').value = Math.round(x);
+            document.getElementById('topBannerYField').value = Math.round(y);
+            copy.style.left = `${x}%`;
+            copy.style.top = `${y}%`;
+        }
+
+        function setupBannerDrag() {
+            const positioner = document.getElementById('topBannerPositioner');
+            const copy = document.getElementById('topBannerCopy');
+            let isDragging = false;
+
+            function moveAt(clientX, clientY) {
+                const rect = positioner.getBoundingClientRect();
+                const x = clamp(((clientX - rect.left) / rect.width) * 100, 6, 94);
+                const y = clamp(((clientY - rect.top) / rect.height) * 100, 10, 90);
+                document.getElementById('topBannerX').value = x.toFixed(1);
+                document.getElementById('topBannerY').value = y.toFixed(1);
+                syncTopBannerPreview();
+            }
+
+            copy.addEventListener('mousedown', (event) => {
+                isDragging = true;
+                copy.classList.add('dragging');
+                moveAt(event.clientX, event.clientY);
+                event.preventDefault();
+            });
+
+            document.addEventListener('mousemove', (event) => {
+                if (!isDragging) return;
+                moveAt(event.clientX, event.clientY);
+            });
+
+            document.addEventListener('mouseup', () => {
+                if (!isDragging) return;
+                isDragging = false;
+                copy.classList.remove('dragging');
+            });
+        }
+
+        function isImageFile(file) {
+            return Boolean(file && file.type && file.type.startsWith('image/'));
+        }
+
+        function fileToDataUrl(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('파일을 읽는 중 문제가 발생했습니다.'));
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function uploadServerImage(file, folder) {
+            const dataUrl = await fileToDataUrl(file);
+            const response = await fetch(getApiUrl('/api/uploads/image'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    folder,
+                    fileName: file.name || '',
+                    dataUrl
+                })
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.success === false || !result.url) {
+                throw new Error(result.message || '이미지 업로드에 실패했습니다.');
+            }
+            return result.url;
+        }
+
+        async function applyImageFile(file, hiddenId, previewId, type) {
+            if (!isImageFile(file)) {
+                alert('이미지 파일만 사용할 수 있습니다.');
+                return;
+            }
+
+            try {
+                const url = await uploadServerImage(file, 'banner');
+                document.getElementById(hiddenId).value = url;
+                updatePreview(previewId, url, type);
+                syncTopBannerPreview();
+            } catch (error) {
+                alert(error.message || '이미지를 불러오는 중 문제가 발생했습니다.');
+            }
+        }
+
+        async function handleImageInput(inputId, hiddenId, previewId, type) {
+            const input = document.getElementById(inputId);
+            const file = input.files[0];
+            if (!file) return;
+            await applyImageFile(file, hiddenId, previewId, type);
+            input.value = '';
+        }
+
+        function setupDropUpload(boxId, hiddenId, previewId, type) {
+            const box = document.getElementById(boxId);
+            if (!box) return;
+
+            box.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                box.classList.add('dragover');
+            });
+
+            box.addEventListener('dragleave', (event) => {
+                if (box.contains(event.relatedTarget)) return;
+                box.classList.remove('dragover');
+            });
+
+            box.addEventListener('drop', async (event) => {
+                event.preventDefault();
+                box.classList.remove('dragover');
+                const file = event.dataTransfer && event.dataTransfer.files ? event.dataTransfer.files[0] : null;
+                if (!file) return;
+                await applyImageFile(file, hiddenId, previewId, type);
+            });
+        }
+
+        function clearTopBannerImage() {
+            document.getElementById('topBannerBg').value = '';
+            updatePreview('topPreview', '', 'top');
+            syncTopBannerPreview();
+        }
+
+        function clearSideBanner(side) {
+            document.getElementById(`${side}BannerUrl`).value = '';
+            updatePreview(`${side}Preview`, '', 'side');
+        }
+
+        function getLoginHeroSettingsInput() {
+            const secondsInput = document.getElementById('loginRotationSeconds');
+            const randomInput = document.getElementById('loginRandomOrder');
+            return {
+                intervalSeconds: clamp(Number(secondsInput && secondsInput.value ? secondsInput.value : 10), 3, 120),
+                randomOrder: Boolean(randomInput && randomInput.checked)
+            };
+        }
+
+        async function fetchLoginHeroState() {
+            const response = await fetch(getApiUrl('/api/login-hero'));
+            if (!response.ok) {
+                throw new Error('로그인 이미지 설정을 불러오지 못했습니다.');
+            }
+            return response.json();
+        }
+
+        async function saveLoginHeroState(payload) {
+            const response = await fetch(getApiUrl('/api/login-hero'), {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok || result.success === false) {
+                throw new Error(result.message || '로그인 이미지 설정 저장에 실패했습니다.');
+            }
+            return result;
+        }
+
+        async function deleteLoginHeroState() {
+            const response = await fetch(getApiUrl('/api/login-hero'), { method: 'DELETE' });
+            if (!response.ok) {
+                throw new Error('로그인 이미지 설정 삭제에 실패했습니다.');
+            }
+        }
+
+        function normalizeLoginPreviewUrl(value) {
+            const rawValue = String(value || '').trim();
+            if (!rawValue) return '';
+            if (rawValue.startsWith('data:image/')) return rawValue;
+
+            const localhostMatch = rawValue.match(/^https?:\/\/localhost:\d+(\/uploads\/.+)$/i);
+            const uploadPath = localhostMatch ? localhostMatch[1] : rawValue;
+
+            if (/^\/uploads\//i.test(uploadPath)) {
+                return window.location.protocol === 'file:' ? `${getApiBase()}${uploadPath}` : uploadPath;
+            }
+
+            return /^https?:\/\//i.test(rawValue) ? rawValue : '';
+        }
+
+        function renderLoginZipState(data) {
+            const preview = document.getElementById('loginZipPreview');
+            const status = document.getElementById('loginZipStatus');
+            const secondsInput = document.getElementById('loginRotationSeconds');
+            const randomInput = document.getElementById('loginRandomOrder');
+            const images = data && Array.isArray(data.images) ? data.images : [];
+            const intervalSeconds = Number.isFinite(Number(data && data.intervalSeconds)) ? Number(data.intervalSeconds) : 10;
+            const randomOrder = Boolean(data && data.randomOrder);
+
+            if (!preview || !status) return;
+            if (secondsInput) secondsInput.value = intervalSeconds;
+            if (randomInput) randomInput.checked = randomOrder;
+
+            if (!images.length) {
+                preview.removeAttribute('src');
+                preview.style.display = 'none';
+                status.textContent = `아직 저장된 로그인 배경 이미지가 없습니다. 현재 순환 시간은 ${intervalSeconds}초이고, 재생 순서는 ${randomOrder ? '랜덤' : '순차'}입니다.`;
+                return;
+            }
+
+            preview.src = normalizeLoginPreviewUrl(images[0]);
+            preview.style.display = 'block';
+            status.textContent = `${images.length}장의 로그인 배경 이미지가 저장되어 있습니다. 로그인 화면에서 ${intervalSeconds}초마다 ${randomOrder ? '랜덤' : '순차'}로 순환됩니다.`;
+        }
+
+        async function readZipImages(file) {
+            if (!file || !/\.zip$/i.test(file.name || '')) {
+                throw new Error('zip 파일만 업로드할 수 있습니다.');
+            }
+
+            if (!window.JSZip) {
+                throw new Error('zip 처리 도구를 불러오지 못했습니다.');
+            }
+
+            const zip = await window.JSZip.loadAsync(file);
+            const imageFiles = Object.values(zip.files)
+                .filter((entry) => !entry.dir && /\.(png|jpe?g|webp|gif)$/i.test(entry.name))
+                .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+
+            if (!imageFiles.length) {
+                throw new Error('zip 안에 사용할 수 있는 이미지가 없습니다.');
+            }
+
+            const images = [];
+            for (const entry of imageFiles) {
+                const base64 = await entry.async('base64');
+                const ext = entry.name.split('.').pop().toLowerCase();
+                const mime = ext === 'jpg' || ext === 'jpeg'
+                    ? 'image/jpeg'
+                    : ext === 'png'
+                        ? 'image/png'
+                        : ext === 'webp'
+                            ? 'image/webp'
+                            : 'image/gif';
+                images.push({
+                    name: entry.name.split('/').pop(),
+                    dataUrl: `data:${mime};base64,${base64}`
+                });
+            }
+
+            return images;
+        }
+
+        async function handleLoginZipInput() {
+            const input = document.getElementById('loginZipInput');
+            const file = input && input.files ? input.files[0] : null;
+            if (!file) return;
+
+            try {
+                const images = await readZipImages(file);
+                const settings = getLoginHeroSettingsInput();
+                const result = await saveLoginHeroState({ images, intervalSeconds: settings.intervalSeconds, randomOrder: settings.randomOrder });
+                renderLoginZipState(result);
+                alert(`로그인 배경 이미지 ${images.length}장을 저장했습니다.`);
+            } catch (error) {
+                alert(error.message || 'zip 파일을 처리하는 중 문제가 발생했습니다.');
+            } finally {
+                input.value = '';
+            }
+        }
+
+        async function saveLoginHeroOptionsOnly() {
+            try {
+                const settings = getLoginHeroSettingsInput();
+                const result = await saveLoginHeroState(settings);
+                renderLoginZipState(result);
+                alert('로그인 화면 재생 설정을 저장했습니다.');
+            } catch (error) {
+                alert(error.message || '로그인 화면 재생 설정 저장에 실패했습니다.');
+            }
+        }
+
+        async function clearLoginZipImages() {
+            try {
+                await deleteLoginHeroState();
+                renderLoginZipState({ images: [], intervalSeconds: 10, randomOrder: false });
+            } catch (error) {
+                alert(error.message || '로그인 이미지 삭제에 실패했습니다.');
+            }
+        }
+
+        function saveBanners() {
+            const banners = {
+                top: {
+                    title: document.getElementById('topBannerTitle').value.trim() || '우리들의 아지트',
+                    desc: document.getElementById('topBannerDesc').value.trim() || '우리끼리 모여 자유롭게 이야기하는 공간',
+                    bg: document.getElementById('topBannerBg').value.trim(),
+                    posX: clamp(Number(document.getElementById('topBannerX').value || 4), 0, 100),
+                    posY: clamp(Number(document.getElementById('topBannerY').value || 50), 0, 100)
+                },
+                left: {
+                    url: document.getElementById('leftBannerUrl').value.trim(),
+                    link: document.getElementById('leftBannerLink').value.trim() || '#'
+                },
+                right: {
+                    url: document.getElementById('rightBannerUrl').value.trim(),
+                    link: document.getElementById('rightBannerLink').value.trim() || '#'
+                }
+            };
+
+            localStorage.setItem('site_banners', JSON.stringify(banners));
+            alert('배너 설정을 저장했습니다.');
+        }
+
+        document.addEventListener('click', (event) => {
+            const deleteCodeIndex = event.target.getAttribute('data-delete-code');
+            const approveId = event.target.getAttribute('data-approve');
+            const pendingId = event.target.getAttribute('data-pending');
+            const deleteUserId = event.target.getAttribute('data-delete-user');
+            const grantPointsId = event.target.getAttribute('data-grant-points');
+            const deductPointsId = event.target.getAttribute('data-deduct-points');
+            const clearSide = event.target.getAttribute('data-clear-side');
+
+            if (deleteCodeIndex !== null) deleteCode(Number(deleteCodeIndex));
+            if (approveId) updateUserStatus(approveId, 'regular');
+            if (pendingId) updateUserStatus(pendingId, 'pending');
+            if (deleteUserId) deleteUser(deleteUserId);
+            if (grantPointsId) adjustUserPoints(grantPointsId, 'grant');
+            if (deductPointsId) adjustUserPoints(deductPointsId, 'deduct');
+            if (clearSide) clearSideBanner(clearSide);
+        });
+
+        document.getElementById('createCodeButton').addEventListener('click', createCode);
+        document.getElementById('saveBannerButton').addEventListener('click', saveBanners);
+        document.getElementById('saveBoardCategoriesButton').addEventListener('click', saveBoardCategories);
+        document.getElementById('refreshCloudStatusButton').addEventListener('click', refreshCloudStatus);
+        document.getElementById('runR2BackupButton').addEventListener('click', runR2Backup);
+        document.getElementById('clearTopBannerButton').addEventListener('click', clearTopBannerImage);
+        document.getElementById('topFileInput').addEventListener('change', () => handleImageInput('topFileInput', 'topBannerBg', 'topPreview', 'top'));
+        document.getElementById('leftFileInput').addEventListener('change', () => handleImageInput('leftFileInput', 'leftBannerUrl', 'leftPreview', 'side'));
+        document.getElementById('rightFileInput').addEventListener('change', () => handleImageInput('rightFileInput', 'rightBannerUrl', 'rightPreview', 'side'));
+        document.getElementById('loginZipInput').addEventListener('change', handleLoginZipInput);
+        document.getElementById('clearLoginZipButton').addEventListener('click', clearLoginZipImages);
+        document.getElementById('saveLoginSettingsButton').addEventListener('click', saveLoginHeroOptionsOnly);
+        document.getElementById('reuseCodeToggle').addEventListener('change', (event) => {
+            localStorage.setItem('settings_reuse_code', event.target.checked);
+        });
+        document.getElementById('topBannerTitle').addEventListener('input', syncTopBannerPreview);
+        document.getElementById('topBannerDesc').addEventListener('input', syncTopBannerPreview);
+        document.getElementById('topBannerXField').addEventListener('input', (event) => {
+            document.getElementById('topBannerX').value = clamp(Number(event.target.value || 4), 0, 100);
+            syncTopBannerPreview();
+        });
+        document.getElementById('topBannerYField').addEventListener('input', (event) => {
+            document.getElementById('topBannerY').value = clamp(Number(event.target.value || 50), 0, 100);
+            syncTopBannerPreview();
+        });
+
+        assertAdmin();
+        document.getElementById('reuseCodeToggle').checked = localStorage.getItem('settings_reuse_code') === 'true';
+        renderCodes();
+        renderUsers();
+        renderBoardCategoryFields();
+        loadBanners();
+        refreshCloudStatus();
+        fetchLoginHeroState()
+            .then(renderLoginZipState)
+            .catch(() => renderLoginZipState({ images: [], intervalSeconds: 10, randomOrder: false }));
+        setupBannerDrag();
+        setupDropUpload('topUploadBox', 'topBannerBg', 'topPreview', 'top');
+        setupDropUpload('leftUploadBox', 'leftBannerUrl', 'leftPreview', 'side');
+        setupDropUpload('rightUploadBox', 'rightBannerUrl', 'rightPreview', 'side');
+    </script>
+</body>
+</html>
+

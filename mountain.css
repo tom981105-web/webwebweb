@@ -1,0 +1,899 @@
+:root {
+    --mountain-cream: #f7efe4;
+    --mountain-cream-deep: #f1e5d5;
+    --mountain-ink: #241a16;
+    --mountain-brown: #6d4026;
+    --mountain-copper: #c67343;
+    --mountain-line: rgba(109, 64, 38, 0.14);
+    --mountain-shadow: 0 28px 58px rgba(63, 34, 20, 0.12);
+    --map-zoom-scale: 1;
+}
+
+body {
+    background:
+        radial-gradient(circle at top, rgba(205, 151, 108, 0.18), transparent 34%),
+        linear-gradient(180deg, #f8f2e9 0%, #f2e8da 100%);
+    color: var(--mountain-ink);
+}
+
+.mountain-page {
+    min-height: 100vh;
+    padding: 18px;
+}
+
+.mountain-hero {
+    position: relative;
+    overflow: hidden;
+    min-height: 360px;
+    padding: 32px 36px 38px;
+    border-radius: 34px;
+    color: #f8efe4;
+    background:
+        linear-gradient(125deg, rgba(35, 24, 18, 0.7), rgba(35, 24, 18, 0.22)),
+        linear-gradient(180deg, rgba(35, 24, 18, 0.12), rgba(35, 24, 18, 0.62)),
+        url("https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1800&q=80") center/cover;
+    box-shadow: 0 24px 55px rgba(48, 24, 14, 0.18);
+    border: none;
+    text-align: left;
+}
+
+.mountain-hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(circle at 80% 18%, rgba(247, 209, 165, 0.24), transparent 24%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 34%);
+    pointer-events: none;
+}
+
+.mountain-hero > * {
+    position: relative;
+    z-index: 1;
+}
+
+.mountain-hero-nav {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.mountain-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mountain-brand-name {
+    font-family: "Marcellus", "Times New Roman", serif;
+    font-size: clamp(2.5rem, 4.8vw, 4rem);
+    line-height: 0.96;
+    letter-spacing: -0.06em;
+}
+
+.mountain-brand-sub {
+    font-size: 0.88rem;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: rgba(248, 239, 228, 0.82);
+}
+
+.mountain-hero-utility {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mountain-home-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 0 22px;
+    border-radius: 999px;
+    border: 1px solid rgba(248, 239, 228, 0.38);
+    color: #f8efe4;
+    text-decoration: none;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+    transition: transform 0.24s ease, background 0.24s ease, border-color 0.24s ease;
+}
+
+.mountain-home-link:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(248, 239, 228, 0.56);
+}
+
+.mountain-hero-copy {
+    max-width: 760px;
+    padding-top: 58px;
+}
+
+.mountain-kicker,
+.surface-eyebrow {
+    display: inline-block;
+    font-size: 0.88rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.mountain-kicker {
+    margin-bottom: 18px;
+    color: rgba(248, 239, 228, 0.84);
+}
+
+.mountain-hero-copy h1,
+.surface-copy h2,
+.modal-title,
+#mtDetailContent h2 {
+    font-family: "Marcellus", "Pretendard", serif;
+    letter-spacing: -0.04em;
+}
+
+.mountain-hero-copy h1 {
+    margin: 0;
+    max-width: 700px;
+    font-size: clamp(2.8rem, 5vw, 4.2rem);
+    line-height: 0.98;
+}
+
+.mountain-hero-copy p {
+    margin: 16px 0 0;
+    max-width: 560px;
+    font-size: 1rem;
+    line-height: 1.68;
+    color: rgba(248, 239, 228, 0.9);
+}
+
+.mountain-hero-panels {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 30px;
+}
+
+.hero-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 128px;
+    padding: 18px 20px;
+    border-radius: 22px;
+    background: rgba(255, 248, 239, 0.12);
+    border: 1px solid rgba(255, 244, 231, 0.16);
+    backdrop-filter: blur(10px);
+}
+
+.hero-panel strong {
+    color: #fff8ef;
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.hero-panel span {
+    color: rgba(255, 244, 231, 0.84);
+    line-height: 1.65;
+    font-size: 0.94rem;
+}
+
+.mountain-shell {
+    width: min(1180px, calc(100% - 40px));
+    margin: 20px auto 0;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.mountain-surface {
+    padding: 30px 32px;
+    border-radius: 30px;
+    background: rgba(248, 242, 233, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.64);
+    box-shadow: var(--mountain-shadow);
+    backdrop-filter: blur(16px);
+}
+
+.surface-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    align-items: flex-end;
+    margin-bottom: 22px;
+}
+
+.surface-copy h2 {
+    margin: 0;
+    font-size: clamp(2rem, 3vw, 2.8rem);
+    line-height: 1;
+    color: #2f1f18;
+}
+
+.surface-copy p {
+    margin: 12px 0 0;
+    max-width: 720px;
+    color: rgba(47, 31, 24, 0.72);
+    line-height: 1.64;
+}
+
+.surface-eyebrow {
+    margin-bottom: 14px;
+    color: rgba(109, 64, 38, 0.62);
+}
+
+.map-wrapper {
+    position: relative;
+    width: 100%;
+    height: 680px;
+    overflow: hidden;
+    border-radius: 28px;
+    border: 1px solid rgba(109, 64, 38, 0.12);
+    box-shadow: 0 20px 40px rgba(70, 40, 15, 0.12);
+    background:
+        radial-gradient(circle at top, rgba(198, 115, 67, 0.12), transparent 30%),
+        linear-gradient(180deg, rgba(230, 220, 206, 0.92), rgba(216, 203, 185, 0.98));
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+.map-fallback-note {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: rgba(255, 248, 239, 0.9);
+    color: rgba(47, 31, 24, 0.68);
+    font-size: 0.84rem;
+    font-weight: 700;
+    box-shadow: 0 10px 20px rgba(70, 40, 15, 0.12);
+    pointer-events: none;
+}
+
+.actions-wrapper {
+    margin-top: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.region-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+
+.region-btn,
+.btn-add-mountain,
+.btn-add-story,
+.btn-submit,
+.btn-delete-marker,
+.detail-delete-btn {
+    font: inherit;
+}
+
+.region-btn {
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(109, 64, 38, 0.14);
+    background: rgba(255, 255, 255, 0.75);
+    color: var(--text-secondary);
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.24s ease, background 0.24s ease, color 0.24s ease, border-color 0.24s ease;
+}
+
+.region-btn:hover {
+    transform: translateY(-2px);
+    color: var(--accent);
+    border-color: rgba(159, 79, 46, 0.24);
+}
+
+.region-btn.active {
+    background: linear-gradient(135deg, #c67343, #a6542f);
+    border-color: transparent;
+    color: #fff8f0;
+    box-shadow: 0 14px 24px rgba(166, 84, 47, 0.2);
+}
+
+.btn-add-mountain,
+.btn-add-story,
+.btn-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 50px;
+    padding: 0 22px;
+    border: none;
+    border-radius: 999px;
+    color: #fff8f0;
+    background: linear-gradient(135deg, #c67343, #a6542f);
+    box-shadow: 0 16px 28px rgba(166, 84, 47, 0.22);
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.24s ease, box-shadow 0.24s ease;
+}
+
+.btn-add-mountain:hover,
+.btn-add-story:hover,
+.btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 20px 34px rgba(166, 84, 47, 0.26);
+}
+
+.btn-add-story,
+.btn-submit-story {
+    background: linear-gradient(135deg, #8c5f3f, #6d4026);
+    box-shadow: 0 16px 28px rgba(109, 64, 38, 0.2);
+}
+
+.btn-submit-story:hover,
+.btn-add-story:hover {
+    box-shadow: 0 20px 34px rgba(109, 64, 38, 0.24);
+}
+
+.board-head {
+    align-items: center;
+}
+
+.mountain-board-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+}
+
+.mountain-board-empty {
+    grid-column: 1 / -1;
+    padding: 40px;
+    border-radius: 24px;
+    border: 1px dashed rgba(109, 64, 38, 0.18);
+    text-align: center;
+    color: rgba(47, 31, 24, 0.54);
+    background: rgba(255, 255, 255, 0.52);
+}
+
+.mountain-post-card {
+    overflow: hidden;
+    border-radius: 24px;
+    border: 1px solid rgba(109, 64, 38, 0.08);
+    background:
+        linear-gradient(180deg, rgba(255, 252, 246, 0.9), rgba(247, 238, 226, 0.94));
+    cursor: pointer;
+    transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
+}
+
+.mountain-post-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(159, 79, 46, 0.2);
+    box-shadow: 0 20px 40px rgba(70, 40, 15, 0.14);
+}
+
+.mountain-post-thumb,
+.mountain-post-thumb-placeholder {
+    width: 100%;
+    height: 210px;
+}
+
+.mountain-post-thumb {
+    object-fit: cover;
+    display: block;
+}
+
+.mountain-post-thumb-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(198, 115, 67, 0.08);
+    color: rgba(109, 64, 38, 0.32);
+    font-size: 2.6rem;
+}
+
+.mountain-post-body {
+    padding: 20px;
+}
+
+.mountain-post-body h3 {
+    margin: 0 0 12px;
+    color: #2f1f18;
+    font-size: 1.12rem;
+    line-height: 1.4;
+}
+
+.mountain-post-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: rgba(47, 31, 24, 0.58);
+    font-size: 0.88rem;
+}
+
+.custom-context-menu {
+    display: none;
+    position: absolute;
+    z-index: 10000;
+    padding: 6px;
+    border-radius: 16px;
+    background: rgba(255, 248, 239, 0.96);
+    border: 1px solid rgba(109, 64, 38, 0.12);
+    box-shadow: 0 16px 30px rgba(70, 40, 15, 0.16);
+}
+
+.custom-context-menu-item {
+    padding: 12px 16px;
+    border-radius: 12px;
+    color: #4a3124;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 700;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.custom-context-menu-item:hover {
+    background: rgba(198, 115, 67, 0.12);
+    color: #a6542f;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    padding: 26px 18px;
+    background: rgba(31, 20, 15, 0.54);
+    backdrop-filter: blur(12px);
+}
+
+.modal-content {
+    position: relative;
+    width: min(760px, 100%);
+    max-height: calc(100vh - 52px);
+    margin: 0 auto;
+    overflow-y: auto;
+    padding: 34px;
+    border-radius: 30px;
+    background:
+        linear-gradient(180deg, rgba(255, 248, 239, 0.96), rgba(245, 235, 221, 0.95));
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    box-shadow: 0 34px 70px rgba(38, 20, 12, 0.22);
+    color: var(--mountain-ink);
+}
+
+.modal-wide {
+    width: min(900px, 100%);
+}
+
+.modal-title {
+    margin: 0 0 24px;
+    font-size: clamp(2rem, 4vw, 2.8rem);
+    color: #2f1f18;
+}
+
+.modal-content::-webkit-scrollbar {
+    width: 10px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(109, 64, 38, 0.18);
+}
+
+.close-btn {
+    position: absolute;
+    top: 22px;
+    right: 24px;
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: rgba(47, 31, 24, 0.58);
+    font-size: 2rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.close-btn:hover {
+    color: #a6542f;
+    background: rgba(198, 115, 67, 0.1);
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: rgba(47, 31, 24, 0.72);
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid rgba(109, 64, 38, 0.12);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.82);
+    color: #34231a;
+    padding: 14px 16px;
+    font: inherit;
+    outline: none;
+    transition: border-color 0.24s ease, box-shadow 0.24s ease;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 132px;
+    line-height: 1.65;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    border-color: rgba(166, 84, 47, 0.36);
+    box-shadow: 0 0 0 4px rgba(198, 115, 67, 0.1);
+}
+
+.form-note {
+    margin: -4px 0 18px;
+    color: rgba(47, 31, 24, 0.54);
+    font-size: 0.9rem;
+}
+
+.photo-drop-zone {
+    min-height: 140px;
+    margin-top: 12px;
+    padding: 24px 20px;
+    border: 2px dashed rgba(109, 64, 38, 0.18);
+    border-radius: 22px;
+    background: rgba(247, 239, 229, 0.72);
+    color: rgba(47, 31, 24, 0.56);
+    transition: border-color 0.24s ease, background 0.24s ease, transform 0.24s ease;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+}
+
+.photo-drop-zone-large {
+    min-height: 220px;
+    margin-bottom: 18px;
+}
+
+.photo-drop-zone.dragover {
+    border-color: rgba(166, 84, 47, 0.44);
+    background: rgba(198, 115, 67, 0.1);
+    transform: translateY(-1px);
+}
+
+.photo-drop-zone img,
+.mt-image-preview img {
+    max-width: 100%;
+    max-height: 260px;
+    border-radius: 14px;
+    object-fit: contain;
+}
+
+.mountain-detail-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 20px;
+    color: rgba(47, 31, 24, 0.58);
+    font-size: 0.92rem;
+}
+
+.mountain-detail-image {
+    width: 100%;
+    max-height: 520px;
+    object-fit: contain;
+    border-radius: 20px;
+    margin-bottom: 22px;
+    background: rgba(198, 115, 67, 0.08);
+}
+
+.mountain-detail-body {
+    color: rgba(47, 31, 24, 0.86);
+    font-size: 1.02rem;
+    line-height: 1.8;
+    white-space: pre-wrap;
+}
+
+.detail-delete-btn,
+.btn-delete-marker {
+    min-height: 46px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(144, 59, 43, 0.16);
+    background: rgba(144, 59, 43, 0.08);
+    color: #8b4232;
+    cursor: pointer;
+    font-weight: 800;
+    transition: transform 0.24s ease, background 0.24s ease;
+}
+
+.detail-delete-btn:hover,
+.btn-delete-marker:hover {
+    transform: translateY(-2px);
+    background: rgba(144, 59, 43, 0.16);
+}
+
+.leaflet-popup-content-wrapper {
+    background: rgba(255, 248, 239, 0.98) !important;
+    border: 1px solid rgba(109, 64, 38, 0.12) !important;
+    border-radius: calc(22px * var(--map-zoom-scale)) !important;
+    padding: 0 !important;
+    box-shadow: 0 20px 36px rgba(70, 40, 15, 0.18) !important;
+    overflow: hidden;
+}
+
+.leaflet-popup-content {
+    margin: 0 !important;
+    width: calc(320px * var(--map-zoom-scale)) !important;
+}
+
+.leaflet-popup-tip {
+    background: rgba(255, 248, 239, 0.98) !important;
+    border: 1px solid rgba(109, 64, 38, 0.12) !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+    color: #8b4232 !important;
+    padding: calc(8px * var(--map-zoom-scale)) calc(10px * var(--map-zoom-scale)) 0 0 !important;
+    font-size: calc(20px * var(--map-zoom-scale)) !important;
+}
+
+.info-window {
+    width: 100%;
+    color: var(--mountain-ink);
+    font-family: 'Pretendard', sans-serif;
+}
+
+.info-window img {
+    width: 100%;
+    height: calc(180px * var(--map-zoom-scale));
+    object-fit: cover;
+    display: block;
+}
+
+.info-content {
+    padding: calc(20px * var(--map-zoom-scale));
+}
+
+.info-content h3 {
+    margin: 0 0 calc(15px * var(--map-zoom-scale));
+    color: #8d4f31;
+    font-size: calc(1.3rem * var(--map-zoom-scale));
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: calc(80px * var(--map-zoom-scale)) 1fr;
+    gap: calc(8px * var(--map-zoom-scale));
+    margin-bottom: calc(15px * var(--map-zoom-scale));
+    font-size: calc(0.95rem * var(--map-zoom-scale));
+}
+
+.info-grid span.label {
+    color: rgba(47, 31, 24, 0.52);
+}
+
+.info-grid span.val {
+    color: rgba(47, 31, 24, 0.88);
+    font-weight: 600;
+}
+
+.info-desc {
+    padding-top: calc(15px * var(--map-zoom-scale));
+    margin-top: calc(15px * var(--map-zoom-scale));
+    border-top: 1px solid rgba(109, 64, 38, 0.1);
+    color: rgba(47, 31, 24, 0.78);
+    line-height: 1.6;
+    word-break: keep-all;
+}
+
+@media (max-width: 980px) {
+    .mountain-page {
+        padding: 14px;
+    }
+
+    .mountain-hero {
+        min-height: 320px;
+        padding: 28px 22px 34px;
+        border-radius: 28px;
+    }
+
+    .mountain-hero-copy {
+        padding-top: 44px;
+    }
+
+    .mountain-hero-panels {
+        grid-template-columns: 1fr;
+    }
+
+    .mountain-shell {
+        width: calc(100% - 8px);
+    }
+
+    .mountain-surface {
+        padding: 24px;
+    }
+
+    .map-wrapper {
+        height: 560px;
+    }
+}
+
+@media (max-width: 760px) {
+    .mountain-hero {
+        min-height: auto;
+        padding: 24px 18px 28px;
+    }
+
+    .mountain-brand-name {
+        font-size: 2.35rem;
+    }
+
+    .mountain-brand-sub {
+        letter-spacing: 0.22em;
+    }
+
+    .mountain-hero-copy {
+        padding-top: 30px;
+    }
+
+    .mountain-hero-copy h1 {
+        font-size: clamp(2.3rem, 12vw, 3.5rem);
+    }
+
+    .mountain-hero-copy p {
+        font-size: 0.96rem;
+        line-height: 1.62;
+    }
+
+    .mountain-hero-nav,
+    .surface-head,
+    .actions-wrapper,
+    .form-row {
+        flex-direction: column;
+        align-items: stretch;
+        display: flex;
+    }
+
+    .mountain-hero-utility {
+        justify-content: flex-start;
+    }
+
+    .mountain-home-link,
+    .btn-add-mountain,
+    .btn-add-story,
+    .btn-submit {
+        width: 100%;
+    }
+
+    .mountain-board-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .map-wrapper {
+        height: 400px;
+        border-radius: 22px;
+    }
+
+    .mountain-surface {
+        padding: 20px 18px;
+        border-radius: 24px;
+    }
+
+    .surface-copy p {
+        font-size: 0.94rem;
+        line-height: 1.6;
+    }
+
+    .actions-wrapper {
+        gap: 14px;
+    }
+
+    .region-filters {
+        gap: 8px;
+    }
+
+    .region-btn {
+        flex: 1 1 calc(50% - 8px);
+        padding: 0 14px;
+        min-height: 42px;
+    }
+
+    .hero-panel {
+        min-height: auto;
+        padding: 16px 16px;
+        border-radius: 18px;
+    }
+
+    .mountain-post-body {
+        padding: 18px;
+    }
+
+    .modal-content {
+        padding: 26px 18px;
+        border-radius: 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .mountain-page {
+        padding: 12px;
+    }
+
+    .mountain-brand-name {
+        font-size: 2rem;
+    }
+
+    .mountain-home-link,
+    .region-btn,
+    .btn-add-mountain,
+    .btn-add-story,
+    .btn-submit {
+        width: 100%;
+    }
+
+    .mountain-hero-copy {
+        padding-top: 24px;
+    }
+
+    .mountain-hero-panels {
+        gap: 10px;
+        margin-top: 22px;
+    }
+
+    .map-wrapper {
+        height: 340px;
+    }
+
+    .map-fallback-note {
+        right: 12px;
+        bottom: 12px;
+        padding: 8px 11px;
+        font-size: 0.76rem;
+    }
+
+    .region-filters {
+        width: 100%;
+    }
+
+    .region-btn {
+        flex-basis: 100%;
+    }
+
+    .modal {
+        padding: 18px 10px;
+    }
+
+    .modal-content {
+        padding: 24px 16px;
+    }
+}

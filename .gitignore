@@ -1,0 +1,18 @@
+.env
+node_modules/
+uploads/
+backup-*.json
+*.log
+.codex/
+__ui_check/
+__backup_board_2026-03-23_cafe/
+__codex_open.html
+__codex_setup.html
+TEST1 웹 백업_*.zip
+TEST1 웹 백업_*
+functions_log.txt
+functions_log_2.txt
+functions_log_3.txt
+db_dump.json
+.firebase/
+백업/

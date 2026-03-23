@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>포인트 라운지 - 우리들의 아지트</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Marcellus&display=swap">
+    <script src="sync.js"></script>
+    <script src="auth.js"></script>
+    <style>
+        .points-page {
+            min-height: 100vh;
+            padding: 18px;
+        }
+
+        .points-hero {
+            position: relative;
+            overflow: hidden;
+            padding: 34px 36px 40px;
+            border-radius: 34px;
+            color: #f8efe4;
+            background:
+                linear-gradient(125deg, rgba(35, 23, 18, 0.74), rgba(35, 23, 18, 0.24)),
+                linear-gradient(180deg, rgba(36, 24, 19, 0.16), rgba(36, 24, 19, 0.62)),
+                url("https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?auto=format&fit=crop&w=1800&q=80") center/cover;
+            box-shadow: 0 24px 55px rgba(48, 24, 14, 0.2);
+        }
+
+        .points-hero::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 84% 18%, rgba(247, 214, 173, 0.28), transparent 24%),
+                linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 38%);
+            pointer-events: none;
+        }
+
+        .points-hero > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .points-hero-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 18px;
+        }
+
+        .points-brand {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .points-brand-name {
+            font-family: "Marcellus", "Times New Roman", serif;
+            font-size: clamp(2.5rem, 4.8vw, 4.1rem);
+            line-height: 0.96;
+            letter-spacing: -0.06em;
+        }
+
+        .points-brand-sub {
+            font-size: 0.88rem;
+            letter-spacing: 0.32em;
+            text-transform: uppercase;
+            color: rgba(248, 239, 228, 0.82);
+        }
+
+        .points-hero-copy {
+            max-width: 760px;
+            padding-top: 68px;
+        }
+
+        .points-kicker {
+            display: inline-block;
+            margin-bottom: 18px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: rgba(248, 239, 228, 0.86);
+        }
+
+        .points-hero-copy h1 {
+            margin: 0;
+            font-family: "Marcellus", "Pretendard", serif;
+            font-size: clamp(3rem, 7vw, 5rem);
+            line-height: 0.96;
+            letter-spacing: -0.06em;
+            color: #fff4e7;
+        }
+
+        .points-hero-copy p {
+            margin: 18px 0 0;
+            max-width: 620px;
+            font-size: 1rem;
+            line-height: 1.68;
+            color: rgba(248, 239, 228, 0.9);
+        }
+
+        .points-shell {
+            width: min(1180px, calc(100% - 40px));
+            margin: 22px auto 0;
+        }
+
+        .points-shell .attendance-section,
+        .points-shell .game-grid {
+            margin-bottom: 22px;
+        }
+
+        @media (max-width: 980px) {
+            .points-page {
+                padding: 14px;
+            }
+
+            .points-hero {
+                padding: 28px 22px 34px;
+                border-radius: 28px;
+            }
+
+            .points-hero-copy {
+                padding-top: 54px;
+            }
+
+            .points-shell {
+                width: calc(100% - 8px);
+            }
+        }
+
+        @media (max-width: 760px) {
+            .points-hero-nav {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .points-brand-name {
+                font-size: 2.4rem;
+            }
+
+            .points-hero-copy h1 {
+                font-size: clamp(2.6rem, 14vw, 4rem);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="points-page">
+        <header class="page-header points-hero">
+            <div class="points-hero-nav">
+                <a href="index.html" class="points-brand">
+                    <span class="points-brand-name">우리들의 아지트</span>
+                    <span class="points-brand-sub">Point Lounge</span>
+                </a>
+                <div class="hero-links" id="heroUtilityNav"></div>
+            </div>
+
+            <div class="points-hero-copy">
+                <span class="points-kicker">Daily Reward & Ranking</span>
+                <h1>포인트 라운지</h1>
+                <p>출석 보상, 누적 포인트, 랭킹, 칭호 상점을 한 페이지에서 바로 관리할 수 있는 게임형 공간입니다.</p>
+            </div>
+        </header>
+
+        <main class="points-shell">
+            <section class="attendance-section">
+                <div class="attendance-card">
+                    <span class="attendance-kicker">Daily Check-In</span>
+                    <h2>오늘의 출석 보상</h2>
+                    <p>하루에 한 번 출석체크를 하면 1pt에서 3pt를 랜덤으로 받고, 7일 연속 출석마다 추가 보너스가 붙습니다.</p>
+                    <div class="attendance-action-row">
+                        <button id="attendanceButton" class="attendance-button" type="button">출석체크 하고 포인트 받기</button>
+                        <span id="attendanceStatus" class="attendance-status">오늘의 보상을 아직 받지 않았습니다.</span>
+                    </div>
+                </div>
+
+                <aside class="attendance-summary">
+                    <span class="attendance-kicker">Point Wallet</span>
+                    <strong>누적 포인트</strong>
+                    <div id="attendancePoints" class="attendance-points">0pt</div>
+                    <p id="attendanceSummaryText">출석을 시작하면 누적 기록과 연속 출석 현황이 여기에 표시됩니다.</p>
+                </aside>
+            </section>
+
+            <section class="game-grid">
+                <article class="game-card">
+                    <div class="game-card-head">
+                        <span class="attendance-kicker">Community Ranking</span>
+                        <h2>포인트 랭킹</h2>
+                        <p>포인트 우선, 동점이면 연속 출석 기준으로 가장 활발한 멤버를 보여줍니다.</p>
+                    </div>
+                    <div id="rankingList" class="ranking-list"></div>
+                </article>
+
+                <article class="game-card">
+                    <div class="game-card-head">
+                        <span class="attendance-kicker">Point Shop</span>
+                        <h2>포인트 상점</h2>
+                        <p>포인트로 칭호를 구매하고 바로 장착할 수 있습니다. 장착한 칭호는 상단 프로필 옆에 노출됩니다.</p>
+                    </div>
+                    <div id="storeGrid" class="store-grid"></div>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        function renderAttendancePanel() {
+            const button = document.getElementById('attendanceButton');
+            const status = document.getElementById('attendanceStatus');
+            const points = document.getElementById('attendancePoints');
+            const summary = document.getElementById('attendanceSummaryText');
+            const profile = typeof window.getCurrentUserProfile === 'function' ? window.getCurrentUserProfile() : null;
+
+            if (!button || !status || !points || !summary) return;
+
+            if (!profile) {
+                button.disabled = true;
+                status.textContent = '로그인 후 출석체크를 이용할 수 있습니다.';
+                points.textContent = '0pt';
+                summary.textContent = '현재 로그인 정보가 없어 포인트를 표시할 수 없습니다.';
+                return;
+            }
+
+            points.textContent = `${profile.points}pt`;
+
+            if (profile.canAttendToday) {
+                button.disabled = false;
+                button.textContent = '출석체크 하고 포인트 받기';
+                status.textContent = '오늘의 보상을 아직 받지 않았습니다.';
+                summary.textContent = `현재 연속 출석 ${profile.attendanceStreak}일입니다. 7일 단위로 추가 보너스를 받을 수 있습니다.`;
+            } else {
+                button.disabled = true;
+                button.textContent = '오늘 출석 완료';
+                status.textContent = '오늘은 이미 출석체크를 마쳤습니다.';
+                summary.textContent = `현재 연속 출석 ${profile.attendanceStreak}일, 최고 기록 ${profile.maxAttendanceStreak}일입니다.`;
+            }
+        }
+
+        function renderRankingPanel() {
+            const rankingList = document.getElementById('rankingList');
+            if (!rankingList) return;
+
+            const ranking = typeof window.getCommunityRanking === 'function'
+                ? window.getCommunityRanking().slice(0, 5)
+                : [];
+
+            if (!ranking.length) {
+                rankingList.innerHTML = '<div class="ranking-item"><div class="ranking-user"><div class="ranking-name">랭킹 데이터가 아직 없습니다.</div></div></div>';
+                return;
+            }
+
+            rankingList.innerHTML = ranking.map((user, index) => `
+                <div class="ranking-item">
+                    <span class="ranking-rank">${index + 1}</span>
+                    <div class="ranking-user">
+                        <div class="ranking-name">${user.nickname}${user.activeTitle ? ` <span style="color:#9f4f2e; font-size:0.88rem;">${user.activeTitle}</span>` : ''}</div>
+                        <div class="ranking-meta">연속 출석 ${user.attendanceStreak}일</div>
+                    </div>
+                    <span class="ranking-score">${user.points}pt</span>
+                </div>
+            `).join('');
+        }
+
+        function renderStorePanel() {
+            const storeGrid = document.getElementById('storeGrid');
+            const profile = typeof window.getCurrentUserProfile === 'function' ? window.getCurrentUserProfile() : null;
+            const items = typeof window.getPointStoreItems === 'function' ? window.getPointStoreItems() : [];
+
+            if (!storeGrid) return;
+
+            storeGrid.innerHTML = items.map((item) => {
+                const isUnlocked = profile && Array.isArray(profile.unlockedTitles) && profile.unlockedTitles.includes(item.id);
+                const isActive = profile && profile.activeTitleId === item.id;
+                const canAfford = profile && profile.points >= item.cost;
+                const buttonLabel = isActive ? '해제하기' : (isUnlocked ? '장착하기' : `${item.cost}pt 구매`);
+                const buttonAction = isActive ? 'unequip' : (isUnlocked ? 'equip' : 'buy');
+                const disabled = !profile || (!isUnlocked && !canAfford);
+
+                return `
+                    <div class="store-item">
+                        <span class="store-price">${item.cost}pt</span>
+                        <h3>${item.title}</h3>
+                        <p>${item.description}</p>
+                        <button
+                            class="store-button"
+                            type="button"
+                            data-store-id="${item.id}"
+                            data-store-action="${buttonAction}"
+                            ${disabled ? 'disabled' : ''}
+                        >${disabled && !isUnlocked && !canAfford ? `${item.cost}pt 필요` : buttonLabel}</button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function setupAttendanceButton() {
+            const button = document.getElementById('attendanceButton');
+            if (!button) return;
+
+            button.addEventListener('click', () => {
+                if (typeof window.claimDailyAttendance !== 'function') return;
+                const result = window.claimDailyAttendance();
+
+                if (result && result.ok) {
+                    const bonusMessage = result.streakBonus > 0 ? `\n7일 연속 출석 보너스 +${result.streakBonus}pt!` : '';
+                    alert(`출석 완료! ${result.earnedPoints}pt를 획득했습니다.\n연속 출석 ${result.attendanceStreak}일${bonusMessage}\n현재 포인트는 ${result.totalPoints}pt입니다.`);
+                    renderAttendancePanel();
+                    renderRankingPanel();
+                    renderStorePanel();
+                    if (typeof window.injectLogoutButton === 'function') {
+                        window.injectLogoutButton();
+                    }
+                    return;
+                }
+
+                if (result && result.message) {
+                    alert(result.message);
+                    renderAttendancePanel();
+                }
+            });
+        }
+
+        function setupStoreButtons() {
+            const storeGrid = document.getElementById('storeGrid');
+            if (!storeGrid) return;
+
+            storeGrid.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-store-id]');
+                if (!button) return;
+
+                const itemId = button.getAttribute('data-store-id');
+                const action = button.getAttribute('data-store-action');
+                const result = action === 'equip'
+                    ? (typeof window.equipStoreItem === 'function' ? window.equipStoreItem(itemId) : null)
+                    : action === 'unequip'
+                        ? (typeof window.unequipStoreItem === 'function' ? window.unequipStoreItem() : null)
+                    : (typeof window.purchaseStoreItem === 'function' ? window.purchaseStoreItem(itemId) : null);
+
+                if (!result) return;
+
+                if (result.ok) {
+                    if (action === 'equip') {
+                        alert(`${result.item.title} 칭호를 장착했습니다.`);
+                    } else if (action === 'unequip') {
+                        alert('장착 중인 칭호를 해제했습니다.');
+                    } else {
+                        alert(`${result.item.title} 칭호를 구매하고 바로 장착했습니다.`);
+                    }
+                    renderAttendancePanel();
+                    renderRankingPanel();
+                    renderStorePanel();
+                    if (typeof window.injectLogoutButton === 'function') {
+                        window.injectLogoutButton();
+                    }
+                    return;
+                }
+
+                if (result.message) {
+                    alert(result.message);
+                }
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            renderAttendancePanel();
+            renderRankingPanel();
+            renderStorePanel();
+            setupAttendanceButton();
+            setupStoreButtons();
+
+            window.addEventListener('attendance:updated', () => {
+                renderAttendancePanel();
+                renderRankingPanel();
+                renderStorePanel();
+                if (typeof window.injectLogoutButton === 'function') {
+                    window.injectLogoutButton();
+                }
+            });
+
+            window.addEventListener('points:updated', () => {
+                renderAttendancePanel();
+                renderRankingPanel();
+                renderStorePanel();
+                if (typeof window.injectLogoutButton === 'function') {
+                    window.injectLogoutButton();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
