@@ -25,15 +25,15 @@
             <div class="mypage-hero-copy">
                 <span class="mypage-kicker">My Page</span>
                 <h1>내 정보를 정리하는 공간</h1>
-                <p>자주 바꾸는 계정 정보만 꺼내 두고, 바로 수정하고 바로 저장할 수 있게 정리했습니다.</p>
+                <p>닉네임과 프로필 이미지는 가볍게 바꾸고, 비밀번호는 따로 안전하게 관리할 수 있도록 구성했습니다.</p>
             </div>
         </header>
 
         <main class="mypage-shell">
             <section class="mypage-intro">
                 <div>
-                    <h2>바로 수정할 수 있게</h2>
-                    <p>닉네임과 비밀번호 변경만 먼저 보이도록 정리해 마이페이지가 과하게 길어지지 않게 맞췄습니다.</p>
+                    <h2>바로 수정하고 바로 반영</h2>
+                    <p>프로필 이미지를 올리고 닉네임을 저장하면 상단 사용자 영역에도 바로 반영됩니다. 꼭 필요한 항목만 보이도록 간단하게 정리했습니다.</p>
                 </div>
             </section>
 
@@ -41,41 +41,50 @@
                 <article class="mypage-card">
                     <div class="card-header">
                         <span class="card-kicker">Profile</span>
-                        <h2>닉네임 변경</h2>
-                        <p>지금 보여지는 이름 대신 원하는 닉네임으로 바꿀 수 있습니다.</p>
+                        <h2>프로필 설정</h2>
+                        <p>닉네임과 프로필 이미지를 수정해 나만의 프로필을 관리할 수 있습니다.</p>
+                    </div>
+
+                    <div class="profile-image-block">
+                        <div id="profileImagePreviewWrap" class="profile-image-placeholder">미리보기</div>
+                        <div class="profile-image-controls">
+                            <input id="profileImageInput" type="file" accept="image/*">
+                            <button class="btn-secondary" type="button" id="clearProfileImageButton">프로필 이미지 제거</button>
+                            <input type="hidden" id="profileImageValue">
+                        </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="nicknameInput">새 닉네임</label>
-                        <input type="text" id="nicknameInput" placeholder="닉네임을 입력해 주세요" autocomplete="nickname">
+                        <label for="nicknameInput">닉네임</label>
+                        <input type="text" id="nicknameInput" placeholder="닉네임을 입력해 주세요." autocomplete="nickname">
                     </div>
 
-                    <button class="btn-save" onclick="updateNickname()">닉네임 저장</button>
+                    <button class="btn-save" type="button" onclick="updateProfile()">프로필 저장</button>
                 </article>
 
                 <article class="mypage-card">
                     <div class="card-header">
                         <span class="card-kicker">Security</span>
                         <h2>비밀번호 변경</h2>
-                        <p>현재 비밀번호를 확인한 뒤 새로운 비밀번호로 안전하게 변경합니다.</p>
+                        <p>현재 비밀번호를 확인한 뒤 새로운 비밀번호로 안전하게 변경할 수 있습니다.</p>
                     </div>
 
                     <div class="form-group">
                         <label for="currentPw">현재 비밀번호</label>
-                        <input type="password" id="currentPw" placeholder="현재 비밀번호를 입력해 주세요" autocomplete="current-password">
+                        <input type="password" id="currentPw" placeholder="현재 비밀번호를 입력해 주세요." autocomplete="current-password">
                     </div>
 
                     <div class="form-group">
                         <label for="newPw">새 비밀번호</label>
-                        <input type="password" id="newPw" placeholder="최소 4자 이상 입력해 주세요" autocomplete="new-password">
+                        <input type="password" id="newPw" placeholder="최소 4자 이상 입력해 주세요." autocomplete="new-password">
                     </div>
 
                     <div class="form-group">
                         <label for="confirmNewPw">새 비밀번호 확인</label>
-                        <input type="password" id="confirmNewPw" placeholder="새 비밀번호를 다시 입력해 주세요" autocomplete="new-password">
+                        <input type="password" id="confirmNewPw" placeholder="새 비밀번호를 다시 입력해 주세요." autocomplete="new-password">
                     </div>
 
-                    <button class="btn-save btn-save-accent" onclick="updatePassword()">비밀번호 변경</button>
+                    <button class="btn-save btn-save-accent" type="button" onclick="updatePassword()">비밀번호 변경</button>
                 </article>
             </section>
         </main>
