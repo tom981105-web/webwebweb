@@ -209,7 +209,7 @@
                 <div class="list" id="codeList" style="margin-top: 18px;"></div>
             </section>
 
-            <section class="card">
+            <section class="card full">
                 <h2>회원 관리</h2>
                 <p class="meta">가입한 회원 상태를 승인/대기/삭제로 관리합니다.</p>
                 <div class="list" id="userList"></div>
@@ -797,36 +797,30 @@
             return '<span class="badge pending">대기중</span>';
         }
 
-        async function renderUsers() {
+        function renderUsersList(usersDb) {
             const list = document.getElementById('userList');
-            list.innerHTML = '<div class="list-item"><div><strong>회원 정보를 불러오는 중입니다.</strong></div></div>';
-
-            let usersDb = getUsersDbSafe();
-            try {
-                usersDb = await fetchUsersFromServer();
-            } catch (error) {
-                usersDb = getUsersDbSafe();
-            }
+            if (!list) return;
 
             list.innerHTML = '';
 
-            const entries = Object.entries(usersDb);
+            const entries = Object.entries(usersDb || {});
             if (!entries.length) {
                 list.innerHTML = '<div class="list-item"><div><strong>가입한 회원이 없습니다.</strong></div></div>';
                 return;
             }
 
             entries.forEach(([id, user]) => {
+                const safeUser = user && typeof user === 'object' ? user : {};
                 const item = document.createElement('div');
                 item.className = 'list-item user-list-item';
-                const isAdmin = id.toLowerCase() === 'admin' || user.isAdmin === true;
-                const status = isAdmin ? 'regular' : (user.status || 'pending');
+                const isAdmin = id.toLowerCase() === 'admin' || safeUser.isAdmin === true;
+                const status = isAdmin ? 'regular' : (safeUser.status || 'pending');
                 item.innerHTML = `
                     <div class="list-item-main">
                         <strong>${id}</strong>
-                        <div class="sub">가입일: ${user.signupDate || '-'}</div>
-                        <div class="sub">최근 로그인: ${user.lastLogin || '-'}</div>
-                        <div class="sub">보유 포인트: <span class="point-value">${Number(user.points || 0)}pt</span></div>
+                        <div class="sub">가입일: ${safeUser.signupDate || '-'}</div>
+                        <div class="sub">최근 로그인: ${safeUser.lastLogin || '-'}</div>
+                        <div class="sub">보유 포인트: <span class="point-value">${Number(safeUser.points || 0)}pt</span></div>
                         <div style="margin-top: 8px;">${getStatusBadge(status, isAdmin)}</div>
                     </div>
                     <div class="action-group">
@@ -842,6 +836,23 @@
                 `;
                 list.appendChild(item);
             });
+        }
+
+        async function renderUsers() {
+            const list = document.getElementById('userList');
+            if (!list) return;
+
+            const localUsers = getUsersDbSafe();
+            renderUsersList(localUsers);
+
+            try {
+                const usersDb = await fetchUsersFromServer();
+                renderUsersList(usersDb);
+            } catch (error) {
+                if (!Object.keys(localUsers).length) {
+                    list.innerHTML = `<div class="list-item"><div><strong>회원 정보를 불러오지 못했습니다.</strong><div class="sub">${error.message || '잠시 후 다시 시도해 주세요.'}</div></div></div>`;
+                }
+            }
         }
 
         async function updateUserStatus(id, status) {
