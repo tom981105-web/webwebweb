@@ -16,6 +16,7 @@ const {
 } = require('./paths');
 const storage = require('./storage');
 const { uploadBackupToR2 } = require('./r2-backup');
+const LIVE_DB_KEY = 'system/database.json';
 
 const app = express();
 app.use(cors());
@@ -374,12 +375,56 @@ function createLegacyPayloadFromState(state) {
     };
 }
 
-let rawDb = safeParseJson(fs.readFileSync(DB_FILE, 'utf8'), {});
-let state = normalizeRawDb(rawDb);
+let rawDb = {};
+let state = normalizeRawDb({});
+
+async function hydrateDatabaseFromRemote() {
+    const storageStatus = storage.getStorageStatus();
+    if (storageStatus.provider !== 'r2' || !storageStatus.isR2Configured) {
+        return false;
+    }
+
+    try {
+        const remoteText = await storage.readTextByKey(LIVE_DB_KEY);
+        if (!remoteText) return false;
+
+        const remoteDb = safeParseJson(remoteText, null);
+        if (!remoteDb || typeof remoteDb !== 'object') return false;
+
+        fs.writeFileSync(DB_FILE, JSON.stringify(remoteDb, null, 2));
+        return true;
+    } catch (error) {
+        console.warn('[DB] 원격 최신 상태 복구에 실패했습니다.', error.message || error);
+        return false;
+    }
+}
+
+async function mirrorDatabaseToRemote() {
+    const storageStatus = storage.getStorageStatus();
+    if (storageStatus.provider !== 'r2' || !storageStatus.isR2Configured) {
+        return;
+    }
+
+    try {
+        await storage.saveTextByKey({
+            key: LIVE_DB_KEY,
+            content: JSON.stringify(rawDb, null, 2),
+            contentType: 'application/json'
+        });
+    } catch (error) {
+        console.warn('[DB] 원격 최신 상태 저장에 실패했습니다.', error.message || error);
+    }
+}
+
+function loadStateFromDisk() {
+    rawDb = safeParseJson(fs.readFileSync(DB_FILE, 'utf8'), {});
+    state = normalizeRawDb(rawDb);
+}
 
 function persistDb() {
     rawDb = createLegacyPayloadFromState(state);
     fs.writeFileSync(DB_FILE, JSON.stringify(rawDb, null, 2));
+    mirrorDatabaseToRemote();
 }
 
 function migrateLoginHeroStorageIfNeeded() {
@@ -396,14 +441,10 @@ function migrateBannerStorageIfNeeded() {
 }
 
 function reloadDb() {
-    rawDb = safeParseJson(fs.readFileSync(DB_FILE, 'utf8'), {});
-    state = normalizeRawDb(rawDb);
+    loadStateFromDisk();
     migrateLoginHeroStorageIfNeeded();
     migrateBannerStorageIfNeeded();
 }
-
-migrateLoginHeroStorageIfNeeded();
-migrateBannerStorageIfNeeded();
 
 function applyLegacySyncWrite(key, value) {
     switch (key) {
@@ -790,9 +831,21 @@ app.get('/api/admin/state', (req, res) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}.`);
-    console.log('Normalized API is ready for Railway/R2 migration.');
-    console.log(`Data directory: ${DATA_DIR}`);
+async function bootstrap() {
+    await hydrateDatabaseFromRemote();
+    loadStateFromDisk();
+    migrateLoginHeroStorageIfNeeded();
+    migrateBannerStorageIfNeeded();
+
+    const PORT = process.env.PORT || 3000;
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}.`);
+        console.log('Normalized API is ready for Railway/R2 migration.');
+        console.log(`Data directory: ${DATA_DIR}`);
+    });
+}
+
+bootstrap().catch((error) => {
+    console.error('[Boot] 서버 시작에 실패했습니다.', error);
+    process.exit(1);
 });

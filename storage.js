@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const {
     UPLOADS_DIR,
     LOGIN_HERO_DIR,
@@ -200,6 +200,73 @@ async function saveTextFile({ content, folder, fileName, contentType = 'applicat
     return `${folderConfig.publicPrefix}/${normalizedFileName}`;
 }
 
+async function saveTextByKey({ key, content, contentType = 'application/json' }) {
+    const normalizedKey = String(key || '').trim().replace(/^\/+/, '');
+    if (!normalizedKey) {
+        throw new Error('저장할 키가 필요합니다.');
+    }
+
+    if (PROVIDER === 'r2') {
+        const bucket = process.env.R2_BUCKET;
+        const publicBaseUrl = String(process.env.R2_PUBLIC_BASE_URL || '').trim().replace(/\/+$/, '');
+        if (!bucket || !publicBaseUrl) {
+            throw new Error('R2 버킷 또는 공개 URL 설정이 없습니다.');
+        }
+
+        await getR2Client().send(new PutObjectCommand({
+            Bucket: bucket,
+            Key: normalizedKey,
+            Body: Buffer.from(String(content || ''), 'utf8'),
+            ContentType: contentType
+        }));
+
+        return `${publicBaseUrl}/${normalizedKey}`;
+    }
+
+    const targetPath = path.join(BACKUP_DIR, normalizedKey.replace(/\//g, path.sep));
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.writeFileSync(targetPath, String(content || ''), 'utf8');
+    return targetPath;
+}
+
+async function readTextByKey(key) {
+    const normalizedKey = String(key || '').trim().replace(/^\/+/, '');
+    if (!normalizedKey) return '';
+
+    if (PROVIDER === 'r2') {
+        const bucket = process.env.R2_BUCKET;
+        if (!bucket) {
+            throw new Error('R2 버킷 설정이 없습니다.');
+        }
+
+        try {
+            const response = await getR2Client().send(new GetObjectCommand({
+                Bucket: bucket,
+                Key: normalizedKey
+            }));
+
+            if (response && response.Body && typeof response.Body.transformToString === 'function') {
+                return await response.Body.transformToString();
+            }
+
+            const chunks = [];
+            for await (const chunk of response.Body) {
+                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+            }
+            return Buffer.concat(chunks).toString('utf8');
+        } catch (error) {
+            if (error && (error.name === 'NoSuchKey' || error.$metadata && error.$metadata.httpStatusCode === 404)) {
+                return '';
+            }
+            throw error;
+        }
+    }
+
+    const targetPath = path.join(BACKUP_DIR, normalizedKey.replace(/\//g, path.sep));
+    if (!fs.existsSync(targetPath)) return '';
+    return fs.readFileSync(targetPath, 'utf8');
+}
+
 async function listFolderEntries(folder) {
     const folderConfig = FOLDER_MAP[folder];
     if (!folderConfig) {
@@ -285,6 +352,8 @@ module.exports = {
     saveImageDataUrl,
     deleteStoredUrl,
     saveTextFile,
+    saveTextByKey,
+    readTextByKey,
     listFolderEntries,
     deleteByKey,
     getStorageStatus
