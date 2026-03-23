@@ -3,11 +3,11 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const storage = require('./storage');
+const { DATA_DIR, DB_FILE, UPLOADS_DIR, ensureDataLayout } = require('./paths');
 
-const ROOT_DIR = __dirname;
-const DB_FILE = path.join(ROOT_DIR, 'database.json');
-const UPLOADS_DIR = path.join(ROOT_DIR, 'uploads');
 const RETAIN_BACKUP_COUNT = 2;
+
+ensureDataLayout();
 
 function createSnapshot() {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -16,7 +16,7 @@ function createSnapshot() {
 
     if (fs.existsSync(UPLOADS_DIR)) {
         walkDirectory(UPLOADS_DIR, (absolutePath) => {
-            const relativePath = path.relative(ROOT_DIR, absolutePath).replace(/\\/g, '/');
+            const relativePath = path.relative(DATA_DIR, absolutePath).replace(/\\/g, '/');
             const stat = fs.statSync(absolutePath);
             uploadFiles.push({
                 path: relativePath,

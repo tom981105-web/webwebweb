@@ -1,39 +1,41 @@
 const fs = require('fs');
 const path = require('path');
 const { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command } = require('@aws-sdk/client-s3');
+const {
+    UPLOADS_DIR,
+    LOGIN_HERO_DIR,
+    BANNER_DIR,
+    BOARD_INLINE_DIR,
+    BACKUP_DIR,
+    ensureDataLayout
+} = require('./paths');
 
-const ROOT_DIR = __dirname;
-const UPLOADS_DIR = path.join(ROOT_DIR, 'uploads');
 const PROVIDER = String(process.env.STORAGE_PROVIDER || 'local').trim().toLowerCase();
 
 const FOLDER_MAP = {
     'login-hero': {
-        localDir: path.join(UPLOADS_DIR, 'login-hero'),
+        localDir: LOGIN_HERO_DIR,
         publicPrefix: '/uploads/login-hero',
         fallback: 'login-hero'
     },
     banner: {
-        localDir: path.join(UPLOADS_DIR, 'banners'),
+        localDir: BANNER_DIR,
         publicPrefix: '/uploads/banners',
         fallback: 'banner'
     },
     'board-inline': {
-        localDir: path.join(UPLOADS_DIR, 'board-inline'),
+        localDir: BOARD_INLINE_DIR,
         publicPrefix: '/uploads/board-inline',
         fallback: 'board-inline'
     },
     backup: {
-        localDir: path.join(UPLOADS_DIR, 'backups'),
+        localDir: BACKUP_DIR,
         publicPrefix: '/uploads/backups',
         fallback: 'backup'
     }
 };
 
-Object.values(FOLDER_MAP).forEach((config) => {
-    if (!fs.existsSync(config.localDir)) {
-        fs.mkdirSync(config.localDir, { recursive: true });
-    }
-});
+ensureDataLayout();
 
 let r2Client = null;
 
@@ -158,7 +160,7 @@ async function deleteStoredUrl(value) {
     }
 
     if (!normalized.startsWith('/uploads/')) return;
-    const filePath = path.join(ROOT_DIR, normalized.replace(/^\//, '').replace(/\//g, path.sep));
+    const filePath = path.join(UPLOADS_DIR, normalized.replace(/^\/uploads\//, '').replace(/\//g, path.sep));
     if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
     }
@@ -255,7 +257,7 @@ async function deleteByKey(key) {
         return;
     }
 
-    const absolutePath = path.join(ROOT_DIR, normalizedKey.replace(/\//g, path.sep));
+    const absolutePath = path.join(BACKUP_DIR, normalizedKey.replace(/^backup\//, '').replace(/\//g, path.sep));
     if (fs.existsSync(absolutePath)) {
         fs.unlinkSync(absolutePath);
     }
