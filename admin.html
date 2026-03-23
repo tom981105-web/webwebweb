@@ -97,9 +97,15 @@
         .status-pill.pending { background: rgba(215, 167, 63, 0.14); color: #946500; }
         .status-pill.offline { background: rgba(189, 73, 56, 0.1); color: #9f3f32; }
         .status-note { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; }
-        .admin-profile-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 18px; align-items: center; }
+        .admin-profile-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 18px; align-items: start; }
         .admin-profile-preview { width: 110px; height: 110px; border-radius: 26px; object-fit: cover; background: rgba(230, 219, 205, 0.7); border: 1px solid rgba(88, 60, 28, 0.12); display: block; }
         .admin-profile-placeholder { width: 110px; height: 110px; border-radius: 26px; display: flex; align-items: center; justify-content: center; background: rgba(88, 60, 28, 0.08); border: 1px dashed rgba(88, 60, 28, 0.18); color: var(--text-secondary); font-size: 0.9rem; font-weight: 700; }
+        .admin-profile-focus { position: relative; width: min(100%, 280px); aspect-ratio: 1; border-radius: 28px; overflow: hidden; border: 1px solid rgba(88, 60, 28, 0.14); background: linear-gradient(135deg, rgba(255,255,255,0.84), rgba(241,229,213,0.92)); cursor: crosshair; }
+        .admin-profile-focus.is-empty { display: none; }
+        .admin-profile-focus img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .admin-profile-focus-ring { position: absolute; inset: 16%; border-radius: 999px; border: 2px solid rgba(255, 248, 240, 0.96); box-shadow: 0 0 0 999px rgba(34, 22, 15, 0.18), inset 0 0 0 1px rgba(88, 60, 28, 0.12); pointer-events: none; }
+        .admin-profile-focus-marker { position: absolute; width: 18px; height: 18px; margin-left: -9px; margin-top: -9px; border-radius: 999px; background: #fff8f0; border: 2px solid #a6542f; box-shadow: 0 10px 18px rgba(34, 22, 15, 0.18); pointer-events: none; }
+        .admin-profile-focus-caption { position: absolute; left: 14px; right: 14px; bottom: 14px; padding: 10px 12px; border-radius: 16px; background: rgba(34, 22, 15, 0.62); color: #fff3e6; font-size: 0.82rem; line-height: 1.5; pointer-events: none; }
         @media (max-width: 960px) {
             .overview, .grid { grid-template-columns: 1fr; }
             .card.full { grid-column: auto; }
@@ -111,6 +117,7 @@
             .status-item { align-items: flex-start; flex-direction: column; }
             .status-item span { text-align: left; }
             .admin-profile-row { grid-template-columns: 1fr; }
+            .admin-profile-focus { width: 100%; }
         }
         @media (max-width: 720px) {
             .admin-page { padding: 18px 14px 70px; }
@@ -257,6 +264,12 @@
                     <div class="admin-profile-row">
                         <div id="adminProfilePreviewWrap" class="admin-profile-placeholder">미리보기</div>
                         <div class="stack">
+                            <div id="adminProfileFocusEditor" class="admin-profile-focus is-empty">
+                                <img id="adminProfileFocusImage" alt="관리자 프로필 영역 편집">
+                                <div class="admin-profile-focus-ring"></div>
+                                <div id="adminProfileFocusMarker" class="admin-profile-focus-marker"></div>
+                                <div class="admin-profile-focus-caption">누른 채 드래그해서 원형 프로필 중심을 맞춰 주세요.</div>
+                            </div>
                             <input id="adminNicknameInput" type="text" placeholder="관리자 닉네임">
                             <div class="upload-box">
                                 <div class="row wrap">
@@ -264,6 +277,8 @@
                                     <button class="btn-muted" type="button" id="clearAdminProfileImageButton">프로필 이미지 제거</button>
                                 </div>
                                 <input id="adminProfileImageValue" type="hidden">
+                                <input id="adminProfileFocusXValue" type="hidden" value="50">
+                                <input id="adminProfileFocusYValue" type="hidden" value="50">
                             </div>
                         </div>
                     </div>
@@ -375,6 +390,8 @@
     </main>
 
     <script>
+        let isAdminProfileDragging = false;
+
         function getApiBase() {
             return window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
         }
@@ -409,6 +426,24 @@
             return /^https?:\/\//i.test(normalized) ? normalized : '';
         }
 
+        function normalizeProfileFocusValue(value) {
+            const numericValue = Number(value);
+            return Number.isFinite(numericValue) ? Math.min(100, Math.max(0, numericValue)) : 50;
+        }
+
+        function getAdminProfileFocus() {
+            return {
+                x: normalizeProfileFocusValue(document.getElementById('adminProfileFocusXValue').value),
+                y: normalizeProfileFocusValue(document.getElementById('adminProfileFocusYValue').value)
+            };
+        }
+
+        function setAdminProfileFocus(x, y) {
+            document.getElementById('adminProfileFocusXValue').value = normalizeProfileFocusValue(x);
+            document.getElementById('adminProfileFocusYValue').value = normalizeProfileFocusValue(y);
+            syncAdminProfileFocus();
+        }
+
         function renderAdminProfilePreview(url) {
             const wrap = document.getElementById('adminProfilePreviewWrap');
             if (!wrap) return;
@@ -422,13 +457,69 @@
             wrap.innerHTML = `<img src="${displayUrl}" alt="관리자 프로필 미리보기" class="admin-profile-preview">`;
         }
 
+        function syncAdminProfileFocus() {
+            const focusEditor = document.getElementById('adminProfileFocusEditor');
+            const marker = document.getElementById('adminProfileFocusMarker');
+            const image = document.getElementById('adminProfileFocusImage');
+            const imageValue = document.getElementById('adminProfileImageValue');
+            const displayUrl = normalizeProfileDisplayUrl(imageValue.value || '');
+            const { x, y } = getAdminProfileFocus();
+
+            if (!focusEditor || !marker || !image) return;
+
+            if (!displayUrl) {
+                focusEditor.classList.add('is-empty');
+                renderAdminProfilePreview('');
+                return;
+            }
+
+            focusEditor.classList.remove('is-empty');
+            image.src = displayUrl;
+            image.style.objectPosition = `${x}% ${y}%`;
+            marker.style.left = `${x}%`;
+            marker.style.top = `${y}%`;
+            renderAdminProfilePreview(displayUrl);
+            const previewImage = document.querySelector('#adminProfilePreviewWrap img');
+            if (previewImage) {
+                previewImage.style.objectPosition = `${x}% ${y}%`;
+            }
+        }
+
+        function moveAdminProfileFocus(event) {
+            const focusEditor = document.getElementById('adminProfileFocusEditor');
+            if (!focusEditor || focusEditor.classList.contains('is-empty')) return;
+            const rect = focusEditor.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * 100;
+            const y = ((event.clientY - rect.top) / rect.height) * 100;
+            setAdminProfileFocus(x, y);
+        }
+
+        function startAdminProfileDrag(event) {
+            const focusEditor = document.getElementById('adminProfileFocusEditor');
+            if (!focusEditor || focusEditor.classList.contains('is-empty')) return;
+            isAdminProfileDragging = true;
+            moveAdminProfileFocus(event);
+            event.preventDefault();
+        }
+
+        function handleAdminProfileDrag(event) {
+            if (!isAdminProfileDragging) return;
+            moveAdminProfileFocus(event);
+        }
+
+        function stopAdminProfileDrag() {
+            isAdminProfileDragging = false;
+        }
+
         function renderAdminProfileCard() {
             const adminUser = getAdminProfileUser() || {};
             const nicknameInput = document.getElementById('adminNicknameInput');
             const imageValue = document.getElementById('adminProfileImageValue');
             if (nicknameInput) nicknameInput.value = adminUser.nickname || 'admin';
             if (imageValue) imageValue.value = adminUser.profileImage || '';
-            renderAdminProfilePreview(adminUser.profileImage || '');
+            document.getElementById('adminProfileFocusXValue').value = normalizeProfileFocusValue(adminUser.profileFocusX);
+            document.getElementById('adminProfileFocusYValue').value = normalizeProfileFocusValue(adminUser.profileFocusY);
+            syncAdminProfileFocus();
         }
 
         async function handleAdminProfileImageInput() {
@@ -438,7 +529,7 @@
             try {
                 const url = await uploadServerImage(file, 'profile');
                 document.getElementById('adminProfileImageValue').value = url;
-                renderAdminProfilePreview(url);
+                setAdminProfileFocus(50, 50);
             } catch (error) {
                 alert(error.message || '프로필 이미지 업로드에 실패했습니다.');
             } finally {
@@ -448,12 +539,15 @@
 
         function clearAdminProfileImage() {
             document.getElementById('adminProfileImageValue').value = '';
-            renderAdminProfilePreview('');
+            document.getElementById('adminProfileFocusXValue').value = '50';
+            document.getElementById('adminProfileFocusYValue').value = '50';
+            syncAdminProfileFocus();
         }
 
         async function saveAdminProfile() {
             const nickname = String(document.getElementById('adminNicknameInput').value || '').trim();
             const profileImage = String(document.getElementById('adminProfileImageValue').value || '').trim();
+            const { x, y } = getAdminProfileFocus();
 
             if (!nickname) {
                 alert('관리자 닉네임을 입력해 주세요.');
@@ -466,7 +560,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         nickname,
-                        profileImage
+                        profileImage,
+                        profileFocusX: x,
+                        profileFocusY: y
                     })
                 });
                 const result = await response.json().catch(() => ({}));
@@ -478,7 +574,9 @@
                 usersDb.admin = {
                     ...(usersDb.admin || {}),
                     nickname,
-                    profileImage
+                    profileImage,
+                    profileFocusX: x,
+                    profileFocusY: y
                 };
                 localStorage.setItem('users_db', JSON.stringify(usersDb));
                 renderAdminProfileCard();
@@ -1253,6 +1351,7 @@
         document.getElementById('saveAdminProfileButton').addEventListener('click', saveAdminProfile);
         document.getElementById('adminProfileImageInput').addEventListener('change', handleAdminProfileImageInput);
         document.getElementById('clearAdminProfileImageButton').addEventListener('click', clearAdminProfileImage);
+        document.getElementById('adminProfileFocusEditor').addEventListener('mousedown', startAdminProfileDrag);
         document.getElementById('clearTopBannerButton').addEventListener('click', clearTopBannerImage);
         document.getElementById('topFileInput').addEventListener('change', () => handleImageInput('topFileInput', 'topBannerBg', 'topPreview', 'top'));
         document.getElementById('leftFileInput').addEventListener('change', () => handleImageInput('leftFileInput', 'leftBannerUrl', 'leftPreview', 'side'));
@@ -1273,6 +1372,8 @@
             document.getElementById('topBannerY').value = clamp(Number(event.target.value || 50), 0, 100);
             syncTopBannerPreview();
         });
+        document.addEventListener('mousemove', handleAdminProfileDrag);
+        document.addEventListener('mouseup', stopAdminProfileDrag);
 
         assertAdmin();
         document.getElementById('reuseCodeToggle').checked = localStorage.getItem('settings_reuse_code') === 'true';

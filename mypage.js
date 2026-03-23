@@ -1,5 +1,7 @@
 // mypage.js
 (function () {
+    let isDraggingFocus = false;
+
     function getUsersDb() {
         try {
             return JSON.parse(localStorage.getItem('users_db') || '{}');
@@ -197,7 +199,7 @@
         syncFocusVisual();
     }
 
-    function handleFocusEditorClick(event) {
+    function moveFocusFromEvent(event) {
         const focusEditor = document.getElementById('profileFocusEditor');
         if (!focusEditor || focusEditor.classList.contains('is-empty')) return;
 
@@ -205,6 +207,23 @@
         const x = ((event.clientX - rect.left) / rect.width) * 100;
         const y = ((event.clientY - rect.top) / rect.height) * 100;
         setFocusPosition(x, y);
+    }
+
+    function startFocusDrag(event) {
+        const focusEditor = document.getElementById('profileFocusEditor');
+        if (!focusEditor || focusEditor.classList.contains('is-empty')) return;
+        isDraggingFocus = true;
+        moveFocusFromEvent(event);
+        event.preventDefault();
+    }
+
+    function handleFocusDrag(event) {
+        if (!isDraggingFocus) return;
+        moveFocusFromEvent(event);
+    }
+
+    function stopFocusDrag() {
+        isDraggingFocus = false;
     }
 
     async function updateProfile() {
@@ -320,8 +339,11 @@
         }
 
         if (profileFocusEditor) {
-            profileFocusEditor.addEventListener('click', handleFocusEditorClick);
+            profileFocusEditor.addEventListener('mousedown', startFocusDrag);
         }
+
+        document.addEventListener('mousemove', handleFocusDrag);
+        document.addEventListener('mouseup', stopFocusDrag);
     });
 
     window.clearProfileImage = clearProfileImage;
