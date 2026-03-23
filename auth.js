@@ -17,6 +17,22 @@ function getNotificationsDb() {
     }
 }
 
+function getAuthApiBase() {
+    return window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
+}
+
+function resolveProfileImageUrl(value) {
+    const rawValue = String(value || '').trim();
+    if (!rawValue) return '';
+    if (rawValue.startsWith('data:image/')) return rawValue;
+    const localhostMatch = rawValue.match(/^https?:\/\/localhost:\d+(\/uploads\/.+)$/i);
+    const normalized = localhostMatch ? localhostMatch[1] : rawValue;
+    if (/^\/uploads\//i.test(normalized)) {
+        return window.location.protocol === 'file:' ? `${getAuthApiBase()}${normalized}` : normalized;
+    }
+    return /^https?:\/\//i.test(normalized) ? normalized : '';
+}
+
 function saveNotificationsDb(notifications) {
     localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
 }
@@ -305,7 +321,8 @@ function getUsersDb() {
             attendanceStreak: Number(users[key].attendanceStreak || 0),
             maxAttendanceStreak: Number(users[key].maxAttendanceStreak || 0),
             unlockedTitles: Array.isArray(users[key].unlockedTitles) ? users[key].unlockedTitles : [],
-            activeTitleId: users[key].activeTitleId || ''
+            activeTitleId: users[key].activeTitleId || '',
+            profileImage: users[key].profileImage || ''
         };
     });
 
@@ -357,7 +374,8 @@ function getCurrentUserProfile() {
         maxAttendanceStreak: Number(user.maxAttendanceStreak || 0),
         unlockedTitles: Array.isArray(user.unlockedTitles) ? user.unlockedTitles : [],
         activeTitleId: user.activeTitleId || '',
-        activeTitle: activeTitle ? activeTitle.title : ''
+        activeTitle: activeTitle ? activeTitle.title : '',
+        profileImage: user.profileImage || ''
     };
 }
 
@@ -685,6 +703,8 @@ function injectLogoutButton() {
         const isAdmin = currentUser.toLowerCase() === 'admin' || Boolean(userObj.isAdmin);
         const isRegular = isAdmin || userObj.status === 'regular';
         const displayName = userObj.nickname ? userObj.nickname : currentUser;
+        const profileImageUrl = resolveProfileImageUrl(userObj.profileImage || '');
+        const avatarHtml = profileImageUrl ? `<img src="${profileImageUrl}" alt="${displayName}" class="hero-avatar">` : '';
         const points = Number(userObj.points || 0);
         const activeTitle = POINT_STORE_ITEMS.find((item) => item.id === userObj.activeTitleId);
         const activeTitleHtml = activeTitle ? `<span class="hero-title-badge">${activeTitle.title}</span>` : '';
@@ -744,6 +764,7 @@ function injectLogoutButton() {
                 ${notificationHtml}
                 ${activeTitleHtml}
                 <a href="points.html" class="hero-points">${points}pt</a>
+                ${avatarHtml}
                 <span class="hero-user">${displayName}님</span>
                 <button onclick="logout()" class="hero-pill danger" type="button">로그아웃</button>
             `;
@@ -782,6 +803,7 @@ function injectLogoutButton() {
             ${myPageBtnHtml}
             <button onclick="toggleNotificationPanel()" type="button" style="color:#f8efe4; font-size:0.88rem; margin-right:12px; font-weight:700; text-decoration:none; padding:6px 12px; border:1px solid rgba(255,255,255,0.2); border-radius:999px; background:rgba(255,255,255,0.08); cursor:pointer;">알림${unreadCount > 0 ? ` ${unreadCount}` : ''}</button>
             <a href="points.html" style="color:#fde68a; font-size:0.88rem; margin-right:12px; font-weight:700; text-decoration:none; padding:6px 12px; border:1px solid rgba(253,230,138,0.34); border-radius:999px; background:rgba(253,230,138,0.08);">${points}pt</a>
+            ${profileImageUrl ? `<img src="${profileImageUrl}" alt="${displayName}" style="width:34px; height:34px; object-fit:cover; border-radius:999px; margin-right:10px; border:1px solid rgba(255,255,255,0.24);">` : ''}
             <span style="color:#e2e8f0; font-size:0.95rem; margin-right:15px; font-weight:500;">${displayName}님</span>
             <button onclick="logout()" style="background:rgba(239,68,68,0.15); color:#f87171; border:1px solid rgba(239,68,68,0.3); padding:6px 16px; border-radius:8px; cursor:pointer; font-weight:600; font-family:inherit; transition:all 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.25)'" onmouseout="this.style.background='rgba(239,68,68,0.15)'">로그아웃</button>
         `;

@@ -6,6 +6,7 @@ const {
     LOGIN_HERO_DIR,
     BANNER_DIR,
     BOARD_INLINE_DIR,
+    PROFILE_DIR,
     BACKUP_DIR,
     ensureDataLayout
 } = require('./paths');
@@ -27,6 +28,11 @@ const FOLDER_MAP = {
         localDir: BOARD_INLINE_DIR,
         publicPrefix: '/uploads/board-inline',
         fallback: 'board-inline'
+    },
+    profile: {
+        localDir: PROFILE_DIR,
+        publicPrefix: '/uploads/profiles',
+        fallback: 'profile'
     },
     backup: {
         localDir: BACKUP_DIR,

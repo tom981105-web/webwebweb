@@ -12,6 +12,7 @@ const {
     LOGIN_HERO_DIR,
     BANNER_DIR,
     BOARD_INLINE_DIR,
+    PROFILE_DIR,
     ensureDataLayout
 } = require('./paths');
 const storage = require('./storage');
@@ -73,7 +74,8 @@ function normalizeUsers(value) {
             attendanceStreak: Number(normalized[key].attendanceStreak || 0),
             maxAttendanceStreak: Number(normalized[key].maxAttendanceStreak || 0),
             unlockedTitles: Array.isArray(normalized[key].unlockedTitles) ? normalized[key].unlockedTitles : [],
-            activeTitleId: normalized[key].activeTitleId || ''
+            activeTitleId: normalized[key].activeTitleId || '',
+            profileImage: normalized[key].profileImage || ''
         };
     });
 
@@ -656,10 +658,10 @@ app.post('/api/uploads/image', async (req, res) => {
         const savedPath = await storage.saveImageDataUrl({
             dataUrl,
             originalName: fileName,
-            folder,
-            fallbackName: folder === 'banner' ? 'banner' : 'board-inline',
-            index: 0
-        });
+                folder,
+                fallbackName: folder === 'banner' ? 'banner' : folder === 'profile' ? 'profile' : 'board-inline',
+                index: 0
+            });
         res.json({ success: true, url: savedPath });
     } catch (error) {
         res.status(400).json({

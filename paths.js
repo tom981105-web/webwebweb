@@ -9,6 +9,7 @@ const UPLOADS_DIR = path.join(DATA_DIR, 'uploads');
 const LOGIN_HERO_DIR = path.join(UPLOADS_DIR, 'login-hero');
 const BANNER_DIR = path.join(UPLOADS_DIR, 'banners');
 const BOARD_INLINE_DIR = path.join(UPLOADS_DIR, 'board-inline');
+const PROFILE_DIR = path.join(UPLOADS_DIR, 'profiles');
 const BACKUP_DIR = path.join(UPLOADS_DIR, 'backups');
 
 function ensureDataLayout() {
@@ -18,6 +19,7 @@ function ensureDataLayout() {
         LOGIN_HERO_DIR,
         BANNER_DIR,
         BOARD_INLINE_DIR,
+        PROFILE_DIR,
         BACKUP_DIR
     ].forEach((targetPath) => {
         if (!fs.existsSync(targetPath)) {
@@ -42,6 +44,7 @@ module.exports = {
     LOGIN_HERO_DIR,
     BANNER_DIR,
     BOARD_INLINE_DIR,
+    PROFILE_DIR,
     BACKUP_DIR,
     ensureDataLayout
 };
