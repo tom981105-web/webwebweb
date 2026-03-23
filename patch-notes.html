@@ -218,6 +218,27 @@
                             <div class="timeline-dot"></div>
                             <div>
                                 <span class="timeline-date">2026. 3. 23</span>
+                                <h3>Railway · R2 운영 구조 정리와 등산 기록 연동</h3>
+                                <p>배포 후에도 회원, 포인트, 게시글 같은 실데이터가 유지되도록 저장 구조를 다시 묶고, 등산 페이지의 지도 기록과 아래 산행기 카드가 같은 데이터를 바라보도록 연결했습니다.</p>
+                                <ul class="timeline-list">
+                                    <li>Railway 볼륨과 R2 라이브 DB 미러링 기준으로 redeploy 이후에도 최신 운영 데이터가 복구되도록 정리했습니다.</li>
+                                    <li>로그인 배경 이미지, 배너, 게시판 인라인 이미지를 DB 밖 파일 저장 구조로 정리하고 R2 업로드 기준으로 맞췄습니다.</li>
+                                    <li>관리자 페이지에서 클라우드 상태와 최근 백업을 바로 확인하고, R2 백업을 수동 실행할 수 있게 구성했습니다.</li>
+                                    <li>등산 페이지는 위에서 저장한 산 기록이 아래 전국 산행기 & 사진첩에도 즉시 반영되고, 작성자 본인이나 admin이 수정·삭제할 수 있게 연결했습니다.</li>
+                                    <li>포인트 라운지에서는 테스트용 도박 시스템을 제거하고 출석, 랭킹, 상점 중심 구조로 다시 정리했습니다.</li>
+                                </ul>
+                                <div class="tag-row">
+                                    <span class="tag">Railway</span>
+                                    <span class="tag">R2 백업</span>
+                                    <span class="tag">등산 기록 연동</span>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="timeline-item">
+                            <div class="timeline-dot"></div>
+                            <div>
+                                <span class="timeline-date">2026. 3. 23</span>
                                 <h3>자유게시판 카페형 개편</h3>
                                 <p>자유게시판을 카테고리 중심 게시판으로 다시 구성하고, 목록과 본문 전환 흐름을 카페처럼 읽기 쉽게 정리했습니다.</p>
                                 <ul class="timeline-list">
