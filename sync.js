@@ -1,5 +1,10 @@
 ﻿// sync.js
 (function () {
+    let resolveInitialSync;
+    const initialSyncPromise = new Promise((resolve) => {
+        resolveInitialSync = resolve;
+    });
+
     function getApiBase() {
         if (window.location.protocol === 'file:') {
             return 'http://localhost:3000';
@@ -37,6 +42,11 @@
             window.dispatchEvent(new CustomEvent('sync:initial-complete'));
         } catch (error) {
             console.warn('[Sync] 초기 동기화에 실패했습니다.', error);
+        } finally {
+            if (typeof resolveInitialSync === 'function') {
+                resolveInitialSync(true);
+                resolveInitialSync = null;
+            }
         }
     }
 
@@ -72,11 +82,16 @@
             if (!response.ok) return false;
             const db = await response.json();
             applyServerState(db);
+            window.dispatchEvent(new CustomEvent('sync:initial-complete'));
             return true;
         } catch (error) {
             console.warn('[Sync] 수동 동기화에 실패했습니다.', error);
             return false;
         }
+    };
+
+    window.waitForInitialSync = function () {
+        return initialSyncPromise;
     };
 
     initialSync();

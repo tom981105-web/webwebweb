@@ -35,7 +35,6 @@ function getUsersDb() {
         };
     });
 
-    localStorage.setItem('users_db', JSON.stringify(users));
     return users;
 }
 
@@ -277,20 +276,19 @@ function unequipStoreItem() {
 }
 
 function getInviteCodes() {
-    let codes = localStorage.getItem('invite_codes');
-
-    if (!codes) {
-        codes = ['FRIENDS2026'];
-        localStorage.setItem('invite_codes', JSON.stringify(codes));
-        return codes;
+    try {
+        const codes = JSON.parse(localStorage.getItem('invite_codes') || 'null');
+        return Array.isArray(codes) && codes.length ? codes : ['FRIENDS2026'];
+    } catch (error) {
+        return ['FRIENDS2026'];
     }
-
-    return JSON.parse(codes);
 }
 
 function checkAuth() {
     const currentUser = localStorage.getItem('current_user');
-    const isLoginPage = window.location.pathname.endsWith('login.html');
+    const pathname = window.location.pathname.toLowerCase();
+    const isLoginPage = pathname.endsWith('login.html');
+    const isIndexPage = pathname.endsWith('index.html') || pathname === '/' || pathname.endsWith('/');
 
     if (!currentUser && !isLoginPage) {
         window.location.href = 'login.html';
@@ -308,13 +306,9 @@ function checkAuth() {
             const userKey = Object.keys(users).find((key) => key.toLowerCase() === currentUser.toLowerCase());
             const user = userKey ? users[userKey] : null;
             const isAdmin = currentUser.toLowerCase() === 'admin' || Boolean(user && user.isAdmin);
-            const isRestrictedPage =
-                window.location.pathname.includes('board.html') ||
-                window.location.pathname.includes('mypage.html') ||
-                window.location.pathname.includes('mountain.html') ||
-                window.location.pathname.includes('ai.html');
+            const requiresApproval = !isLoginPage && !isIndexPage;
 
-            if (currentUser.toLowerCase() !== 'admin' && user && user.status !== 'regular' && !isAdmin && isRestrictedPage) {
+            if (currentUser.toLowerCase() !== 'admin' && user && user.status !== 'regular' && !isAdmin && requiresApproval) {
                 alert('승인된 회원만 이용 가능합니다. 관리자 승인 후 다시 시도해 주세요.');
                 window.location.href = 'index.html';
             }
@@ -515,6 +509,7 @@ function injectLogoutButton() {
 }
 
 checkAuth();
+window.addEventListener('sync:initial-complete', checkAuth);
 
 window.getCurrentUserProfile = getCurrentUserProfile;
 window.claimDailyAttendance = claimDailyAttendance;

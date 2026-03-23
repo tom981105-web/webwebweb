@@ -774,6 +774,23 @@ app.patch('/api/users/:id', (req, res) => {
     res.json({ success: true, userId: key, user: state.users[key] });
 });
 
+app.delete('/api/users/:id', (req, res) => {
+    reloadDb();
+    const id = String(req.params.id || '');
+    const key = Object.keys(state.users).find((entry) => entry.toLowerCase() === id.toLowerCase());
+    if (!key) {
+        return res.status(404).json({ success: false, message: '?뚯썝??李얠쓣 ???놁뒿?덈떎.' });
+    }
+
+    if (key.toLowerCase() === 'admin' || state.users[key].isAdmin) {
+        return res.status(400).json({ success: false, message: '관리자 계정은 삭제할 수 없습니다.' });
+    }
+
+    delete state.users[key];
+    persistDb();
+    res.json({ success: true });
+});
+
 app.get('/api/admin/state', (req, res) => {
     reloadDb();
     res.json({

@@ -410,13 +410,20 @@
         signupPw.addEventListener('input', checkPasswordMatch);
         signupPwConfirm.addEventListener('input', checkPasswordMatch);
 
-        document.getElementById('loginForm').onsubmit = (e) => {
+        document.getElementById('loginForm').onsubmit = async (e) => {
             e.preventDefault();
+            if (window.waitForInitialSync) {
+                await window.waitForInitialSync();
+            }
             handleLogin(document.getElementById('loginId').value, document.getElementById('loginPw').value);
         };
 
-        document.getElementById('signupForm').onsubmit = (e) => {
+        document.getElementById('signupForm').onsubmit = async (e) => {
             e.preventDefault();
+
+            if (window.waitForInitialSync) {
+                await window.waitForInitialSync();
+            }
 
             const pw = document.getElementById('signupPw').value;
             const pwConfirm = document.getElementById('signupPwConfirm').value;
