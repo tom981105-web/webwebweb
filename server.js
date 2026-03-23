@@ -452,6 +452,11 @@ function reloadDb() {
     migrateBannerStorageIfNeeded();
 }
 
+function isReuseCodeEnabled() {
+    const value = rawDb.settings_reuse_code;
+    return value === true || value === 'true' || value === 1 || value === '1';
+}
+
 function applyLegacySyncWrite(key, value) {
     switch (key) {
     case 'users_db':
@@ -542,6 +547,87 @@ app.post('/api/sync', (req, res) => {
     }
 
     res.json({ success: true });
+});
+
+app.post('/api/auth/signup', (req, res) => {
+    reloadDb();
+
+    const id = String(req.body && req.body.id ? req.body.id : '').trim();
+    const password = String(req.body && req.body.password ? req.body.password : '').trim();
+    const inviteCode = String(req.body && req.body.code ? req.body.code : '').trim();
+
+    if (!id) {
+        return res.status(400).json({ success: false, message: '아이디를 입력해 주세요.' });
+    }
+
+    if (password.length < 4) {
+        return res.status(400).json({ success: false, message: '비밀번호는 최소 4자 이상이어야 합니다.' });
+    }
+
+    const duplicateKey = Object.keys(state.users).find((key) => key.toLowerCase() === id.toLowerCase());
+    if (duplicateKey) {
+        return res.status(400).json({ success: false, message: '이미 존재하는 아이디입니다.' });
+    }
+
+    const codeIndex = state.inviteCodes.indexOf(inviteCode);
+    if (codeIndex < 0) {
+        return res.status(400).json({ success: false, message: '초대 코드가 올바르지 않습니다.' });
+    }
+
+    state.users[id] = {
+        password,
+        status: 'pending',
+        signupDate: new Date().toLocaleString('ko-KR'),
+        points: 0,
+        lastAttendanceDate: '',
+        attendanceStreak: 0,
+        maxAttendanceStreak: 0,
+        unlockedTitles: [],
+        activeTitleId: '',
+        profileImage: '',
+        profileFocusX: 50,
+        profileFocusY: 50
+    };
+    state.users = normalizeUsers(state.users);
+
+    if (!isReuseCodeEnabled()) {
+        state.inviteCodes.splice(codeIndex, 1);
+    }
+
+    persistDb();
+    res.json({
+        success: true,
+        userId: id,
+        users: state.users,
+        inviteCodes: state.inviteCodes
+    });
+});
+
+app.post('/api/auth/login', (req, res) => {
+    reloadDb();
+
+    const id = String(req.body && req.body.id ? req.body.id : '').trim();
+    const password = String(req.body && req.body.password ? req.body.password : '').trim();
+    const userKey = Object.keys(state.users).find((key) => key.toLowerCase() === id.toLowerCase());
+
+    if (!userKey || state.users[userKey].password !== password) {
+        return res.status(400).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+    }
+
+    state.users[userKey] = {
+        ...state.users[userKey],
+        lastLogin: new Date().toLocaleString('ko-KR')
+    };
+    state.users = normalizeUsers(state.users);
+    state.currentUser = userKey;
+    persistDb();
+
+    res.json({
+        success: true,
+        userId: userKey,
+        user: state.users[userKey],
+        users: state.users
+    });
 });
 
 app.get('/api/login-hero', (req, res) => {

@@ -178,6 +178,10 @@ function getAuthApiBase() {
     return window.location.protocol === 'file:' ? 'http://localhost:3000' : '';
 }
 
+function getAuthApiUrl(path) {
+    return `${getAuthApiBase()}${path}`;
+}
+
 function resolveProfileImageUrl(value) {
     const rawValue = String(value || '').trim();
     if (!rawValue) return '';
@@ -1083,6 +1087,77 @@ function handleLogin(id, pw) {
     return false;
 }
 
+async function handleSignupRequest(id, pw, code) {
+    const normalizedId = String(id || '').trim();
+    const normalizedPw = String(pw || '').trim();
+    const normalizedCode = String(code || '').trim();
+
+    try {
+        const response = await fetch(getAuthApiUrl('/api/auth/signup'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: normalizedId,
+                password: normalizedPw,
+                code: normalizedCode
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success === false) {
+            throw new Error(result.message || '회원가입에 실패했습니다.');
+        }
+
+        if (result.users && typeof result.users === 'object') {
+            localStorage.setItem('users_db', JSON.stringify(result.users));
+        }
+        if (Array.isArray(result.inviteCodes)) {
+            localStorage.setItem('invite_codes', JSON.stringify(result.inviteCodes));
+        }
+
+        alert('가입이 완료되었습니다. 로그인해 주세요.');
+        return true;
+    } catch (error) {
+        if (getAuthApiBase()) {
+            alert(error.message || '회원가입에 실패했습니다.');
+            return false;
+        }
+        return handleSignup(normalizedId, normalizedPw, normalizedCode);
+    }
+}
+
+async function handleLoginRequest(id, pw) {
+    const normalizedId = String(id || '').trim();
+    const normalizedPw = String(pw || '').trim();
+
+    try {
+        const response = await fetch(getAuthApiUrl('/api/auth/login'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id: normalizedId,
+                password: normalizedPw
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success === false || !result.userId) {
+            throw new Error(result.message || '로그인에 실패했습니다.');
+        }
+
+        if (result.users && typeof result.users === 'object') {
+            localStorage.setItem('users_db', JSON.stringify(result.users));
+        }
+        localStorage.setItem('current_user', result.userId);
+        window.location.href = 'index.html';
+        return true;
+    } catch (error) {
+        if (getAuthApiBase()) {
+            alert(error.message || '로그인에 실패했습니다.');
+            return false;
+        }
+        return handleLogin(normalizedId, normalizedPw);
+    }
+}
+
 function injectLogoutButton() {
     try {
         const currentUser = localStorage.getItem('current_user');
@@ -1238,6 +1313,8 @@ window.markAllNotificationsRead = markAllNotificationsRead;
 window.toggleNotificationPanel = toggleNotificationPanel;
 window.renderNotificationPanel = renderNotificationPanel;
 window.openNotificationItem = openNotificationItem;
+window.handleSignupRequest = handleSignupRequest;
+window.handleLoginRequest = handleLoginRequest;
 
 if (!window.location.pathname.endsWith('login.html')) {
     document.addEventListener('DOMContentLoaded', () => {

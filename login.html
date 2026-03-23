@@ -415,6 +415,13 @@
             if (window.waitForInitialSync) {
                 await window.waitForInitialSync();
             }
+            if (typeof window.handleLoginRequest === 'function') {
+                await window.handleLoginRequest(
+                    document.getElementById('loginId').value,
+                    document.getElementById('loginPw').value
+                );
+                return;
+            }
             handleLogin(document.getElementById('loginId').value, document.getElementById('loginPw').value);
         };
 
@@ -433,11 +440,17 @@
                 return;
             }
 
-            const success = handleSignup(
-                document.getElementById('signupId').value,
-                pw,
-                document.getElementById('signupCode').value
-            );
+            const success = typeof window.handleSignupRequest === 'function'
+                ? await window.handleSignupRequest(
+                    document.getElementById('signupId').value,
+                    pw,
+                    document.getElementById('signupCode').value
+                )
+                : handleSignup(
+                    document.getElementById('signupId').value,
+                    pw,
+                    document.getElementById('signupCode').value
+                );
 
             if (success) {
                 document.getElementById('signupForm').reset();
