@@ -356,7 +356,9 @@ function normalizeRawDb(raw) {
             intervalSeconds: Number.isFinite(Number(raw.login_hero_interval_seconds)) ? Math.min(120, Math.max(3, Number(raw.login_hero_interval_seconds))) : 10,
             randomOrder: Boolean(raw.login_hero_random_order)
         },
-        currentUser: raw.current_user || null
+        currentUser: raw.current_user || null,
+        notifications: safeParseJson(raw.user_notifications, raw.user_notifications || {}),
+        reuseInviteCode: raw.settings_reuse_code === true || raw.settings_reuse_code === 'true' || raw.settings_reuse_code === 1 || raw.settings_reuse_code === '1'
     };
 
     return normalized;
@@ -377,7 +379,9 @@ function createLegacyPayloadFromState(state) {
         board_categories: state.board.categories,
         login_hero_images: state.loginHero.images,
         login_hero_interval_seconds: state.loginHero.intervalSeconds,
-        login_hero_random_order: state.loginHero.randomOrder
+        login_hero_random_order: state.loginHero.randomOrder,
+        user_notifications: state.notifications,
+        settings_reuse_code: state.reuseInviteCode
     };
 }
 
@@ -453,8 +457,7 @@ function reloadDb() {
 }
 
 function isReuseCodeEnabled() {
-    const value = rawDb.settings_reuse_code;
-    return value === true || value === 'true' || value === 1 || value === '1';
+    return Boolean(state.reuseInviteCode);
 }
 
 function applyLegacySyncWrite(key, value) {
@@ -485,6 +488,12 @@ function applyLegacySyncWrite(key, value) {
     }
     case 'invite_codes':
         state.inviteCodes = safeParseJson(value, ['FRIENDS2026']);
+        break;
+    case 'user_notifications':
+        state.notifications = safeParseJson(value, {});
+        break;
+    case 'settings_reuse_code':
+        state.reuseInviteCode = value === true || value === 'true' || value === 1 || value === '1';
         break;
     case 'my_ai_directory':
         state.ai.directory = safeParseJson(value, []);
