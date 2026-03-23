@@ -410,9 +410,9 @@
     "카테고리 4"
   ],
   "login_hero_images": [
-    "/uploads/login-hero/1774230193167-1-login-hero-1.jpg",
-    "/uploads/login-hero/1774230193185-2-login-hero-2.jpg",
-    "/uploads/login-hero/1774230193213-3-login-hero-3.jpg"
+    "https://pub-7312b8a6e0dc4497a623787af3fbee50.r2.dev/login-hero/1774241214494-1-1774230193167-1-login-hero-1.jpg",
+    "https://pub-7312b8a6e0dc4497a623787af3fbee50.r2.dev/login-hero/1774241214949-2-1774230193185-2-login-hero-2.jpg",
+    "https://pub-7312b8a6e0dc4497a623787af3fbee50.r2.dev/login-hero/1774241216189-3-1774230193213-3-login-hero-3.jpg"
   ],
   "login_hero_interval_seconds": 10,
   "login_hero_random_order": true

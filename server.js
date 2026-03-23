@@ -189,6 +189,16 @@ function deleteLoginHeroFiles(imageList) {
     });
 }
 
+async function deleteStoredImageList(imageList) {
+    const files = Array.isArray(imageList) ? imageList : [];
+    for (const entry of files) {
+        try {
+            await storage.deleteStoredUrl(entry);
+        } catch (error) {
+        }
+    }
+}
+
 function deleteMatchingUploadedFiles(imageList, prefix) {
     const files = Array.isArray(imageList) ? imageList : [];
     files.forEach((entry) => {
@@ -232,6 +242,52 @@ function normalizeLoginHeroImages(entries) {
             if (savedPath) normalized.push(savedPath);
         }
     });
+
+    return normalized;
+}
+
+async function persistLoginHeroImages(entries) {
+    const list = Array.isArray(entries) ? entries : [];
+    const normalized = [];
+
+    for (let index = 0; index < list.length; index += 1) {
+        const entry = list[index];
+        if (!entry) continue;
+
+        if (typeof entry === 'string') {
+            const trimmed = entry.trim();
+            if (!trimmed) continue;
+
+            if (trimmed.startsWith('data:image/')) {
+                const savedPath = await storage.saveImageDataUrl({
+                    dataUrl: trimmed,
+                    originalName: '',
+                    folder: 'login-hero',
+                    fallbackName: 'login-hero',
+                    index
+                });
+                if (savedPath) normalized.push(savedPath);
+                continue;
+            }
+
+            const uploadPath = normalizeUploadPath(trimmed);
+            if (uploadPath) {
+                normalized.push(uploadPath);
+            }
+            continue;
+        }
+
+        if (typeof entry === 'object' && typeof entry.dataUrl === 'string') {
+            const savedPath = await storage.saveImageDataUrl({
+                dataUrl: entry.dataUrl,
+                originalName: entry.name || '',
+                folder: 'login-hero',
+                fallbackName: 'login-hero',
+                index
+            });
+            if (savedPath) normalized.push(savedPath);
+        }
+    }
 
     return normalized;
 }
@@ -461,17 +517,17 @@ app.get('/api/login-hero', (req, res) => {
     });
 });
 
-app.post('/api/login-hero', (req, res) => {
+app.post('/api/login-hero', async (req, res) => {
     const nextImages = req.body && Array.isArray(req.body.images) ? req.body.images : null;
     const hasInterval = req.body && Object.prototype.hasOwnProperty.call(req.body, 'intervalSeconds');
     const hasRandom = req.body && Object.prototype.hasOwnProperty.call(req.body, 'randomOrder');
 
     if (nextImages !== null) {
-        const validImages = normalizeLoginHeroImages(nextImages);
+        const validImages = await persistLoginHeroImages(nextImages);
         if (!validImages.length) {
             return res.status(400).json({ success: false, message: '저장할 이미지가 없습니다.' });
         }
-        deleteLoginHeroFiles(state.loginHero.images);
+        await deleteStoredImageList(state.loginHero.images);
         state.loginHero.images = validImages;
     }
 
@@ -495,8 +551,8 @@ app.post('/api/login-hero', (req, res) => {
     });
 });
 
-app.delete('/api/login-hero', (req, res) => {
-    deleteLoginHeroFiles(state.loginHero.images);
+app.delete('/api/login-hero', async (req, res) => {
+    await deleteStoredImageList(state.loginHero.images);
     state.loginHero.images = [];
     state.loginHero.intervalSeconds = 10;
     state.loginHero.randomOrder = false;
