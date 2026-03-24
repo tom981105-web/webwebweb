@@ -28,6 +28,21 @@ ensureDataLayout();
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.static(path.resolve(APP_DIR)));
 
+app.get('/uploads/board-inline/:fileName', async (req, res, next) => {
+    const fileName = String(req.params.fileName || '').trim();
+    if (!fileName) return next();
+
+    try {
+        const matchedEntry = await storage.findStoredEntryByFileName('board-inline', fileName);
+        if (matchedEntry && matchedEntry.url) {
+            return res.redirect(matchedEntry.url);
+        }
+    } catch (error) {
+    }
+
+    return next();
+});
+
 app.get('/health', (req, res) => res.send('OK'));
 
 app.get('/', (req, res) => {
@@ -136,6 +151,78 @@ function normalizeBoardContent(content) {
             const savedPath = writeImageDataUrl(dataUrl, 'board-inline', BOARD_INLINE_DIR, '/uploads/board-inline', 'board-inline', imageIndex++);
             return savedPath ? `${prefix}${savedPath}${suffix}` : match;
         });
+}
+
+async function resolveBoardInlineLegacyUrl(value) {
+    const normalized = normalizeUploadPath(value);
+    if (!normalized || !normalized.startsWith('/uploads/board-inline/')) {
+        return value;
+    }
+
+    const fileName = path.basename(normalized);
+    const localFilePath = path.join(BOARD_INLINE_DIR, fileName);
+
+    if (fs.existsSync(localFilePath)) {
+        try {
+            const mimeType = getMimeTypeFromExtension(localFilePath);
+            const buffer = fs.readFileSync(localFilePath);
+            return await storage.saveImageDataUrl({
+                dataUrl: bufferToDataUrl(buffer, mimeType),
+                originalName: fileName,
+                folder: 'board-inline',
+                fallbackName: 'board-inline',
+                index: 0
+            });
+        } catch (error) {
+            return value;
+        }
+    }
+
+    try {
+        const matchedEntry = await storage.findStoredEntryByFileName('board-inline', fileName);
+        if (matchedEntry && matchedEntry.url) {
+            return matchedEntry.url;
+        }
+    } catch (error) {
+    }
+
+    return value;
+}
+
+async function repairBoardContentUploads(content) {
+    const originalContent = String(content || '');
+    if (!/\/uploads\/board-inline\//i.test(originalContent)) {
+        return originalContent;
+    }
+
+    const pattern = /(["'])((?:https?:\/\/localhost:\d+)?\/uploads\/board-inline\/([^"' )]+))\1/gi;
+    let nextContent = originalContent;
+    let match;
+
+    while ((match = pattern.exec(originalContent)) !== null) {
+        const quote = match[1];
+        const fullMatch = match[0];
+        const storedUrl = match[2];
+        const repairedUrl = await resolveBoardInlineLegacyUrl(storedUrl);
+
+        if (repairedUrl && repairedUrl !== storedUrl) {
+            nextContent = nextContent.replace(fullMatch, `${quote}${repairedUrl}${quote}`);
+        }
+    }
+
+    return nextContent;
+}
+
+async function repairBoardPostsInState() {
+    if (!Array.isArray(state.board.posts) || !state.board.posts.length) return;
+    if (!state.board.posts.some((post) => /\/uploads\/board-inline\//i.test(String(post.content || '')))) return;
+
+    for (const post of state.board.posts) {
+        const repairedContent = await repairBoardContentUploads(post.content || '');
+        if (repairedContent !== post.content) {
+            post.content = repairedContent;
+        }
+    }
 }
 
 function getMimeExtension(mimeType) {
@@ -463,6 +550,7 @@ function loadStateFromDisk() {
 }
 
 async function persistDb() {
+    await repairBoardPostsInState();
     rawDb = createLegacyPayloadFromState(state);
     fs.writeFileSync(DB_FILE, JSON.stringify(rawDb, null, 2));
     await mirrorDatabaseToRemote();
@@ -484,49 +572,13 @@ function migrateBannerStorageIfNeeded() {
 async function migrateBoardInlineStorageIfNeeded() {
     const storageStatus = storage.getStorageStatus();
     if (storageStatus.provider !== 'r2' || !storageStatus.isR2Configured) return;
+    const before = JSON.stringify(state.board.posts.map((post) => post.content || ''));
+    await repairBoardPostsInState();
+    const after = JSON.stringify(state.board.posts.map((post) => post.content || ''));
 
-    let changed = false;
-    const uploadPattern = /(["'])((?:https?:\/\/localhost:\d+)?\/uploads\/board-inline\/([^"' )]+))\1/gi;
-
-    for (const post of state.board.posts) {
-        const originalContent = String(post.content || '');
-        let nextContent = originalContent;
-        let match;
-
-        while ((match = uploadPattern.exec(originalContent)) !== null) {
-            const quote = match[1];
-            const fullMatch = match[0];
-            const storedUrl = match[2];
-            const fileName = decodeURIComponent(match[3] || '');
-            const localFilePath = path.join(BOARD_INLINE_DIR, path.basename(fileName));
-
-            if (!fs.existsSync(localFilePath)) continue;
-
-            try {
-                const mimeType = getMimeTypeFromExtension(localFilePath);
-                const buffer = fs.readFileSync(localFilePath);
-                const remoteUrl = await storage.saveImageDataUrl({
-                    dataUrl: bufferToDataUrl(buffer, mimeType),
-                    originalName: path.basename(localFilePath),
-                    folder: 'board-inline',
-                    fallbackName: 'board-inline',
-                    index: 0
-                });
-
-                if (remoteUrl && remoteUrl !== storedUrl) {
-                    nextContent = nextContent.replace(fullMatch, `${quote}${remoteUrl}${quote}`);
-                    changed = true;
-                }
-            } catch (error) {
-            }
-        }
-
-        if (nextContent !== originalContent) {
-            post.content = nextContent;
-        }
+    if (before !== after) {
+        await persistDb();
     }
-
-    if (changed) persistDb();
 }
 
 function reloadDb() {

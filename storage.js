@@ -101,6 +101,13 @@ function buildFileName(originalName, fallbackName, index, extension) {
     return `${Date.now()}-${index + 1}-${baseName}${extension}`;
 }
 
+function mirrorLocalFile(targetDir, fileName, buffer) {
+    const targetPath = path.join(targetDir, fileName);
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.writeFileSync(targetPath, buffer);
+    return targetPath;
+}
+
 function normalizeStoredUrl(value) {
     const rawValue = String(value || '').trim();
     if (!rawValue) return '';
@@ -137,6 +144,8 @@ async function saveImageDataUrl({ dataUrl, originalName, folder, fallbackName, i
             Body: buffer,
             ContentType: mimeType
         }));
+
+        mirrorLocalFile(folderConfig.localDir, fileName, buffer);
 
         return `${publicBaseUrl}/${key}`;
     }
@@ -313,6 +322,23 @@ async function listFolderEntries(folder) {
     });
 }
 
+async function findStoredEntryByFileName(folder, fileName) {
+    const normalizedName = String(fileName || '').trim();
+    if (!normalizedName) return null;
+
+    const entries = await listFolderEntries(folder);
+    const directMatch = entries.find((entry) => {
+        const baseName = path.posix.basename(String(entry.key || '').replace(/\\/g, '/'));
+        return baseName === normalizedName;
+    });
+    if (directMatch) return directMatch;
+
+    return entries.find((entry) => {
+        const baseName = path.posix.basename(String(entry.key || '').replace(/\\/g, '/'));
+        return baseName.endsWith(`-${normalizedName}`);
+    }) || null;
+}
+
 async function deleteByKey(key) {
     const normalizedKey = String(key || '').trim();
     if (!normalizedKey) return;
@@ -356,6 +382,7 @@ module.exports = {
     normalizeStoredUrl,
     resolveDisplayUrl,
     saveImageDataUrl,
+    findStoredEntryByFileName,
     deleteStoredUrl,
     saveTextFile,
     saveTextByKey,
