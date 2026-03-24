@@ -362,7 +362,6 @@ function escapeHtml(value) {
 }
 
 function normalizeMountainRecord(mountain) {
-    const currentUser = localStorage.getItem('current_user') || 'admin';
     const normalizedPhotos = Array.isArray(mountain.photos)
         ? mountain.photos.filter(Boolean).slice(0, 4)
         : (mountain.photo ? [mountain.photo] : []);
@@ -370,7 +369,7 @@ function normalizeMountainRecord(mountain) {
         ...mountain,
         id: mountain.id || `m_${Date.now()}`,
         title: mountain.title || mountain.name || '산행 기록',
-        author: mountain.author || currentUser,
+        author: (mountain.author ? String(mountain.author).trim() : 'admin') || 'admin',
         createdAt: mountain.createdAt || mountain.date || new Date().toISOString(),
         updatedAt: mountain.updatedAt || mountain.createdAt || mountain.date || new Date().toISOString(),
         photos: normalizedPhotos,

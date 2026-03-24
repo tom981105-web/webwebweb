@@ -58,8 +58,30 @@ function normalizeRecommendedAi(value) {
 function normalizePromptEntry(prompt) {
     return {
         ...prompt,
+        author: (prompt && prompt.author ? String(prompt.author).trim() : 'admin') || 'admin',
         recommendedAi: normalizeRecommendedAi(prompt && prompt.recommendedAi)
     };
+}
+
+function normalizeAiEntry(ai) {
+    return {
+        ...ai,
+        author: (ai && ai.author ? String(ai.author).trim() : 'admin') || 'admin'
+    };
+}
+
+function getCurrentAiUser() {
+    return localStorage.getItem('current_user') || '';
+}
+
+function canManageAiEntry(ai) {
+    const currentUser = getCurrentAiUser();
+    return !!ai && !!currentUser && (currentUser === 'admin' || ai.author === currentUser);
+}
+
+function canManagePromptEntry(prompt) {
+    const currentUser = getCurrentAiUser();
+    return !!prompt && !!currentUser && (currentUser === 'admin' || prompt.author === currentUser);
 }
 
 // DOM Elements
@@ -76,17 +98,17 @@ function init() {
     // Load AI
     const storedAI = localStorage.getItem('my_ai_directory');
     if (storedAI) {
-        aiData = JSON.parse(storedAI);
+        aiData = JSON.parse(storedAI).map(normalizeAiEntry);
         let addedCount = 0;
         defaultAIs.forEach(defAi => {
             if (!aiData.find(a => a.name === defAi.name)) {
-                aiData.push({ ...defAi, id: Date.now() + Math.random() });
+                aiData.push(normalizeAiEntry({ ...defAi, id: Date.now() + Math.random(), author: 'admin' }));
                 addedCount++;
             }
         });
         if (addedCount > 0) saveData();
     }
-    else { aiData = [...defaultAIs]; saveData(); }
+    else { aiData = defaultAIs.map((item) => normalizeAiEntry({ ...item, author: 'admin' })); saveData(); }
     
     // Load Prompts
     const storedPrompts = localStorage.getItem('my_prompt_directory');
@@ -108,7 +130,7 @@ function init() {
 }
 
 function saveData() {
-    localStorage.setItem('my_ai_directory', JSON.stringify(aiData));
+    localStorage.setItem('my_ai_directory', JSON.stringify(aiData.map(normalizeAiEntry)));
 }
 
 function savePromptData() {
@@ -195,11 +217,21 @@ function setupEventListeners() {
     
     // View Modal Actions
     document.getElementById('editAiBtn').onclick = () => {
+        const currentAi = aiData.find(a => a.id === editingId);
+        if (!canManageAiEntry(currentAi)) {
+            alert('작성자 본인 또는 관리자만 수정할 수 있습니다.');
+            return;
+        }
         closeModal(viewModal);
         openEditModal(editingId);
     };
     
     document.getElementById('deleteAiBtn').onclick = () => {
+        const currentAi = aiData.find(a => a.id === editingId);
+        if (!canManageAiEntry(currentAi)) {
+            alert('작성자 본인 또는 관리자만 삭제할 수 있습니다.');
+            return;
+        }
         if(confirm('정말 이 AI 자료를 삭제하시겠습니까? (연결된 프롬프트 추천 AI 목록에서도 함께 삭제됩니다)')) {
             const aiToDelete = aiData.find(a => a.id === editingId);
             
@@ -245,7 +277,8 @@ function setupEventListeners() {
             logo: logoValue,
             category: document.getElementById('aiCategory').value,
             url: document.getElementById('aiUrl').value,
-            description: document.getElementById('aiDescription').value
+            description: document.getElementById('aiDescription').value,
+            author: editingId ? ((aiData.find(a => a.id === editingId) || {}).author || getCurrentAiUser() || 'admin') : (getCurrentAiUser() || 'admin')
         };
 
         if (editingId) {
@@ -280,6 +313,9 @@ function openViewModal(ai) {
     document.getElementById('viewDescription').textContent = ai.description;
     document.getElementById('viewUrl').href = Math.random() ? ai.url : '#'; // Just ensuring it has a link
     document.getElementById('viewUrl').href = ai.url;
+    const canManage = canManageAiEntry(ai);
+    document.getElementById('editAiBtn').style.display = canManage ? 'inline-flex' : 'none';
+    document.getElementById('deleteAiBtn').style.display = canManage ? 'inline-flex' : 'none';
     
     openModal(viewModal);
 }
@@ -287,6 +323,10 @@ function openViewModal(ai) {
 function openEditModal(id) {
     const ai = aiData.find(a => a.id === id);
     if (!ai) return;
+    if (!canManageAiEntry(ai)) {
+        alert('작성자 본인 또는 관리자만 수정할 수 있습니다.');
+        return;
+    }
     
     document.getElementById('aiId').value = ai.id;
     document.getElementById('aiName').value = ai.name;
@@ -496,11 +536,21 @@ function setupPromptEventListeners() {
     
     // View Modal Actions
     document.getElementById('editPromptBtn').onclick = () => {
+        const currentPrompt = promptData.find(p => p.id === editingPromptId);
+        if (!canManagePromptEntry(currentPrompt)) {
+            alert('작성자 본인 또는 관리자만 수정할 수 있습니다.');
+            return;
+        }
         closeModal(document.getElementById('viewPromptModal'));
         openEditPromptModal(editingPromptId);
     };
     
     document.getElementById('deletePromptBtn').onclick = () => {
+        const currentPrompt = promptData.find(p => p.id === editingPromptId);
+        if (!canManagePromptEntry(currentPrompt)) {
+            alert('작성자 본인 또는 관리자만 삭제할 수 있습니다.');
+            return;
+        }
         if(confirm('정말 이 프롬프트를 삭제하시겠습니까?')) {
             promptData = promptData.filter(p => p.id !== editingPromptId);
             savePromptData();
@@ -536,7 +586,8 @@ function setupPromptEventListeners() {
             category: document.getElementById('promptCategory').value,
             recommendedAi: selectedAIs,
             description: document.getElementById('promptDescription').value,
-            text: document.getElementById('promptText').value
+            text: document.getElementById('promptText').value,
+            author: editingPromptId ? ((promptData.find(p => p.id === editingPromptId) || {}).author || getCurrentAiUser() || 'admin') : (getCurrentAiUser() || 'admin')
         };
 
         if (editingPromptId) {
@@ -589,6 +640,9 @@ function openViewPromptModal(p) {
     const btn = document.getElementById('copyPromptBtn');
     btn.textContent = '복사';
     btn.classList.remove('copied');
+    const canManage = canManagePromptEntry(p);
+    document.getElementById('editPromptBtn').style.display = canManage ? 'inline-flex' : 'none';
+    document.getElementById('deletePromptBtn').style.display = canManage ? 'inline-flex' : 'none';
 
     openModal(document.getElementById('viewPromptModal'));
 }
@@ -596,6 +650,10 @@ function openViewPromptModal(p) {
 function openEditPromptModal(id) {
     const p = promptData.find(a => a.id === id);
     if (!p) return;
+    if (!canManagePromptEntry(p)) {
+        alert('작성자 본인 또는 관리자만 수정할 수 있습니다.');
+        return;
+    }
     
     document.getElementById('promptId').value = p.id;
     document.getElementById('promptTitle').value = p.title;

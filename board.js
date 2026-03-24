@@ -35,6 +35,13 @@
     let isResizingImage = false;
     let resizeStartX = 0;
     let resizeStartWidth = 0;
+    let boardReady = false;
+
+    function ensureBoardReady() {
+        if (boardReady) return true;
+        alert('게시판 데이터를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');
+        return false;
+    }
 
     function getUsersDb() {
         return safeParse(localStorage.getItem('users_db') || '{}', {});
@@ -442,7 +449,7 @@ function setupCommentStickerPicker() {
         const displayUrl = imageUrl.startsWith('/uploads/') && window.location.protocol === 'file:'
             ? `${getApiBase()}${imageUrl}`
             : imageUrl;
-        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 320px); height:auto; border-radius:8px; margin:15px 0; display:block;">`;
+        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 520px); height:auto; border-radius:8px; margin:15px auto; display:block;">`;
         document.execCommand('insertHTML', false, html);
         bindEditorImages();
     }
@@ -732,6 +739,7 @@ function setupCommentStickerPicker() {
 
     const writeModal = document.getElementById('writeModal');
     window.openWriteModal = function () {
+        if (!ensureBoardReady()) return;
         if (!writeModal) return;
         writeModal.style.display = 'block';
         clearSelectedEditorImage();
@@ -793,6 +801,7 @@ function setupCommentStickerPicker() {
 
     document.getElementById('writeForm').onsubmit = function (event) {
         event.preventDefault();
+        if (!ensureBoardReady()) return;
         const title = document.getElementById('postTitle').value.trim();
         const content = normalizeContentForStorage(document.getElementById('richEditor').innerHTML.trim());
         const isNotice = currentUser === 'admin' && document.getElementById('isNotice').checked;
@@ -906,7 +915,7 @@ function setupCommentStickerPicker() {
             const commentText = renderCommentRichText(comment.text || '');
             const commentDate = escapeHtml(comment.date || '');
             const hasReply = Boolean(comment.reply && comment.reply.text);
-            const canReply = currentUser === 'admin' && !hasReply;
+            const canReply = Boolean(currentUser && currentUser !== '익명') && !hasReply;
             const canManageComment = currentUser === 'admin' || currentUser === comment.author;
             const canManageReply = Boolean(comment.reply) && (currentUser === 'admin' || currentUser === comment.reply.author);
             const item = document.createElement('div');
@@ -924,7 +933,7 @@ function setupCommentStickerPicker() {
                 <div class="comment-body">${commentText}</div>
                 ${canReply ? `
                     <form class="reply-form-container" id="replyForm-${index}" onsubmit="submitReply(event, ${index})">
-                        <input type="text" id="replyInput-${index}" placeholder="관리자 답글을 입력해 주세요." autocomplete="off" maxlength="300">
+                        <input type="text" id="replyInput-${index}" placeholder="답글을 입력해 주세요." autocomplete="off" maxlength="300">
                         <button type="submit">등록</button>
                     </form>
                 ` : ''}
@@ -941,7 +950,7 @@ function setupCommentStickerPicker() {
                 reply.className = 'comment-reply';
                 reply.innerHTML = `
                     <div class="comment-meta">
-                        <div class="c-author author-marker">${renderAuthorWithAvatar('admin')}</div>
+                        <div class="c-author author-marker">${renderAuthorWithAvatar(comment.reply.author || 'admin')}</div>
                         <div>${escapeHtml(comment.reply.date || '')}</div>
                         <div class="comment-action-group">
                             ${canManageReply ? `<button type="button" class="btn-reply" onclick="toggleReplyEditForm(${index})">수정</button>` : ''}
@@ -1006,7 +1015,7 @@ function setupCommentStickerPicker() {
 
     window.submitReply = function (event, index) {
         event.preventDefault();
-        if (currentUser !== 'admin' || !currentOpenPostId) return;
+        if (!ensureBoardReady() || !currentOpenPostId || !currentUser || currentUser === '익명') return;
 
         const input = document.getElementById(`replyInput-${index}`);
         const text = input ? input.value.trim() : '';
@@ -1024,8 +1033,8 @@ function setupCommentStickerPicker() {
         if (typeof window.createUserNotification === 'function' && post.comments[index].author && post.comments[index].author !== currentUser) {
             window.createUserNotification(post.comments[index].author, {
                 type: 'reply',
-                title: '관리자 답글이 도착했습니다.',
-                message: `"${post.title || '게시글'}" 댓글에 관리자 답글이 등록되었습니다.`,
+                title: '댓글에 새 답글이 도착했습니다.',
+                message: `"${post.title || '게시글'}" 댓글에 ${getAuthorDisplayName(currentUser)}님이 답글을 남겼습니다.`,
                 link: `board.html?id=${post.id}`
             });
         }
@@ -1038,7 +1047,7 @@ function setupCommentStickerPicker() {
 
     window.submitCommentEdit = function (event, index) {
         event.preventDefault();
-        if (!currentOpenPostId) return;
+        if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post || !post.comments[index]) return;
         const targetComment = post.comments[index];
@@ -1056,7 +1065,7 @@ function setupCommentStickerPicker() {
 
     window.submitReplyEdit = function (event, index) {
         event.preventDefault();
-        if (!currentOpenPostId) return;
+        if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post || !post.comments[index] || !post.comments[index].reply) return;
         if (currentUser !== 'admin' && currentUser !== post.comments[index].reply.author) return;
@@ -1072,7 +1081,7 @@ function setupCommentStickerPicker() {
     };
 
     window.deleteComment = function (index) {
-        if (!currentOpenPostId) return;
+        if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post || !post.comments[index]) return;
         if (currentUser !== 'admin' && currentUser !== post.comments[index].author) return;
@@ -1085,7 +1094,7 @@ function setupCommentStickerPicker() {
     };
 
     window.deleteReply = function (index) {
-        if (!currentOpenPostId) return;
+        if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post || !post.comments[index] || !post.comments[index].reply) return;
         if (currentUser !== 'admin' && currentUser !== post.comments[index].reply.author) return;
@@ -1098,6 +1107,7 @@ function setupCommentStickerPicker() {
     };
 
     window.openPostDetail = function (id) {
+        if (!ensureBoardReady()) return;
         const post = boardPosts.find((item) => item.id === id);
         if (!post || !boardDetailView) return;
         post.views = (post.views || 0) + 1;
@@ -1216,7 +1226,7 @@ window.closeDetailModal = function () {
 
 document.getElementById('commentForm').onsubmit = function (event) {
     event.preventDefault();
-    if (!currentOpenPostId) return;
+    if (!ensureBoardReady() || !currentOpenPostId) return;
     const input = document.getElementById('commentInput');
     const text = input.value.trim();
     if (!text) return;
@@ -1296,7 +1306,7 @@ document.getElementById('richEditor').addEventListener('click', (event) => {
     });
 
     window.deleteCurrentPost = function () {
-        if (!currentOpenPostId) return;
+        if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post) return;
         if (post.author !== currentUser && currentUser !== 'admin') return;
@@ -1331,17 +1341,29 @@ document.getElementById('richEditor').addEventListener('click', (event) => {
         renderBoard(currentSearchType, currentSearchQuery);
     });
 
-    ensureSeedPosts();
-    loadBoardCategories();
-    boardPosts = boardPosts.map(normalizePost);
-    savePosts();
-    renderCategoryControls();
-    renderBoard(currentSearchType, currentSearchQuery);
-    bindEditorImages();
+    async function initializeBoard() {
+        if (typeof window.waitForInitialSync === 'function') {
+            await window.waitForInitialSync();
+        }
 
-    const params = new URLSearchParams(window.location.search);
-    const postId = Number(params.get('id'));
-    if (postId) {
-        setTimeout(() => openPostDetail(postId), 0);
+        loadBoardCategories();
+        boardPosts = safeParse(localStorage.getItem('board_posts') || '[]', []).map(normalizePost);
+        if (!boardPosts.length) {
+            ensureSeedPosts();
+            savePosts();
+        }
+
+        renderCategoryControls();
+        renderBoard(currentSearchType, currentSearchQuery);
+        bindEditorImages();
+        boardReady = true;
+
+        const params = new URLSearchParams(window.location.search);
+        const postId = Number(params.get('id'));
+        if (postId) {
+            setTimeout(() => openPostDetail(postId), 0);
+        }
     }
+
+    initializeBoard();
 })();
