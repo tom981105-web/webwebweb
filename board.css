@@ -975,11 +975,23 @@ body {
     overflow-wrap: anywhere;
 }
 
+.post-detail-body a {
+    color: #9f532f;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    word-break: break-all;
+}
+
+.post-detail-body a:hover {
+    color: #c67343;
+}
+
 .rich-editor img,
 .post-detail-body img {
-    max-width: min(100%, 520px) !important;
+    max-width: min(100%, 720px) !important;
     width: auto;
     height: auto;
+    max-height: min(78vh, 860px);
     display: block;
     margin: 18px auto;
     object-fit: contain;
@@ -1297,10 +1309,11 @@ body {
     }
 
     .board-table tbody tr {
-        padding: 14px 16px;
+        padding: 18px 18px 16px;
         border-radius: 20px;
-        background: rgba(255, 255, 255, 0.76);
-        border: 1px solid rgba(109, 64, 38, 0.08);
+        background: rgba(255, 255, 255, 0.88);
+        border: 1px solid rgba(109, 64, 38, 0.1);
+        box-shadow: 0 12px 26px rgba(70, 40, 15, 0.08);
     }
 
     .board-table tbody td {
@@ -1314,9 +1327,13 @@ body {
         margin-top: 8px;
     }
 
+    .board-table tbody td:nth-child(1) {
+        display: none;
+    }
+
     .board-table tbody td::before {
         display: block;
-        margin-bottom: 2px;
+        margin-bottom: 4px;
         color: rgba(47, 31, 24, 0.48);
         font-size: 0.76rem;
         font-weight: 800;
@@ -1331,6 +1348,40 @@ body {
     .board-table tbody td:nth-child(5)::before { content: "작성일"; }
     .board-table tbody td:nth-child(6)::before { content: "조회"; }
     .board-table tbody td:nth-child(7)::before { content: "추천"; }
+
+    .board-table tbody td:nth-child(2) {
+        font-size: 1.02rem;
+        font-weight: 800;
+        line-height: 1.55;
+    }
+
+    .board-table tbody td:nth-child(n + 3) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        font-size: 0.92rem;
+    }
+
+    .board-table tbody td:nth-child(n + 3)::before {
+        margin-bottom: 0;
+        flex: 0 0 auto;
+    }
+
+    .board-table tbody td:nth-child(4) .board-author-chip {
+        justify-content: flex-end;
+        max-width: 70%;
+    }
+
+    .board-table .title-cell .hot-tag {
+        margin-bottom: 8px;
+    }
+
+    .board-table .title-cell .comment-count {
+        display: inline-block;
+        margin-top: 6px;
+        margin-left: 0;
+    }
 
     .title-row,
     .category-row,

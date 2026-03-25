@@ -135,6 +135,91 @@
         });
     }
 
+    function normalizeLinkHref(value) {
+        const rawValue = String(value || '').trim();
+        if (!rawValue) return '';
+        return /^www\./i.test(rawValue) ? `https://${rawValue}` : rawValue;
+    }
+
+    function splitTrailingPunctuation(value) {
+        let core = String(value || '');
+        let trailing = '';
+        while (/[)\],.!?]$/.test(core)) {
+            trailing = core.slice(-1) + trailing;
+            core = core.slice(0, -1);
+        }
+        return { core, trailing };
+    }
+
+    function createLinkifiedTextFragment(text) {
+        const source = String(text || '');
+        const pattern = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/gi;
+        const fragment = document.createDocumentFragment();
+        let lastIndex = 0;
+        let match;
+
+        while ((match = pattern.exec(source)) !== null) {
+            const matchedText = match[0];
+            const startIndex = match.index;
+            const { core, trailing } = splitTrailingPunctuation(matchedText);
+
+            if (startIndex > lastIndex) {
+                fragment.appendChild(document.createTextNode(source.slice(lastIndex, startIndex)));
+            }
+
+            const anchor = document.createElement('a');
+            anchor.href = normalizeLinkHref(core);
+            anchor.target = '_blank';
+            anchor.rel = 'noopener noreferrer';
+            anchor.textContent = core;
+            fragment.appendChild(anchor);
+
+            if (trailing) {
+                fragment.appendChild(document.createTextNode(trailing));
+            }
+
+            lastIndex = startIndex + matchedText.length;
+        }
+
+        if (lastIndex === 0) return null;
+        if (lastIndex < source.length) {
+            fragment.appendChild(document.createTextNode(source.slice(lastIndex)));
+        }
+        return fragment;
+    }
+
+    function linkifyRichHtml(html) {
+        const container = document.createElement('div');
+        container.innerHTML = resolveContentForDisplay(html);
+
+        const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                const parent = node.parentNode;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                if (['A', 'SCRIPT', 'STYLE', 'TEXTAREA', 'IFRAME', 'BUTTON'].includes(parent.nodeName)) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+                return /(?:https?:\/\/|www\.)/i.test(node.nodeValue || '')
+                    ? NodeFilter.FILTER_ACCEPT
+                    : NodeFilter.FILTER_REJECT;
+            }
+        });
+
+        const targets = [];
+        while (walker.nextNode()) {
+            targets.push(walker.currentNode);
+        }
+
+        targets.forEach((node) => {
+            const fragment = createLinkifiedTextFragment(node.nodeValue || '');
+            if (fragment && node.parentNode) {
+                node.parentNode.replaceChild(fragment, node);
+            }
+        });
+
+        return container.innerHTML;
+    }
+
 function escapeHtml(value) {
     return String(value || '')
         .replace(/&/g, '&amp;')
@@ -386,12 +471,29 @@ function setupCommentStickerPicker() {
 
     function adjustSelectedEditorImage(delta) {
         if (!selectedEditorImage) return;
-        const editorWidth = document.getElementById('richEditor').clientWidth || 520;
-        const currentWidth = selectedEditorImage.getBoundingClientRect().width || 320;
+        const editorWidth = document.getElementById('richEditor').clientWidth || 720;
+        const currentWidth = selectedEditorImage.getBoundingClientRect().width || 520;
         const nextWidth = Math.max(140, Math.min(editorWidth, currentWidth + delta));
         selectedEditorImage.style.width = `${nextWidth}px`;
         selectedEditorImage.style.maxWidth = '100%';
         selectedEditorImage.style.height = 'auto';
+    }
+
+    function focusEditorForInsertion() {
+        const editor = document.getElementById('richEditor');
+        if (!editor) return;
+        editor.focus();
+        const selection = window.getSelection();
+        if (!selection) return;
+        const anchorNode = selection.anchorNode;
+        if (selection.rangeCount && anchorNode && editor.contains(anchorNode)) {
+            return;
+        }
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
     }
 
     function ensureEditorImageControls() {
@@ -449,7 +551,8 @@ function setupCommentStickerPicker() {
         const displayUrl = imageUrl.startsWith('/uploads/') && window.location.protocol === 'file:'
             ? `${getApiBase()}${imageUrl}`
             : imageUrl;
-        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 520px); height:auto; border-radius:8px; margin:15px auto; display:block;">`;
+        focusEditorForInsertion();
+        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 680px); height:auto; border-radius:8px; margin:15px auto; display:block;">`;
         document.execCommand('insertHTML', false, html);
         bindEditorImages();
     }
@@ -488,6 +591,7 @@ function setupCommentStickerPicker() {
     function insertYoutubeEmbedFromUrl(url) {
         const videoId = extractYoutubeVideoId(url);
         if (!videoId) return false;
+        focusEditorForInsertion();
         document.execCommand('insertHTML', false, createYoutubeEmbedHtml(videoId, url));
         return true;
     }
@@ -1122,8 +1226,8 @@ function setupCommentStickerPicker() {
         document.getElementById('detailTime').innerText = formatDate(post.date);
         document.getElementById('detailViews').innerText = post.views || 0;
         document.getElementById('detailContent').innerHTML = post.isRich
-            ? resolveContentForDisplay(post.content || '')
-            : String(post.content || '').replace(/\n/g, '<br>');
+            ? linkifyRichHtml(post.content || '')
+            : linkifyRichHtml(escapeHtml(post.content || '').replace(/\n/g, '<br>'));
         document.getElementById('authorActions').style.display = post.author === currentUser || currentUser === 'admin' ? 'flex' : 'none';
         updateVoteUI(post);
         renderComments(post);

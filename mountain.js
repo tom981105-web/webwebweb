@@ -229,8 +229,36 @@ document.getElementById('mountainForm').onsubmit = (e) => {
 // Drag and drop photo setup
 const dropZone = document.getElementById('photoDropZone');
 const photoInput = document.getElementById('mPhoto');
+const mountainPhotoFileInput = document.getElementById('mountainPhotoFile');
 const preview = document.getElementById('photoPreview');
 const dropText = document.getElementById('dropText');
+
+function handleMountainPhotoFiles(fileList) {
+    const imageFiles = Array.from(fileList || []).filter((file) => file && String(file.type || '').startsWith('image/'));
+    if (!imageFiles.length) return;
+
+    const remainingSlots = Math.max(0, 4 - pendingMountainPhotos.length);
+    if (!remainingSlots) {
+        alert('산행 사진은 최대 4장까지 추가할 수 있습니다.');
+        return;
+    }
+
+    imageFiles.slice(0, remainingSlots).forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            addMountainPhoto(evt.target.result);
+        };
+        reader.readAsDataURL(file);
+    });
+
+    if (imageFiles.length > remainingSlots) {
+        alert('산행 사진은 최대 4장까지 추가할 수 있습니다.');
+    }
+}
+
+if (dropText) {
+    dropText.textContent = '사진을 선택하거나 이곳에 드래그해 넣어 주세요. 최대 4장까지 가능합니다.';
+}
 
 photoInput.addEventListener('input', (e) => {
     const values = String(e.target.value || '')
@@ -239,6 +267,19 @@ photoInput.addEventListener('input', (e) => {
         .filter(Boolean);
     values.forEach((value) => addMountainPhoto(value));
     e.target.value = '';
+});
+
+if (mountainPhotoFileInput) {
+    mountainPhotoFileInput.addEventListener('change', (e) => {
+        handleMountainPhotoFiles(e.target.files);
+        e.target.value = '';
+    });
+}
+
+dropZone.addEventListener('click', (e) => {
+    if (!mountainPhotoFileInput) return;
+    if (e.target.closest('button')) return;
+    mountainPhotoFileInput.click();
 });
 
 dropZone.addEventListener('dragover', (e) => {
@@ -251,15 +292,7 @@ dropZone.addEventListener('dragleave', () => {
 dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    const files = Array.from(e.dataTransfer.files || []).slice(0, 4);
-    files.forEach((file) => {
-        if (!file.type.startsWith('image/')) return;
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-            addMountainPhoto(evt.target.result);
-        };
-        reader.readAsDataURL(file);
-    });
+    handleMountainPhotoFiles(e.dataTransfer.files || []);
 });
 
 // -- Region Masking Logic --
