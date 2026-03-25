@@ -471,8 +471,8 @@ function setupCommentStickerPicker() {
 
     function adjustSelectedEditorImage(delta) {
         if (!selectedEditorImage) return;
-        const editorWidth = document.getElementById('richEditor').clientWidth || 720;
-        const currentWidth = selectedEditorImage.getBoundingClientRect().width || 520;
+        const editorWidth = document.getElementById('richEditor').clientWidth || 860;
+        const currentWidth = selectedEditorImage.getBoundingClientRect().width || 680;
         const nextWidth = Math.max(140, Math.min(editorWidth, currentWidth + delta));
         selectedEditorImage.style.width = `${nextWidth}px`;
         selectedEditorImage.style.maxWidth = '100%';
@@ -552,7 +552,7 @@ function setupCommentStickerPicker() {
             ? `${getApiBase()}${imageUrl}`
             : imageUrl;
         focusEditorForInsertion();
-        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 680px); height:auto; border-radius:8px; margin:15px auto; display:block;">`;
+        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 820px); height:auto; border-radius:8px; margin:15px auto; display:block;">`;
         document.execCommand('insertHTML', false, html);
         bindEditorImages();
     }
