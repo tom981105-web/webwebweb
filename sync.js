@@ -1,6 +1,7 @@
 ﻿// sync.js
 (function () {
     let resolveInitialSync;
+    const volatileState = Object.create(null);
     const initialSyncPromise = new Promise((resolve) => {
         resolveInitialSync = resolve;
     });
@@ -19,8 +20,27 @@
         return typeof value === 'string' ? value : JSON.stringify(value);
     }
 
+    function isQuotaExceededError(error) {
+        return !!error && (
+            error.name === 'QuotaExceededError' ||
+            error.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+            error.code === 22 ||
+            error.code === 1014
+        );
+    }
+
     function writeWithoutSync(key, value) {
-        Storage.prototype.setItem.call(localStorage, key, value);
+        try {
+            Storage.prototype.setItem.call(localStorage, key, value);
+            delete volatileState[key];
+        } catch (error) {
+            if (isQuotaExceededError(error)) {
+                volatileState[key] = value;
+                console.warn(`[Sync] localStorage 용량 한도로 ${key} 값을 메모리에 유지합니다.`, error);
+                return;
+            }
+            throw error;
+        }
     }
 
     function applyServerState(db) {
@@ -62,15 +82,40 @@
     }
 
     const originalSetItem = localStorage.setItem.bind(localStorage);
+    const originalGetItem = localStorage.getItem.bind(localStorage);
     localStorage.setItem = function (key, value) {
-        originalSetItem(key, value);
+        try {
+            originalSetItem(key, value);
+            delete volatileState[key];
+        } catch (error) {
+            if (isQuotaExceededError(error)) {
+                volatileState[key] = value;
+                console.warn(`[Sync] localStorage 저장 한도를 넘어 ${key} 값을 메모리에 유지합니다.`, error);
+            } else {
+                throw error;
+            }
+        }
         if (key === 'current_user') return;
         pushChange(key, value);
     };
 
+    localStorage.getItem = function (key) {
+        if (Object.prototype.hasOwnProperty.call(volatileState, key)) {
+            return volatileState[key];
+        }
+        return originalGetItem(key);
+    };
+
     const originalRemoveItem = localStorage.removeItem.bind(localStorage);
     localStorage.removeItem = function (key) {
-        originalRemoveItem(key);
+        delete volatileState[key];
+        try {
+            originalRemoveItem(key);
+        } catch (error) {
+            if (!isQuotaExceededError(error)) {
+                throw error;
+            }
+        }
         if (key === 'current_user') return;
         pushChange(key, null);
     };
