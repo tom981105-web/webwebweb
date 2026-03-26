@@ -438,8 +438,28 @@ function setupCommentStickerPicker() {
     });
 }
 
+    function pushBoardPostsDirectly(serializedPosts) {
+        fetch(getApiUrl('/api/sync'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            keepalive: true,
+            body: JSON.stringify({
+                key: 'board_posts',
+                value: serializedPosts
+            })
+        }).catch((error) => {
+            console.warn('[Board] 게시글 서버 저장에 실패했습니다.', error);
+        });
+    }
+
     function savePosts() {
-        localStorage.setItem('board_posts', JSON.stringify(boardPosts));
+        const serializedPosts = JSON.stringify(boardPosts);
+        try {
+            localStorage.setItem('board_posts', serializedPosts);
+        } catch (error) {
+            console.warn('[Board] 브라우저 저장 한도를 넘어 서버로 직접 저장합니다.', error);
+            pushBoardPostsDirectly(serializedPosts);
+        }
     }
 
     function normalizePost(post) {
