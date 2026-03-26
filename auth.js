@@ -205,8 +205,34 @@ function getProfileObjectPosition(user) {
     return `${focusX}% ${focusY}%`;
 }
 
+function syncNotificationsDb(notifications, preferBeacon = false) {
+    const payload = JSON.stringify({
+        key: NOTIFICATION_STORAGE_KEY,
+        value: JSON.stringify(notifications || {})
+    });
+    const url = getAuthApiUrl('/api/sync');
+
+    if (preferBeacon && navigator.sendBeacon) {
+        try {
+            const sent = navigator.sendBeacon(url, new Blob([payload], { type: 'application/json' }));
+            if (sent) return;
+        } catch (error) {
+        }
+    }
+
+    fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+        keepalive: true
+    }).catch((error) => {
+        console.warn('[Notifications] 서버 동기화에 실패했습니다.', error);
+    });
+}
+
 function saveNotificationsDb(notifications) {
     localStorage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
+    syncNotificationsDb(notifications);
 }
 
 function resolveUserKeyCaseInsensitive(targetUserId) {
@@ -234,7 +260,7 @@ function dispatchNotificationUpdate(userId) {
         detail: {
             userId: userId || localStorage.getItem('current_user') || '',
             unreadCount: getUnreadNotificationCount(userId),
-            latestNotification: notifications[0] || null
+            latestNotification: notifications.find((item) => !item.read) || null
         }
     }));
 }
@@ -1012,6 +1038,10 @@ function checkAuth() {
 }
 
 function logout() {
+    try {
+        syncNotificationsDb(getNotificationsDb(), true);
+    } catch (error) {
+    }
     localStorage.removeItem('current_user');
     window.location.href = 'login.html';
 }
