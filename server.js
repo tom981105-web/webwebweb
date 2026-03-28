@@ -616,6 +616,9 @@ async function mirrorDatabaseToRemote() {
 
 let remoteMirrorTimer = null;
 let remoteMirrorQueue = Promise.resolve();
+let deferredDbPersistTimer = null;
+let deferredDbPersistQueue = Promise.resolve();
+let hasPendingDeferredDbPersist = false;
 
 function scheduleRemoteDatabaseMirror() {
     clearTimeout(remoteMirrorTimer);
@@ -626,6 +629,36 @@ function scheduleRemoteDatabaseMirror() {
                 console.warn('[DB] 지연 원격 미러링에 실패했습니다.', error.message || error);
             });
     }, 350);
+}
+
+function refreshRawDbFromState() {
+    rawDb = createPersistedRawDbFromState(state);
+}
+
+function flushRawDbToDisk() {
+    fs.writeFileSync(DB_FILE, JSON.stringify(rawDb));
+}
+
+function scheduleDeferredDbPersist() {
+    hasPendingDeferredDbPersist = true;
+    refreshRawDbFromState();
+
+    clearTimeout(deferredDbPersistTimer);
+    deferredDbPersistTimer = setTimeout(() => {
+        deferredDbPersistTimer = null;
+        deferredDbPersistQueue = deferredDbPersistQueue
+            .then(async () => {
+                if (!hasPendingDeferredDbPersist) return;
+                await repairBoardPostsInState();
+                refreshRawDbFromState();
+                flushRawDbToDisk();
+                hasPendingDeferredDbPersist = false;
+                scheduleRemoteDatabaseMirror();
+            })
+            .catch((error) => {
+                console.warn('[DB] 지연 저장에 실패했습니다.', error.message || error);
+            });
+    }, 450);
 }
 
 async function saveBoardPostSnapshot(post) {
@@ -728,9 +761,12 @@ function loadStateFromDisk() {
 }
 
 async function persistDb(options = {}) {
+    clearTimeout(deferredDbPersistTimer);
+    deferredDbPersistTimer = null;
+    hasPendingDeferredDbPersist = false;
     await repairBoardPostsInState();
-    rawDb = createPersistedRawDbFromState(state);
-    fs.writeFileSync(DB_FILE, JSON.stringify(rawDb));
+    refreshRawDbFromState();
+    flushRawDbToDisk();
 
     if (options.deferRemote) {
         scheduleRemoteDatabaseMirror();
@@ -766,6 +802,9 @@ async function migrateBoardInlineStorageIfNeeded() {
 }
 
 function reloadDb() {
+    if (hasPendingDeferredDbPersist || deferredDbPersistTimer) {
+        return;
+    }
     loadStateFromDisk();
     migrateLoginHeroStorageIfNeeded();
     migrateBannerStorageIfNeeded();
@@ -1090,7 +1129,6 @@ app.post('/api/uploads/image', async (req, res) => {
 });
 
 app.get('/api/board/meta', (req, res) => {
-    reloadDb();
     res.json({
         categories: state.board.categories,
         totalPosts: state.board.posts.length,
@@ -1099,7 +1137,6 @@ app.get('/api/board/meta', (req, res) => {
 });
 
 app.get('/api/board/posts', (req, res) => {
-    reloadDb();
     const category = String(req.query.category || '').trim();
     const searchType = String(req.query.searchType || 'title');
     const search = String(req.query.search || '').trim().toLowerCase();
@@ -1133,7 +1170,6 @@ app.get('/api/board/posts', (req, res) => {
 });
 
 app.get('/api/board/posts/:id', (req, res) => {
-    reloadDb();
     const id = Number(req.params.id);
     const post = state.board.posts.find((item) => Number(item.id) === id);
     if (!post) {
@@ -1143,7 +1179,6 @@ app.get('/api/board/posts/:id', (req, res) => {
 });
 
 app.post('/api/board/posts', async (req, res) => {
-    reloadDb();
     const payload = req.body || {};
     const nextId = state.board.posts.length ? Math.max(...state.board.posts.map((post) => Number(post.id || 0))) + 1 : 1;
     const nowIso = new Date().toISOString();
@@ -1165,16 +1200,13 @@ app.post('/api/board/posts', async (req, res) => {
 
     state.board.posts.push(post);
     delete state.board.drafts[createBoardDraftKey(post.author, null)];
-    await persistDb({ deferRemote: true });
-    await Promise.allSettled([
-        saveBoardPostSnapshot(post),
-        deleteBoardDraftSnapshot(post.author, null)
-    ]);
+    scheduleDeferredDbPersist();
+    await saveBoardPostSnapshot(post);
+    deleteBoardDraftSnapshot(post.author, null).catch(() => {});
     res.json({ success: true, post });
 });
 
 app.put('/api/board/posts/:id', async (req, res) => {
-    reloadDb();
     const id = Number(req.params.id);
     const index = state.board.posts.findIndex((item) => Number(item.id) === id);
     if (index < 0) {
@@ -1190,29 +1222,25 @@ app.put('/api/board/posts/:id', async (req, res) => {
 
     const savedPost = state.board.posts[index];
     delete state.board.drafts[createBoardDraftKey(savedPost.author, id)];
-    await persistDb({ deferRemote: true });
-    await Promise.allSettled([
-        saveBoardPostSnapshot(savedPost),
-        deleteBoardDraftSnapshot(savedPost.author, id)
-    ]);
+    scheduleDeferredDbPersist();
+    await saveBoardPostSnapshot(savedPost);
+    deleteBoardDraftSnapshot(savedPost.author, id).catch(() => {});
     res.json({ success: true, post: savedPost });
 });
 
 app.delete('/api/board/posts/:id', async (req, res) => {
-    reloadDb();
     const id = Number(req.params.id);
     const existingPost = state.board.posts.find((item) => Number(item.id) === id);
     state.board.posts = state.board.posts.filter((item) => Number(item.id) !== id);
-    await persistDb({ deferRemote: true });
-    await Promise.allSettled([
-        saveBoardPostTombstone(id, new Date().toISOString()),
-        existingPost ? deleteBoardDraftSnapshot(existingPost.author, id) : Promise.resolve()
-    ]);
+    scheduleDeferredDbPersist();
+    await saveBoardPostTombstone(id, new Date().toISOString());
+    if (existingPost) {
+        deleteBoardDraftSnapshot(existingPost.author, id).catch(() => {});
+    }
     res.json({ success: true });
 });
 
 app.get('/api/board/drafts', (req, res) => {
-    reloadDb();
     const userId = String(req.query.user || '').trim();
     const postId = Number(req.query.postId || 0);
     if (!userId) {
@@ -1224,7 +1252,6 @@ app.get('/api/board/drafts', (req, res) => {
 });
 
 app.post('/api/board/drafts', async (req, res) => {
-    reloadDb();
     const payload = req.body || {};
     const userId = String(payload.userId || '').trim();
     const postId = Number(payload.postId || 0);
@@ -1248,19 +1275,18 @@ app.post('/api/board/drafts', async (req, res) => {
 
     if (!normalizedDraft || (!normalizedDraft.title && !normalizedDraft.content)) {
         delete state.board.drafts[draftKey];
-        await persistDb({ deferRemote: true });
+        scheduleDeferredDbPersist();
         await deleteBoardDraftSnapshot(userId, postId).catch(() => {});
         return res.json({ success: true, draft: null });
     }
 
     state.board.drafts[draftKey] = normalizedDraft;
-    await persistDb({ deferRemote: true });
+    scheduleDeferredDbPersist();
     await saveBoardDraftSnapshot(normalizedDraft).catch(() => {});
     res.json({ success: true, draft: normalizedDraft });
 });
 
 app.delete('/api/board/drafts', async (req, res) => {
-    reloadDb();
     const userId = String(req.query.user || '').trim();
     const postId = Number(req.query.postId || 0);
     if (!userId) {
@@ -1268,7 +1294,7 @@ app.delete('/api/board/drafts', async (req, res) => {
     }
 
     delete state.board.drafts[createBoardDraftKey(userId, postId)];
-    await persistDb({ deferRemote: true });
+    scheduleDeferredDbPersist();
     await deleteBoardDraftSnapshot(userId, postId).catch(() => {});
     res.json({ success: true });
 });
