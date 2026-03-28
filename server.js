@@ -60,7 +60,21 @@ app.get('/uploads/board-inline/:fileName', async (req, res, next) => {
     return next();
 });
 
-app.get('/health', (req, res) => res.send('OK'));
+let bootState = {
+    startedAt: null,
+    readyAt: null,
+    error: null
+};
+
+app.get('/health', (req, res) => {
+    res.json({
+        ok: true,
+        booting: !bootState.readyAt,
+        startedAt: bootState.startedAt,
+        readyAt: bootState.readyAt,
+        error: bootState.error
+    });
+});
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(APP_DIR, 'index.html'));
@@ -1358,22 +1372,49 @@ app.get('/api/admin/state', (req, res) => {
     });
 });
 
+async function runBackgroundBootstrap() {
+    bootState.startedAt = new Date().toISOString();
+
+    try {
+        await hydrateDatabaseFromRemote();
+        loadStateFromDisk();
+        const reconciledBoardArtifacts = await reconcileBoardArtifactsInState();
+        migrateLoginHeroStorageIfNeeded();
+        migrateBannerStorageIfNeeded();
+        await migrateBoardInlineStorageIfNeeded();
+        if (reconciledBoardArtifacts) {
+            await persistDb({ deferRemote: true });
+        }
+
+        bootState.readyAt = new Date().toISOString();
+        console.log(`[Boot] Background initialization complete at ${bootState.readyAt}.`);
+    } catch (error) {
+        bootState.error = error && error.message ? error.message : String(error);
+        console.error('[Boot] 백그라운드 초기화에 실패했습니다.', error);
+    }
+}
+
 async function bootstrap() {
-    await hydrateDatabaseFromRemote();
-    loadStateFromDisk();
-    const reconciledBoardArtifacts = await reconcileBoardArtifactsInState();
-    migrateLoginHeroStorageIfNeeded();
-    migrateBannerStorageIfNeeded();
-    await migrateBoardInlineStorageIfNeeded();
-    if (reconciledBoardArtifacts) {
-        await persistDb({ deferRemote: true });
+    try {
+        loadStateFromDisk();
+    } catch (error) {
+        console.warn('[Boot] 로컬 DB를 먼저 불러오지 못했습니다. 초기 상태로 시작합니다.', error.message || error);
     }
 
     const PORT = process.env.PORT || 3000;
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}.`);
-        console.log('Normalized API is ready for Railway/R2 migration.');
-        console.log(`Data directory: ${DATA_DIR}`);
+    const HOST = process.env.HOST || '0.0.0.0';
+
+    await new Promise((resolve, reject) => {
+        const server = app.listen(PORT, HOST, () => {
+            console.log(`Server running on port ${PORT}.`);
+            console.log('Normalized API is ready for Railway/R2 migration.');
+            console.log(`Data directory: ${DATA_DIR}`);
+            console.log(`[Boot] Listening on ${HOST}:${PORT} while background initialization continues.`);
+            runBackgroundBootstrap();
+            resolve(server);
+        });
+
+        server.on('error', reject);
     });
 }
 
