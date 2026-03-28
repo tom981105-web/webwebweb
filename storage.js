@@ -322,6 +322,51 @@ async function listFolderEntries(folder) {
     });
 }
 
+async function listKeysByPrefix(prefix) {
+    const normalizedPrefix = String(prefix || '').trim().replace(/^\/+/, '');
+    if (!normalizedPrefix) return [];
+
+    if (PROVIDER === 'r2') {
+        const bucket = process.env.R2_BUCKET;
+        if (!bucket) {
+            throw new Error('R2 버킷 설정이 없습니다.');
+        }
+
+        const response = await getR2Client().send(new ListObjectsV2Command({
+            Bucket: bucket,
+            Prefix: normalizedPrefix
+        }));
+
+        return (response.Contents || [])
+            .map((entry) => String(entry.Key || '').trim())
+            .filter(Boolean);
+    }
+
+    const rootPath = path.join(BACKUP_DIR, normalizedPrefix.replace(/\//g, path.sep));
+    if (!fs.existsSync(rootPath)) return [];
+
+    const keys = [];
+    const stack = [rootPath];
+
+    while (stack.length) {
+        const currentPath = stack.pop();
+        const stat = fs.statSync(currentPath);
+        if (stat.isDirectory()) {
+            fs.readdirSync(currentPath).forEach((entry) => {
+                stack.push(path.join(currentPath, entry));
+            });
+            continue;
+        }
+
+        const relativePath = path.relative(BACKUP_DIR, currentPath).replace(/\\/g, '/');
+        if (relativePath) {
+            keys.push(relativePath);
+        }
+    }
+
+    return keys.sort();
+}
+
 async function findStoredEntryByFileName(folder, fileName) {
     const normalizedName = String(fileName || '').trim();
     if (!normalizedName) return null;
@@ -388,6 +433,7 @@ module.exports = {
     saveTextByKey,
     readTextByKey,
     listFolderEntries,
+    listKeysByPrefix,
     deleteByKey,
     getStorageStatus
 };

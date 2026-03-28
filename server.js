@@ -18,6 +18,8 @@ const {
 const storage = require('./storage');
 const { uploadBackupToR2 } = require('./r2-backup');
 const LIVE_DB_KEY = 'system/database.json';
+const BOARD_POST_STATE_PREFIX = 'system/board-posts/';
+const BOARD_DRAFT_STATE_PREFIX = 'system/board-drafts/';
 
 const app = express();
 app.use(cors());
@@ -542,6 +544,20 @@ function createPersistedRawDbFromState(state) {
     };
 }
 
+function getEntryUpdatedAt(entry) {
+    const timestamp = Date.parse(entry && entry.updatedAt ? entry.updatedAt : '');
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getBoardPostSnapshotKey(postId) {
+    return `${BOARD_POST_STATE_PREFIX}${Number(postId || 0)}.json`;
+}
+
+function getBoardDraftSnapshotKey(userId, postId) {
+    const safeUserId = encodeURIComponent(String(userId || '').trim() || 'anonymous');
+    return `${BOARD_DRAFT_STATE_PREFIX}${safeUserId}-${Number(postId || 0) > 0 ? `edit_${Number(postId)}` : 'new'}.json`;
+}
+
 let rawDb = {};
 let state = normalizeRawDb({});
 
@@ -598,15 +614,129 @@ async function mirrorDatabaseToRemote() {
     }
 }
 
+let remoteMirrorTimer = null;
+let remoteMirrorQueue = Promise.resolve();
+
+function scheduleRemoteDatabaseMirror() {
+    clearTimeout(remoteMirrorTimer);
+    remoteMirrorTimer = setTimeout(() => {
+        remoteMirrorQueue = remoteMirrorQueue
+            .then(() => mirrorDatabaseToRemote())
+            .catch((error) => {
+                console.warn('[DB] 지연 원격 미러링에 실패했습니다.', error.message || error);
+            });
+    }, 350);
+}
+
+async function saveBoardPostSnapshot(post) {
+    if (!post || !post.id) return;
+    await storage.saveTextByKey({
+        key: getBoardPostSnapshotKey(post.id),
+        content: JSON.stringify(post),
+        contentType: 'application/json'
+    });
+}
+
+async function saveBoardPostTombstone(postId, updatedAt) {
+    await storage.saveTextByKey({
+        key: getBoardPostSnapshotKey(postId),
+        content: JSON.stringify({
+            id: Number(postId || 0),
+            deleted: true,
+            updatedAt: updatedAt || new Date().toISOString()
+        }),
+        contentType: 'application/json'
+    });
+}
+
+async function saveBoardDraftSnapshot(draft) {
+    if (!draft || !draft.userId) return;
+    await storage.saveTextByKey({
+        key: getBoardDraftSnapshotKey(draft.userId, draft.postId),
+        content: JSON.stringify(draft),
+        contentType: 'application/json'
+    });
+}
+
+async function deleteBoardDraftSnapshot(userId, postId) {
+    await storage.deleteByKey(getBoardDraftSnapshotKey(userId, postId));
+}
+
+async function reconcileBoardArtifactsInState() {
+    let changed = false;
+
+    const postKeys = await storage.listKeysByPrefix(BOARD_POST_STATE_PREFIX);
+    for (const key of postKeys) {
+        const text = await storage.readTextByKey(key);
+        const snapshot = safeParseJson(text, null);
+        if (!snapshot || typeof snapshot !== 'object') continue;
+
+        const snapshotUpdatedAt = getEntryUpdatedAt(snapshot);
+        const index = state.board.posts.findIndex((post) => Number(post.id) === Number(snapshot.id));
+
+        if (snapshot.deleted) {
+            if (index >= 0) {
+                const existingPost = state.board.posts[index];
+                if (snapshotUpdatedAt >= getEntryUpdatedAt(existingPost)) {
+                    state.board.posts.splice(index, 1);
+                    changed = true;
+                }
+            }
+            continue;
+        }
+
+        const normalizedPost = normalizeBoardPosts([snapshot], state.board.categories)[0];
+        if (index < 0) {
+            state.board.posts.push(normalizedPost);
+            changed = true;
+            continue;
+        }
+
+        if (snapshotUpdatedAt >= getEntryUpdatedAt(state.board.posts[index])) {
+            state.board.posts[index] = normalizedPost;
+            changed = true;
+        }
+    }
+
+    const draftKeys = await storage.listKeysByPrefix(BOARD_DRAFT_STATE_PREFIX);
+    for (const key of draftKeys) {
+        const text = await storage.readTextByKey(key);
+        const snapshot = safeParseJson(text, null);
+        if (!snapshot || typeof snapshot !== 'object' || !snapshot.userId) continue;
+
+        const normalizedDraftMap = normalizeBoardDrafts({
+            [createBoardDraftKey(snapshot.userId, snapshot.postId)]: snapshot
+        }, state.board.categories);
+        const [normalizedDraft] = Object.values(normalizedDraftMap);
+        if (!normalizedDraft) continue;
+
+        const draftKey = createBoardDraftKey(normalizedDraft.userId, normalizedDraft.postId);
+        const existingDraft = state.board.drafts[draftKey];
+
+        if (!existingDraft || getEntryUpdatedAt(normalizedDraft) >= getEntryUpdatedAt(existingDraft)) {
+            state.board.drafts[draftKey] = normalizedDraft;
+            changed = true;
+        }
+    }
+
+    return changed;
+}
+
 function loadStateFromDisk() {
     rawDb = safeParseJson(fs.readFileSync(DB_FILE, 'utf8'), {});
     state = normalizeRawDb(rawDb);
 }
 
-async function persistDb() {
+async function persistDb(options = {}) {
     await repairBoardPostsInState();
     rawDb = createPersistedRawDbFromState(state);
-    fs.writeFileSync(DB_FILE, JSON.stringify(rawDb, null, 2));
+    fs.writeFileSync(DB_FILE, JSON.stringify(rawDb));
+
+    if (options.deferRemote) {
+        scheduleRemoteDatabaseMirror();
+        return;
+    }
+
     await mirrorDatabaseToRemote();
 }
 
@@ -1016,12 +1146,14 @@ app.post('/api/board/posts', async (req, res) => {
     reloadDb();
     const payload = req.body || {};
     const nextId = state.board.posts.length ? Math.max(...state.board.posts.map((post) => Number(post.id || 0))) + 1 : 1;
+    const nowIso = new Date().toISOString();
     const post = normalizeBoardPosts([{
         id: nextId,
         title: payload.title || '',
         content: payload.content || '',
         author: payload.author || '익명',
         date: payload.date || '',
+        updatedAt: payload.updatedAt || nowIso,
         views: payload.views || 0,
         likes: payload.likes || 0,
         dislikes: payload.dislikes || 0,
@@ -1033,7 +1165,11 @@ app.post('/api/board/posts', async (req, res) => {
 
     state.board.posts.push(post);
     delete state.board.drafts[createBoardDraftKey(post.author, null)];
-    await persistDb();
+    await persistDb({ deferRemote: true });
+    await Promise.allSettled([
+        saveBoardPostSnapshot(post),
+        deleteBoardDraftSnapshot(post.author, null)
+    ]);
     res.json({ success: true, post });
 });
 
@@ -1048,19 +1184,30 @@ app.put('/api/board/posts/:id', async (req, res) => {
     state.board.posts[index] = normalizeBoardPosts([{
         ...state.board.posts[index],
         ...req.body,
+        updatedAt: new Date().toISOString(),
         id
     }], state.board.categories)[0];
 
-    delete state.board.drafts[createBoardDraftKey(state.board.posts[index].author, id)];
-    await persistDb();
-    res.json({ success: true, post: state.board.posts[index] });
+    const savedPost = state.board.posts[index];
+    delete state.board.drafts[createBoardDraftKey(savedPost.author, id)];
+    await persistDb({ deferRemote: true });
+    await Promise.allSettled([
+        saveBoardPostSnapshot(savedPost),
+        deleteBoardDraftSnapshot(savedPost.author, id)
+    ]);
+    res.json({ success: true, post: savedPost });
 });
 
 app.delete('/api/board/posts/:id', async (req, res) => {
     reloadDb();
     const id = Number(req.params.id);
+    const existingPost = state.board.posts.find((item) => Number(item.id) === id);
     state.board.posts = state.board.posts.filter((item) => Number(item.id) !== id);
-    await persistDb();
+    await persistDb({ deferRemote: true });
+    await Promise.allSettled([
+        saveBoardPostTombstone(id, new Date().toISOString()),
+        existingPost ? deleteBoardDraftSnapshot(existingPost.author, id) : Promise.resolve()
+    ]);
     res.json({ success: true });
 });
 
@@ -1101,12 +1248,14 @@ app.post('/api/board/drafts', async (req, res) => {
 
     if (!normalizedDraft || (!normalizedDraft.title && !normalizedDraft.content)) {
         delete state.board.drafts[draftKey];
-        await persistDb();
+        await persistDb({ deferRemote: true });
+        await deleteBoardDraftSnapshot(userId, postId).catch(() => {});
         return res.json({ success: true, draft: null });
     }
 
     state.board.drafts[draftKey] = normalizedDraft;
-    await persistDb();
+    await persistDb({ deferRemote: true });
+    await saveBoardDraftSnapshot(normalizedDraft).catch(() => {});
     res.json({ success: true, draft: normalizedDraft });
 });
 
@@ -1119,7 +1268,8 @@ app.delete('/api/board/drafts', async (req, res) => {
     }
 
     delete state.board.drafts[createBoardDraftKey(userId, postId)];
-    await persistDb();
+    await persistDb({ deferRemote: true });
+    await deleteBoardDraftSnapshot(userId, postId).catch(() => {});
     res.json({ success: true });
 });
 
@@ -1185,9 +1335,13 @@ app.get('/api/admin/state', (req, res) => {
 async function bootstrap() {
     await hydrateDatabaseFromRemote();
     loadStateFromDisk();
+    const reconciledBoardArtifacts = await reconcileBoardArtifactsInState();
     migrateLoginHeroStorageIfNeeded();
     migrateBannerStorageIfNeeded();
     await migrateBoardInlineStorageIfNeeded();
+    if (reconciledBoardArtifacts) {
+        await persistDb({ deferRemote: true });
+    }
 
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => {
