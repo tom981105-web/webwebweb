@@ -36,6 +36,86 @@
     let resizeStartX = 0;
     let resizeStartWidth = 0;
     let boardReady = false;
+    let boardDraftSaveTimer = null;
+    const BOARD_DRAFT_STORAGE_PREFIX = 'board_draft_';
+
+    function getBoardDraftStorageKey(postId = currentEditingPostId) {
+        return `${BOARD_DRAFT_STORAGE_PREFIX}${currentUser}_${postId ? `edit_${postId}` : 'new'}`;
+    }
+
+    function readBoardDraft(postId = currentEditingPostId) {
+        const storageKey = getBoardDraftStorageKey(postId);
+        const rawValue = Storage.prototype.getItem.call(localStorage, storageKey)
+            || Storage.prototype.getItem.call(sessionStorage, storageKey);
+        return safeParse(rawValue || 'null', null);
+    }
+
+    function clearBoardDraft(postId = currentEditingPostId) {
+        const storageKey = getBoardDraftStorageKey(postId);
+        Storage.prototype.removeItem.call(localStorage, storageKey);
+        Storage.prototype.removeItem.call(sessionStorage, storageKey);
+    }
+
+    function persistBoardDraft() {
+        const writeModal = document.getElementById('writeModal');
+        if (!writeModal || writeModal.style.display !== 'block') return;
+
+        const titleInput = document.getElementById('postTitle');
+        const editor = document.getElementById('richEditor');
+        const categoryInput = document.getElementById('postCategory');
+        const noticeInput = document.getElementById('isNotice');
+        if (!titleInput || !editor || !categoryInput) return;
+
+        const title = titleInput.value.trim();
+        const content = normalizeContentForStorage(editor.innerHTML.trim());
+        const isEffectivelyEmpty = !title && (!content || content === '<p><br></p>');
+
+        if (isEffectivelyEmpty) {
+            clearBoardDraft(currentEditingPostId);
+            return;
+        }
+
+        const draft = {
+            postId: currentEditingPostId || null,
+            title,
+            content,
+            category: categoryInput.value || activeCategory,
+            isNotice: Boolean(noticeInput && noticeInput.checked),
+            updatedAt: new Date().toISOString()
+        };
+
+        const serializedDraft = JSON.stringify(draft);
+        const storageKey = getBoardDraftStorageKey(currentEditingPostId);
+        try {
+            Storage.prototype.setItem.call(localStorage, storageKey, serializedDraft);
+            Storage.prototype.removeItem.call(sessionStorage, storageKey);
+        } catch (error) {
+            Storage.prototype.setItem.call(sessionStorage, storageKey, serializedDraft);
+        }
+    }
+
+    function queueBoardDraftSave() {
+        window.clearTimeout(boardDraftSaveTimer);
+        boardDraftSaveTimer = window.setTimeout(persistBoardDraft, 500);
+    }
+
+    function restoreBoardDraft(postId = currentEditingPostId) {
+        const draft = readBoardDraft(postId);
+        if (!draft) return false;
+
+        const titleInput = document.getElementById('postTitle');
+        const editor = document.getElementById('richEditor');
+        const categoryInput = document.getElementById('postCategory');
+        const noticeInput = document.getElementById('isNotice');
+        if (!titleInput || !editor || !categoryInput) return false;
+
+        titleInput.value = draft.title || '';
+        editor.innerHTML = resolveContentForDisplay(draft.content || '<p><br></p>');
+        categoryInput.value = draft.category || activeCategory;
+        if (noticeInput) noticeInput.checked = Boolean(draft.isNotice);
+        bindEditorImages();
+        return true;
+    }
 
     function ensureBoardReady() {
         if (boardReady) return true;
@@ -462,6 +542,27 @@ function setupCommentStickerPicker() {
         }
     }
 
+    async function persistPostToServer(payload) {
+        const isEditing = Boolean(currentEditingPostId);
+        const response = await fetch(getApiUrl(isEditing ? `/api/board/posts/${currentEditingPostId}` : '/api/board/posts'), {
+            method: isEditing ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || !result.post) {
+            throw new Error(result.message || '게시글 저장에 실패했습니다.');
+        }
+
+        return normalizePost(result.post);
+    }
+
     function normalizePost(post) {
         return {
             ...post,
@@ -862,7 +963,7 @@ function setupCommentStickerPicker() {
     };
 
     const writeModal = document.getElementById('writeModal');
-    window.openWriteModal = function () {
+    window.openWriteModal = function (options = {}) {
         if (!ensureBoardReady()) return;
         if (!writeModal) return;
         writeModal.style.display = 'block';
@@ -879,10 +980,16 @@ function setupCommentStickerPicker() {
         const submitButton = document.querySelector('#writeForm .board-submit');
         if (submitButton) submitButton.innerText = '등록하기';
         document.getElementById('richEditor').innerHTML = '<p><br></p>';
+        if (options.restoreDraft !== false) {
+            restoreBoardDraft(null);
+        }
     };
 
-    window.closeWriteModal = function () {
+    window.closeWriteModal = function (options = {}) {
         if (!writeModal) return;
+        if (options.preserveDraft !== false) {
+            persistBoardDraft();
+        }
         writeModal.style.display = 'none';
         document.getElementById('writeForm').reset();
         document.getElementById('richEditor').innerHTML = '<p><br></p>';
@@ -923,7 +1030,7 @@ function setupCommentStickerPicker() {
         }
     };
 
-    document.getElementById('writeForm').onsubmit = function (event) {
+    document.getElementById('writeForm').onsubmit = async function (event) {
         event.preventDefault();
         if (!ensureBoardReady()) return;
         const title = document.getElementById('postTitle').value.trim();
@@ -937,27 +1044,56 @@ function setupCommentStickerPicker() {
         const now = new Date();
         const pad = (n) => String(n).padStart(2, '0');
         const dateStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`;
-        if (currentEditingPostId) {
-            const targetPost = boardPosts.find((post) => post.id === currentEditingPostId);
-            if (!targetPost) return;
-            if (targetPost.author !== currentUser && currentUser !== 'admin') {
-                alert('수정 권한이 없습니다.');
-                return;
-            }
-            targetPost.title = title;
-            targetPost.content = content;
-            targetPost.category = category;
-            targetPost.isNotice = isNotice;
-            targetPost.isRich = true;
-        } else {
-            const newId = boardPosts.length ? Math.max(...boardPosts.map((post) => post.id || 0)) + 1 : 1;
-            boardPosts.push({ id: newId, title, content, category, author: currentUser, date: dateStr, views: 0, likes: 0, dislikes: 0, comments: [], isNotice, isRich: true });
+
+        const targetPost = currentEditingPostId
+            ? boardPosts.find((post) => post.id === currentEditingPostId)
+            : null;
+        if (currentEditingPostId && !targetPost) return;
+        if (targetPost && targetPost.author !== currentUser && currentUser !== 'admin') {
+            alert('수정 권한이 없습니다.');
+            return;
         }
+
+        const payload = {
+            ...(targetPost || {}),
+            title,
+            content,
+            category,
+            author: targetPost ? targetPost.author : currentUser,
+            date: targetPost ? targetPost.date : dateStr,
+            views: targetPost ? (targetPost.views || 0) : 0,
+            likes: targetPost ? (targetPost.likes || 0) : 0,
+            dislikes: targetPost ? (targetPost.dislikes || 0) : 0,
+            comments: targetPost ? (targetPost.comments || []) : [],
+            isNotice,
+            isRich: true
+        };
+
+        try {
+            const savedPost = await persistPostToServer(payload);
+            if (currentEditingPostId) {
+                boardPosts = boardPosts.map((post) => post.id === currentEditingPostId ? savedPost : post);
+            } else {
+                boardPosts.unshift(savedPost);
+            }
+        } catch (error) {
+            persistBoardDraft();
+            alert(`${error.message || '게시글 저장에 실패했습니다.'}\n작성 중인 내용은 임시 저장되었습니다.`);
+            return;
+        }
+
         savePosts();
+        clearBoardDraft(currentEditingPostId);
         activeCategory = category;
         renderBoard(currentSearchType, currentSearchQuery);
-        closeWriteModal();
+        closeWriteModal({ preserveDraft: false });
     };
+
+    document.getElementById('postTitle').addEventListener('input', queueBoardDraftSave);
+    document.getElementById('postCategory').addEventListener('change', queueBoardDraftSave);
+    document.getElementById('isNotice').addEventListener('change', queueBoardDraftSave);
+    document.getElementById('richEditor').addEventListener('input', queueBoardDraftSave);
+    window.addEventListener('beforeunload', persistBoardDraft);
 
     const boardListView = document.getElementById('boardListView');
     const boardDetailView = document.getElementById('boardDetailView');
@@ -1289,7 +1425,7 @@ window.closeDetailModal = function () {
         if (!post) return;
         if (post.author !== currentUser && currentUser !== 'admin') return;
 
-        openWriteModal();
+        openWriteModal({ restoreDraft: false });
         currentEditingPostId = post.id;
         document.getElementById('postTitle').value = post.title || '';
         document.getElementById('richEditor').innerHTML = resolveContentForDisplay(post.content || '<p><br></p>');
@@ -1300,6 +1436,7 @@ window.closeDetailModal = function () {
         const submitButton = document.querySelector('#writeForm .board-submit');
         if (submitButton) submitButton.innerText = '수정 저장';
         bindEditorImages();
+        restoreBoardDraft(post.id);
     };
 
     function persistVotes() {
