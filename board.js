@@ -41,13 +41,34 @@
     let boardDraftRemoteTimer = null;
     let boardDraftRestoreToken = 0;
     let boardDraftRemoteChain = Promise.resolve();
-    let boardPostsStorageDisabled = false;
-    let boardDraftLocalStorageDisabled = false;
-    let boardDraftSessionStorageDisabled = false;
     const BOARD_DRAFT_STORAGE_PREFIX = 'board_draft_';
     const inMemoryBoardDrafts = Object.create(null);
     const boardDraftRemoteFingerprints = Object.create(null);
     const boardDraftRemoteVersions = Object.create(null);
+
+    function clearLegacyBoardStorageCaches() {
+        const removeKeys = [];
+        for (let index = 0; index < localStorage.length; index += 1) {
+            const key = localStorage.key(index);
+            if (!key) continue;
+            if (key === 'board_posts' || key.startsWith(BOARD_DRAFT_STORAGE_PREFIX)) {
+                removeKeys.push(key);
+            }
+        }
+        removeKeys.forEach((key) => Storage.prototype.removeItem.call(localStorage, key));
+
+        const removeSessionKeys = [];
+        for (let index = 0; index < sessionStorage.length; index += 1) {
+            const key = sessionStorage.key(index);
+            if (!key) continue;
+            if (key.startsWith(BOARD_DRAFT_STORAGE_PREFIX)) {
+                removeSessionKeys.push(key);
+            }
+        }
+        removeSessionKeys.forEach((key) => Storage.prototype.removeItem.call(sessionStorage, key));
+    }
+
+    clearLegacyBoardStorageCaches();
 
     function getBoardDraftStorageKey(postId = currentEditingPostId) {
         return `${BOARD_DRAFT_STORAGE_PREFIX}${currentUser}_${postId ? `edit_${postId}` : 'new'}`;
@@ -97,9 +118,7 @@
 
     function readBoardDraft(postId = currentEditingPostId) {
         const storageKey = getBoardDraftStorageKey(postId);
-        const rawValue = inMemoryBoardDrafts[storageKey]
-            || Storage.prototype.getItem.call(localStorage, storageKey)
-            || Storage.prototype.getItem.call(sessionStorage, storageKey);
+        const rawValue = inMemoryBoardDrafts[storageKey];
         return safeParse(rawValue || 'null', null);
     }
 
@@ -107,27 +126,6 @@
         const storageKey = getBoardDraftStorageKey(postId);
         const serializedDraft = JSON.stringify(draft);
         inMemoryBoardDrafts[storageKey] = serializedDraft;
-
-        if (!boardDraftLocalStorageDisabled) {
-            try {
-                Storage.prototype.setItem.call(localStorage, storageKey, serializedDraft);
-                if (!boardDraftSessionStorageDisabled) {
-                    Storage.prototype.removeItem.call(sessionStorage, storageKey);
-                }
-                return;
-            } catch (error) {
-                boardDraftLocalStorageDisabled = true;
-            }
-        }
-
-        if (!boardDraftSessionStorageDisabled) {
-            try {
-                Storage.prototype.setItem.call(sessionStorage, storageKey, serializedDraft);
-                return;
-            } catch (error) {
-                boardDraftSessionStorageDisabled = true;
-            }
-        }
     }
 
     async function fetchBoardDraftFromServer(postId = currentEditingPostId) {
@@ -271,8 +269,6 @@
         const storageKey = getBoardDraftStorageKey(postId);
         const hadDraft = Boolean(
             inMemoryBoardDrafts[storageKey]
-            || Storage.prototype.getItem.call(localStorage, storageKey)
-            || Storage.prototype.getItem.call(sessionStorage, storageKey)
             || boardDraftRemoteFingerprints[storageKey]
             || options.force
         );
@@ -281,8 +277,6 @@
         window.clearTimeout(boardDraftRemoteTimer);
         delete inMemoryBoardDrafts[storageKey];
         delete boardDraftRemoteFingerprints[storageKey];
-        Storage.prototype.removeItem.call(localStorage, storageKey);
-        Storage.prototype.removeItem.call(sessionStorage, storageKey);
 
         if (options.remote !== false && hadDraft) {
             void deleteBoardDraftFromServer(postId, {
@@ -751,13 +745,9 @@ function setupCommentStickerPicker() {
 }
 
     function savePosts() {
-        const serializedPosts = JSON.stringify(boardPosts);
-        if (boardPostsStorageDisabled) return;
-        try {
-            Storage.prototype.setItem.call(localStorage, 'board_posts', serializedPosts);
-        } catch (error) {
-            boardPostsStorageDisabled = true;
-        }
+        // Board posts are now protected through server APIs and server-side snapshots.
+        // Avoid browser storage writes here so very large post bodies or many images
+        // never trigger repeated localStorage quota warnings during normal editing.
     }
 
     async function persistPostToServer(payload) {
