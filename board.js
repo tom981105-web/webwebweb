@@ -41,6 +41,9 @@
     let boardDraftRemoteTimer = null;
     let boardDraftRestoreToken = 0;
     let boardDraftRemoteChain = Promise.resolve();
+    let boardPostsStorageDisabled = false;
+    let boardDraftLocalStorageDisabled = false;
+    let boardDraftSessionStorageDisabled = false;
     const BOARD_DRAFT_STORAGE_PREFIX = 'board_draft_';
     const inMemoryBoardDrafts = Object.create(null);
     const boardDraftRemoteFingerprints = Object.create(null);
@@ -105,17 +108,25 @@
         const serializedDraft = JSON.stringify(draft);
         inMemoryBoardDrafts[storageKey] = serializedDraft;
 
-        try {
-            Storage.prototype.setItem.call(localStorage, storageKey, serializedDraft);
-            Storage.prototype.removeItem.call(sessionStorage, storageKey);
-            return;
-        } catch (error) {
+        if (!boardDraftLocalStorageDisabled) {
+            try {
+                Storage.prototype.setItem.call(localStorage, storageKey, serializedDraft);
+                if (!boardDraftSessionStorageDisabled) {
+                    Storage.prototype.removeItem.call(sessionStorage, storageKey);
+                }
+                return;
+            } catch (error) {
+                boardDraftLocalStorageDisabled = true;
+            }
         }
 
-        try {
-            Storage.prototype.setItem.call(sessionStorage, storageKey, serializedDraft);
-        } catch (error) {
-            console.warn('[Board] 임시저장 초과로 메모리 보관만 유지합니다.', error);
+        if (!boardDraftSessionStorageDisabled) {
+            try {
+                Storage.prototype.setItem.call(sessionStorage, storageKey, serializedDraft);
+                return;
+            } catch (error) {
+                boardDraftSessionStorageDisabled = true;
+            }
         }
     }
 
@@ -741,10 +752,11 @@ function setupCommentStickerPicker() {
 
     function savePosts() {
         const serializedPosts = JSON.stringify(boardPosts);
+        if (boardPostsStorageDisabled) return;
         try {
-            localStorage.setItem('board_posts', serializedPosts);
+            Storage.prototype.setItem.call(localStorage, 'board_posts', serializedPosts);
         } catch (error) {
-            console.warn('[Board] 브라우저 저장 한도를 넘어 게시글 캐시를 메모리로 유지합니다.', error);
+            boardPostsStorageDisabled = true;
         }
     }
 

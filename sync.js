@@ -2,7 +2,9 @@
 (function () {
     let resolveInitialSync;
     const volatileState = Object.create(null);
-    const REMOTE_PUSH_EXCLUDED_KEYS = new Set(['current_user', 'board_posts']);
+    const REMOTE_PUSH_EXCLUDED_KEYS = new Set(['current_user', 'board_posts', 'board_drafts']);
+    const VOLATILE_ONLY_KEYS = new Set(['board_posts', 'board_drafts']);
+    const quotaLimitedKeys = new Set();
     const initialSyncPromise = new Promise((resolve) => {
         resolveInitialSync = resolve;
     });
@@ -31,13 +33,18 @@
     }
 
     function writeWithoutSync(key, value) {
+        if (VOLATILE_ONLY_KEYS.has(key) || quotaLimitedKeys.has(key)) {
+            volatileState[key] = value;
+            return;
+        }
+
         try {
             Storage.prototype.setItem.call(localStorage, key, value);
             delete volatileState[key];
         } catch (error) {
             if (isQuotaExceededError(error)) {
+                quotaLimitedKeys.add(key);
                 volatileState[key] = value;
-                console.warn(`[Sync] localStorage 용량 한도로 ${key} 값을 메모리에 유지합니다.`, error);
                 return;
             }
             throw error;
@@ -85,13 +92,20 @@
     const originalSetItem = localStorage.setItem.bind(localStorage);
     const originalGetItem = localStorage.getItem.bind(localStorage);
     localStorage.setItem = function (key, value) {
+        if (VOLATILE_ONLY_KEYS.has(key) || quotaLimitedKeys.has(key)) {
+            volatileState[key] = value;
+            if (REMOTE_PUSH_EXCLUDED_KEYS.has(key)) return;
+            pushChange(key, value);
+            return;
+        }
+
         try {
             originalSetItem(key, value);
             delete volatileState[key];
         } catch (error) {
             if (isQuotaExceededError(error)) {
+                quotaLimitedKeys.add(key);
                 volatileState[key] = value;
-                console.warn(`[Sync] localStorage 저장 한도를 넘어 ${key} 값을 메모리에 유지합니다.`, error);
             } else {
                 throw error;
             }
