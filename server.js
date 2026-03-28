@@ -21,7 +21,7 @@ const LIVE_DB_KEY = 'system/database.json';
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '150mb' }));
 
 ensureDataLayout();
 
@@ -118,6 +118,37 @@ function normalizeBoardPosts(value, categories) {
         comments: Array.isArray(post.comments) ? post.comments : [],
         category: categories.includes(post.category) ? post.category : categories[0]
     }));
+}
+
+function createBoardDraftKey(userId, postId) {
+    const normalizedUserId = String(userId || '').trim();
+    const normalizedPostId = Number(postId || 0);
+    return `${normalizedUserId}::${normalizedPostId > 0 ? `edit_${normalizedPostId}` : 'new'}`;
+}
+
+function normalizeBoardDrafts(value, categories) {
+    const source = value && typeof value === 'object' ? value : {};
+    const normalized = {};
+
+    Object.entries(source).forEach(([key, draft]) => {
+        if (!draft || typeof draft !== 'object') return;
+        const userId = String(draft.userId || '').trim();
+        if (!userId) return;
+
+        const normalizedPostId = Number(draft.postId || 0);
+        const normalizedKey = createBoardDraftKey(userId, normalizedPostId);
+        normalized[normalizedKey] = {
+            userId,
+            postId: normalizedPostId > 0 ? normalizedPostId : null,
+            title: String(draft.title || ''),
+            content: normalizeBoardContent(draft.content || ''),
+            category: categories.includes(draft.category) ? draft.category : categories[0],
+            isNotice: Boolean(draft.isNotice),
+            updatedAt: draft.updatedAt || new Date().toISOString()
+        };
+    });
+
+    return normalized;
 }
 
 function normalizeBanners(value) {
@@ -441,6 +472,7 @@ function normalizeRawDb(raw) {
         board: {
             categories,
             posts: normalizeBoardPosts(safeParseJson(raw.board_posts, raw.board_posts || []), categories),
+            drafts: normalizeBoardDrafts(safeParseJson(raw.board_drafts, raw.board_drafts || {}), categories),
             likedPosts: safeParseJson(raw.liked_posts, raw.liked_posts || []),
             dislikedPosts: safeParseJson(raw.disliked_posts, raw.disliked_posts || [])
         },
@@ -485,6 +517,13 @@ function createLegacyPayloadFromState(state) {
         __meta: {
             updatedAt: new Date().toISOString()
         }
+    };
+}
+
+function createPersistedRawDbFromState(state) {
+    return {
+        ...createLegacyPayloadFromState(state),
+        board_drafts: state.board.drafts
     };
 }
 
@@ -551,7 +590,7 @@ function loadStateFromDisk() {
 
 async function persistDb() {
     await repairBoardPostsInState();
-    rawDb = createLegacyPayloadFromState(state);
+    rawDb = createPersistedRawDbFromState(state);
     fs.writeFileSync(DB_FILE, JSON.stringify(rawDb, null, 2));
     await mirrorDatabaseToRemote();
 }
@@ -600,6 +639,8 @@ function applyLegacySyncWrite(key, value) {
         // Board posts are now managed only through the dedicated /api/board/posts APIs.
         // Ignoring legacy sync writes here prevents stale browser caches from overwriting
         // live posts during redeploys, reloads, or cross-feature localStorage sync flows.
+        break;
+    case 'board_drafts':
         break;
     case 'liked_posts':
         state.board.likedPosts = safeParseJson(value, []);
@@ -976,6 +1017,7 @@ app.post('/api/board/posts', async (req, res) => {
     }], state.board.categories)[0];
 
     state.board.posts.push(post);
+    delete state.board.drafts[createBoardDraftKey(post.author, null)];
     await persistDb();
     res.json({ success: true, post });
 });
@@ -994,6 +1036,7 @@ app.put('/api/board/posts/:id', async (req, res) => {
         id
     }], state.board.categories)[0];
 
+    delete state.board.drafts[createBoardDraftKey(state.board.posts[index].author, id)];
     await persistDb();
     res.json({ success: true, post: state.board.posts[index] });
 });
@@ -1002,6 +1045,65 @@ app.delete('/api/board/posts/:id', async (req, res) => {
     reloadDb();
     const id = Number(req.params.id);
     state.board.posts = state.board.posts.filter((item) => Number(item.id) !== id);
+    await persistDb();
+    res.json({ success: true });
+});
+
+app.get('/api/board/drafts', (req, res) => {
+    reloadDb();
+    const userId = String(req.query.user || '').trim();
+    const postId = Number(req.query.postId || 0);
+    if (!userId) {
+        return res.status(400).json({ success: false, message: '사용자 정보가 필요합니다.' });
+    }
+
+    const draft = state.board.drafts[createBoardDraftKey(userId, postId)] || null;
+    res.json({ success: true, draft });
+});
+
+app.post('/api/board/drafts', async (req, res) => {
+    reloadDb();
+    const payload = req.body || {};
+    const userId = String(payload.userId || '').trim();
+    const postId = Number(payload.postId || 0);
+
+    if (!userId) {
+        return res.status(400).json({ success: false, message: '사용자 정보가 필요합니다.' });
+    }
+
+    const draftKey = createBoardDraftKey(userId, postId);
+    const normalizedDraft = normalizeBoardDrafts({
+        [draftKey]: {
+            userId,
+            postId: postId > 0 ? postId : null,
+            title: payload.title || '',
+            content: payload.content || '',
+            category: payload.category || state.board.categories[0],
+            isNotice: Boolean(payload.isNotice),
+            updatedAt: payload.updatedAt || new Date().toISOString()
+        }
+    }, state.board.categories)[draftKey];
+
+    if (!normalizedDraft || (!normalizedDraft.title && !normalizedDraft.content)) {
+        delete state.board.drafts[draftKey];
+        await persistDb();
+        return res.json({ success: true, draft: null });
+    }
+
+    state.board.drafts[draftKey] = normalizedDraft;
+    await persistDb();
+    res.json({ success: true, draft: normalizedDraft });
+});
+
+app.delete('/api/board/drafts', async (req, res) => {
+    reloadDb();
+    const userId = String(req.query.user || '').trim();
+    const postId = Number(req.query.postId || 0);
+    if (!userId) {
+        return res.status(400).json({ success: false, message: '사용자 정보가 필요합니다.' });
+    }
+
+    delete state.board.drafts[createBoardDraftKey(userId, postId)];
     await persistDb();
     res.json({ success: true });
 });

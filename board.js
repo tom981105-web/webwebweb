@@ -38,45 +38,51 @@
     let boardReady = false;
     let boardDraftSaveTimer = null;
     let boardDraftIntervalId = null;
+    let boardDraftRemoteTimer = null;
+    let boardDraftRestoreToken = 0;
+    let boardDraftRemoteChain = Promise.resolve();
     const BOARD_DRAFT_STORAGE_PREFIX = 'board_draft_';
+    const inMemoryBoardDrafts = Object.create(null);
+    const boardDraftRemoteFingerprints = Object.create(null);
+    const boardDraftRemoteVersions = Object.create(null);
 
     function getBoardDraftStorageKey(postId = currentEditingPostId) {
         return `${BOARD_DRAFT_STORAGE_PREFIX}${currentUser}_${postId ? `edit_${postId}` : 'new'}`;
     }
 
-    function readBoardDraft(postId = currentEditingPostId) {
-        const storageKey = getBoardDraftStorageKey(postId);
-        const rawValue = Storage.prototype.getItem.call(localStorage, storageKey)
-            || Storage.prototype.getItem.call(sessionStorage, storageKey);
-        return safeParse(rawValue || 'null', null);
+    function parseDraftUpdatedAt(draft) {
+        const timestamp = Date.parse(draft && draft.updatedAt ? draft.updatedAt : '');
+        return Number.isFinite(timestamp) ? timestamp : 0;
     }
 
-    function clearBoardDraft(postId = currentEditingPostId) {
-        const storageKey = getBoardDraftStorageKey(postId);
-        Storage.prototype.removeItem.call(localStorage, storageKey);
-        Storage.prototype.removeItem.call(sessionStorage, storageKey);
+    function getBoardDraftFingerprint(draft) {
+        if (!draft) return '';
+        return JSON.stringify([
+            draft.postId || null,
+            draft.title || '',
+            draft.content || '',
+            draft.category || '',
+            Boolean(draft.isNotice)
+        ]);
     }
 
-    function persistBoardDraft() {
+    function buildCurrentBoardDraft() {
         const writeModal = document.getElementById('writeModal');
-        if (!writeModal || writeModal.style.display !== 'block') return;
+        if (!writeModal || writeModal.style.display !== 'block') return null;
 
         const titleInput = document.getElementById('postTitle');
         const editor = document.getElementById('richEditor');
         const categoryInput = document.getElementById('postCategory');
         const noticeInput = document.getElementById('isNotice');
-        if (!titleInput || !editor || !categoryInput) return;
+        if (!titleInput || !editor || !categoryInput) return null;
 
         const title = titleInput.value.trim();
         const content = normalizeContentForStorage(editor.innerHTML.trim());
         const isEffectivelyEmpty = !title && (!content || content === '<p><br></p>');
+        if (isEffectivelyEmpty) return null;
 
-        if (isEffectivelyEmpty) {
-            clearBoardDraft(currentEditingPostId);
-            return;
-        }
-
-        const draft = {
+        return {
+            userId: currentUser,
             postId: currentEditingPostId || null,
             title,
             content,
@@ -84,15 +90,217 @@
             isNotice: Boolean(noticeInput && noticeInput.checked),
             updatedAt: new Date().toISOString()
         };
+    }
 
+    function readBoardDraft(postId = currentEditingPostId) {
+        const storageKey = getBoardDraftStorageKey(postId);
+        const rawValue = inMemoryBoardDrafts[storageKey]
+            || Storage.prototype.getItem.call(localStorage, storageKey)
+            || Storage.prototype.getItem.call(sessionStorage, storageKey);
+        return safeParse(rawValue || 'null', null);
+    }
+
+    function cacheBoardDraftLocally(draft, postId = currentEditingPostId) {
+        const storageKey = getBoardDraftStorageKey(postId);
         const serializedDraft = JSON.stringify(draft);
-        const storageKey = getBoardDraftStorageKey(currentEditingPostId);
+        inMemoryBoardDrafts[storageKey] = serializedDraft;
+
         try {
             Storage.prototype.setItem.call(localStorage, storageKey, serializedDraft);
             Storage.prototype.removeItem.call(sessionStorage, storageKey);
+            return;
         } catch (error) {
-            Storage.prototype.setItem.call(sessionStorage, storageKey, serializedDraft);
         }
+
+        try {
+            Storage.prototype.setItem.call(sessionStorage, storageKey, serializedDraft);
+        } catch (error) {
+            console.warn('[Board] 임시저장 초과로 메모리 보관만 유지합니다.', error);
+        }
+    }
+
+    async function fetchBoardDraftFromServer(postId = currentEditingPostId) {
+        const params = new URLSearchParams({ user: currentUser });
+        if (postId) params.set('postId', String(postId));
+        const response = await fetch(getApiUrl(`/api/board/drafts?${params.toString()}`), {
+            cache: 'no-store'
+        });
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || result.success === false) {
+            throw new Error(result.message || '임시저장 데이터를 불러오지 못했습니다.');
+        }
+
+        return result.draft || null;
+    }
+
+    async function saveBoardDraftToServer(draft, options = {}) {
+        if (!draft) return;
+        const body = JSON.stringify({
+            userId: currentUser,
+            postId: draft.postId || null,
+            title: draft.title || '',
+            content: draft.content || '',
+            category: draft.category || activeCategory,
+            isNotice: Boolean(draft.isNotice),
+            updatedAt: draft.updatedAt || new Date().toISOString()
+        });
+
+        const requestOptions = {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body
+        };
+
+        if (options.keepalive && body.length < 60000) {
+            requestOptions.keepalive = true;
+        }
+
+        const response = await fetch(getApiUrl('/api/board/drafts'), requestOptions);
+        if (!response.ok) {
+            let result = {};
+            try {
+                result = await response.json();
+            } catch (error) {
+            }
+            throw new Error(result.message || '임시저장 데이터를 서버에 저장하지 못했습니다.');
+        }
+    }
+
+    async function deleteBoardDraftFromServer(postId = currentEditingPostId, options = {}) {
+        const params = new URLSearchParams({ user: currentUser });
+        if (postId) params.set('postId', String(postId));
+        const requestOptions = { method: 'DELETE' };
+        if (options.keepalive) {
+            requestOptions.keepalive = true;
+        }
+        await fetch(getApiUrl(`/api/board/drafts?${params.toString()}`), requestOptions);
+    }
+
+    function queueRemoteBoardDraftSave(draft, options = {}) {
+        if (!draft) return;
+        const storageKey = getBoardDraftStorageKey(draft.postId);
+        const fingerprint = getBoardDraftFingerprint(draft);
+        const version = boardDraftRemoteVersions[storageKey] || 0;
+        if (!options.force && boardDraftRemoteFingerprints[storageKey] === fingerprint) {
+            return;
+        }
+
+        const runSave = () => {
+            boardDraftRemoteChain = boardDraftRemoteChain.then(async () => {
+                if ((boardDraftRemoteVersions[storageKey] || 0) !== version) {
+                    return;
+                }
+                try {
+                    await saveBoardDraftToServer(draft, options);
+                    boardDraftRemoteFingerprints[storageKey] = fingerprint;
+                } catch (error) {
+                    console.warn('[Board] 서버 임시저장에 실패했습니다.', error);
+                }
+            });
+        };
+
+        if (options.immediate) {
+            runSave();
+            return;
+        }
+
+        window.clearTimeout(boardDraftRemoteTimer);
+        boardDraftRemoteTimer = window.setTimeout(runSave, 350);
+    }
+
+    async function hydrateBoardDraftFromServer(postId = currentEditingPostId) {
+        const restoreToken = ++boardDraftRestoreToken;
+        const localDraft = readBoardDraft(postId);
+
+        try {
+            const remoteDraft = await fetchBoardDraftFromServer(postId);
+            const writeModal = document.getElementById('writeModal');
+            if (!writeModal || writeModal.style.display !== 'block' || restoreToken !== boardDraftRestoreToken) {
+                return false;
+            }
+            if ((postId || null) !== (currentEditingPostId || null)) {
+                return false;
+            }
+            if (!remoteDraft) {
+                return Boolean(localDraft);
+            }
+
+            const remoteFingerprint = getBoardDraftFingerprint(remoteDraft);
+            boardDraftRemoteFingerprints[getBoardDraftStorageKey(postId)] = remoteFingerprint;
+            cacheBoardDraftLocally(remoteDraft, postId);
+
+            if (!localDraft || parseDraftUpdatedAt(remoteDraft) >= parseDraftUpdatedAt(localDraft)) {
+                const titleInput = document.getElementById('postTitle');
+                const editor = document.getElementById('richEditor');
+                const categoryInput = document.getElementById('postCategory');
+                const noticeInput = document.getElementById('isNotice');
+                if (!titleInput || !editor || !categoryInput) return false;
+
+                titleInput.value = remoteDraft.title || '';
+                editor.innerHTML = resolveContentForDisplay(remoteDraft.content || '<p><br></p>');
+                categoryInput.value = remoteDraft.category || activeCategory;
+                if (noticeInput) noticeInput.checked = Boolean(remoteDraft.isNotice);
+                bindEditorImages();
+                return true;
+            }
+        } catch (error) {
+            console.warn('[Board] 서버 임시저장을 불러오지 못했습니다.', error);
+        }
+
+        return Boolean(localDraft);
+    }
+
+    function clearBoardDraft(postId = currentEditingPostId, options = {}) {
+        const storageKey = getBoardDraftStorageKey(postId);
+        const hadDraft = Boolean(
+            inMemoryBoardDrafts[storageKey]
+            || Storage.prototype.getItem.call(localStorage, storageKey)
+            || Storage.prototype.getItem.call(sessionStorage, storageKey)
+            || boardDraftRemoteFingerprints[storageKey]
+            || options.force
+        );
+
+        boardDraftRemoteVersions[storageKey] = (boardDraftRemoteVersions[storageKey] || 0) + 1;
+        window.clearTimeout(boardDraftRemoteTimer);
+        delete inMemoryBoardDrafts[storageKey];
+        delete boardDraftRemoteFingerprints[storageKey];
+        Storage.prototype.removeItem.call(localStorage, storageKey);
+        Storage.prototype.removeItem.call(sessionStorage, storageKey);
+
+        if (options.remote !== false && hadDraft) {
+            void deleteBoardDraftFromServer(postId, {
+                keepalive: Boolean(options.keepalive)
+            }).catch((error) => {
+                console.warn('[Board] 서버 임시저장 삭제에 실패했습니다.', error);
+            });
+        }
+    }
+
+    function persistBoardDraft(options = {}) {
+        const draft = buildCurrentBoardDraft();
+        if (!draft) {
+            clearBoardDraft(currentEditingPostId, {
+                remote: options.remote !== false,
+                keepalive: Boolean(options.keepalive)
+            });
+            return null;
+        }
+
+        cacheBoardDraftLocally(draft, currentEditingPostId);
+        if (options.remote !== false) {
+            queueRemoteBoardDraftSave(draft, {
+                immediate: Boolean(options.immediateRemote),
+                keepalive: Boolean(options.keepalive),
+                force: Boolean(options.forceRemote)
+            });
+        }
+        return draft;
     }
 
     function queueBoardDraftSave() {
@@ -1041,6 +1249,7 @@ function setupCommentStickerPicker() {
         document.getElementById('richEditor').innerHTML = '<p><br></p>';
         if (options.restoreDraft !== false) {
             restoreBoardDraft(null);
+            void hydrateBoardDraftFromServer(null);
         }
     };
 
@@ -1146,6 +1355,11 @@ function setupCommentStickerPicker() {
         clearBoardDraft(currentEditingPostId);
         activeCategory = category;
         renderBoard(currentSearchType, currentSearchQuery);
+        clearBoardDraft(currentEditingPostId, {
+            remote: true,
+            keepalive: true,
+            force: true
+        });
         closeWriteModal({ preserveDraft: false });
     };
 
@@ -1153,7 +1367,13 @@ function setupCommentStickerPicker() {
     document.getElementById('postCategory').addEventListener('change', queueBoardDraftSave);
     document.getElementById('isNotice').addEventListener('change', queueBoardDraftSave);
     document.getElementById('richEditor').addEventListener('input', queueBoardDraftSave);
-    window.addEventListener('beforeunload', persistBoardDraft);
+    window.addEventListener('beforeunload', () => {
+        persistBoardDraft({
+            remote: true,
+            immediateRemote: true,
+            keepalive: true
+        });
+    });
 
     const boardListView = document.getElementById('boardListView');
     const boardDetailView = document.getElementById('boardDetailView');
@@ -1546,6 +1766,7 @@ window.closeDetailModal = function () {
         if (submitButton) submitButton.innerText = '수정 저장';
         bindEditorImages();
         restoreBoardDraft(post.id);
+        void hydrateBoardDraftFromServer(post.id);
     };
 
     async function persistVotes(post, fallbackPost) {
