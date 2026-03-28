@@ -37,6 +37,7 @@
     let resizeStartWidth = 0;
     let boardReady = false;
     let boardDraftSaveTimer = null;
+    let boardDraftIntervalId = null;
     const BOARD_DRAFT_STORAGE_PREFIX = 'board_draft_';
 
     function getBoardDraftStorageKey(postId = currentEditingPostId) {
@@ -96,7 +97,19 @@
 
     function queueBoardDraftSave() {
         window.clearTimeout(boardDraftSaveTimer);
-        boardDraftSaveTimer = window.setTimeout(persistBoardDraft, 500);
+        boardDraftSaveTimer = window.setTimeout(persistBoardDraft, 150);
+    }
+
+    function startBoardDraftInterval() {
+        window.clearInterval(boardDraftIntervalId);
+        boardDraftIntervalId = window.setInterval(() => {
+            persistBoardDraft();
+        }, 3000);
+    }
+
+    function stopBoardDraftInterval() {
+        window.clearInterval(boardDraftIntervalId);
+        boardDraftIntervalId = null;
     }
 
     function restoreBoardDraft(postId = currentEditingPostId) {
@@ -598,6 +611,7 @@ function setupCommentStickerPicker() {
         selectedEditorImage.style.width = `${nextWidth}px`;
         selectedEditorImage.style.maxWidth = '100%';
         selectedEditorImage.style.height = 'auto';
+        queueBoardDraftSave();
     }
 
     function focusEditorForInsertion() {
@@ -676,6 +690,7 @@ function setupCommentStickerPicker() {
         const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 820px); height:auto; border-radius:8px; margin:15px auto; display:block;">`;
         document.execCommand('insertHTML', false, html);
         bindEditorImages();
+        queueBoardDraftSave();
     }
 
     function extractYoutubeVideoId(value) {
@@ -714,6 +729,7 @@ function setupCommentStickerPicker() {
         if (!videoId) return false;
         focusEditorForInsertion();
         document.execCommand('insertHTML', false, createYoutubeEmbedHtml(videoId, url));
+        queueBoardDraftSave();
         return true;
     }
 
@@ -967,6 +983,7 @@ function setupCommentStickerPicker() {
         if (!ensureBoardReady()) return;
         if (!writeModal) return;
         writeModal.style.display = 'block';
+        startBoardDraftInterval();
         clearSelectedEditorImage();
         document.getElementById('postTitle').focus();
         const noticeToggle = document.getElementById('noticeToggleContainer');
@@ -987,6 +1004,7 @@ function setupCommentStickerPicker() {
 
     window.closeWriteModal = function (options = {}) {
         if (!writeModal) return;
+        stopBoardDraftInterval();
         if (options.preserveDraft !== false) {
             persistBoardDraft();
         }
