@@ -597,7 +597,9 @@ function applyLegacySyncWrite(key, value) {
         state.users = normalizeUsers(safeParseJson(value, {}));
         break;
     case 'board_posts':
-        state.board.posts = normalizeBoardPosts(safeParseJson(value, []), state.board.categories);
+        // Board posts are now managed only through the dedicated /api/board/posts APIs.
+        // Ignoring legacy sync writes here prevents stale browser caches from overwriting
+        // live posts during redeploys, reloads, or cross-feature localStorage sync flows.
         break;
     case 'liked_posts':
         state.board.likedPosts = safeParseJson(value, []);

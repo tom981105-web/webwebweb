@@ -2,6 +2,7 @@
 (function () {
     let resolveInitialSync;
     const volatileState = Object.create(null);
+    const REMOTE_PUSH_EXCLUDED_KEYS = new Set(['current_user', 'board_posts']);
     const initialSyncPromise = new Promise((resolve) => {
         resolveInitialSync = resolve;
     });
@@ -95,7 +96,7 @@
                 throw error;
             }
         }
-        if (key === 'current_user') return;
+        if (REMOTE_PUSH_EXCLUDED_KEYS.has(key)) return;
         pushChange(key, value);
     };
 
@@ -116,7 +117,7 @@
                 throw error;
             }
         }
-        if (key === 'current_user') return;
+        if (REMOTE_PUSH_EXCLUDED_KEYS.has(key)) return;
         pushChange(key, null);
     };
 

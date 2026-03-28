@@ -531,27 +531,12 @@ function setupCommentStickerPicker() {
     });
 }
 
-    function pushBoardPostsDirectly(serializedPosts) {
-        fetch(getApiUrl('/api/sync'), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            keepalive: true,
-            body: JSON.stringify({
-                key: 'board_posts',
-                value: serializedPosts
-            })
-        }).catch((error) => {
-            console.warn('[Board] 게시글 서버 저장에 실패했습니다.', error);
-        });
-    }
-
     function savePosts() {
         const serializedPosts = JSON.stringify(boardPosts);
         try {
             localStorage.setItem('board_posts', serializedPosts);
         } catch (error) {
-            console.warn('[Board] 브라우저 저장 한도를 넘어 서버로 직접 저장합니다.', error);
-            pushBoardPostsDirectly(serializedPosts);
+            console.warn('[Board] 브라우저 저장 한도를 넘어 게시글 캐시를 메모리로 유지합니다.', error);
         }
     }
 
@@ -574,6 +559,63 @@ function setupCommentStickerPicker() {
         }
 
         return normalizePost(result.post);
+    }
+
+    async function fetchBoardPostsFromServer() {
+        const response = await fetch(getApiUrl('/api/board/posts'), { cache: 'no-store' });
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || !Array.isArray(result.posts)) {
+            throw new Error(result.message || '게시글 목록을 불러오지 못했습니다.');
+        }
+
+        return result.posts.map(normalizePost);
+    }
+
+    async function persistExistingPost(post) {
+        if (!post || !post.id) throw new Error('저장할 게시글이 없습니다.');
+        const response = await fetch(getApiUrl(`/api/board/posts/${post.id}`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(post)
+        });
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || !result.post) {
+            throw new Error(result.message || '게시글 변경을 저장하지 못했습니다.');
+        }
+
+        return normalizePost(result.post);
+    }
+
+    async function deletePostFromServer(postId) {
+        const response = await fetch(getApiUrl(`/api/board/posts/${postId}`), {
+            method: 'DELETE'
+        });
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || result.success === false) {
+            throw new Error(result.message || '게시글을 삭제하지 못했습니다.');
+        }
+    }
+
+    function replaceBoardPost(savedPost) {
+        boardPosts = boardPosts.map((post) => post.id === savedPost.id ? savedPost : post);
+        return savedPost;
     }
 
     function normalizePost(post) {
@@ -1291,7 +1333,7 @@ function setupCommentStickerPicker() {
         }
     };
 
-    window.submitReply = function (event, index) {
+    window.submitReply = async function (event, index) {
         event.preventDefault();
         if (!ensureBoardReady() || !currentOpenPostId || !currentUser || currentUser === '익명') return;
 
@@ -1301,6 +1343,7 @@ function setupCommentStickerPicker() {
 
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post || !Array.isArray(post.comments) || !post.comments[index]) return;
+        const previousPost = JSON.parse(JSON.stringify(post));
 
         post.comments[index].reply = {
             author: currentUser,
@@ -1317,13 +1360,21 @@ function setupCommentStickerPicker() {
             });
         }
 
+        try {
+            replaceBoardPost(await persistExistingPost(post));
+        } catch (error) {
+            replaceBoardPost(previousPost);
+            alert(error.message || '답글 저장에 실패했습니다.');
+            return;
+        }
+
         savePosts();
-        renderComments(post);
+        renderComments(boardPosts.find((item) => item.id === currentOpenPostId));
         renderBoard(currentSearchType, currentSearchQuery);
         updateDetailNavigation(post.id);
     };
 
-    window.submitCommentEdit = function (event, index) {
+    window.submitCommentEdit = async function (event, index) {
         event.preventDefault();
         if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
@@ -1333,15 +1384,23 @@ function setupCommentStickerPicker() {
         const input = document.getElementById(`commentEditInput-${index}`);
         const text = input ? input.value.trim() : '';
         if (!text) return;
+        const previousPost = JSON.parse(JSON.stringify(post));
         targetComment.text = text;
         targetComment.editedAt = new Date().toLocaleString('ko-KR');
+        try {
+            replaceBoardPost(await persistExistingPost(post));
+        } catch (error) {
+            replaceBoardPost(previousPost);
+            alert(error.message || '댓글 수정에 실패했습니다.');
+            return;
+        }
         savePosts();
-        renderComments(post);
+        renderComments(boardPosts.find((item) => item.id === currentOpenPostId));
         renderBoard(currentSearchType, currentSearchQuery);
         updateDetailNavigation(post.id);
     };
 
-    window.submitReplyEdit = function (event, index) {
+    window.submitReplyEdit = async function (event, index) {
         event.preventDefault();
         if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
@@ -1350,36 +1409,60 @@ function setupCommentStickerPicker() {
         const input = document.getElementById(`replyEditInput-${index}`);
         const text = input ? input.value.trim() : '';
         if (!text) return;
+        const previousPost = JSON.parse(JSON.stringify(post));
         post.comments[index].reply.text = text;
         post.comments[index].reply.editedAt = new Date().toLocaleString('ko-KR');
+        try {
+            replaceBoardPost(await persistExistingPost(post));
+        } catch (error) {
+            replaceBoardPost(previousPost);
+            alert(error.message || '답글 수정에 실패했습니다.');
+            return;
+        }
         savePosts();
-        renderComments(post);
+        renderComments(boardPosts.find((item) => item.id === currentOpenPostId));
         renderBoard(currentSearchType, currentSearchQuery);
         updateDetailNavigation(post.id);
     };
 
-    window.deleteComment = function (index) {
+    window.deleteComment = async function (index) {
         if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post || !post.comments[index]) return;
         if (currentUser !== 'admin' && currentUser !== post.comments[index].author) return;
         if (!confirm('이 댓글을 삭제하시겠습니까?')) return;
+        const previousPost = JSON.parse(JSON.stringify(post));
         post.comments.splice(index, 1);
+        try {
+            replaceBoardPost(await persistExistingPost(post));
+        } catch (error) {
+            replaceBoardPost(previousPost);
+            alert(error.message || '댓글 삭제에 실패했습니다.');
+            return;
+        }
         savePosts();
-        renderComments(post);
+        renderComments(boardPosts.find((item) => item.id === currentOpenPostId));
         renderBoard(currentSearchType, currentSearchQuery);
         updateDetailNavigation(post.id);
     };
 
-    window.deleteReply = function (index) {
+    window.deleteReply = async function (index) {
         if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post || !post.comments[index] || !post.comments[index].reply) return;
         if (currentUser !== 'admin' && currentUser !== post.comments[index].reply.author) return;
         if (!confirm('이 답글을 삭제하시겠습니까?')) return;
+        const previousPost = JSON.parse(JSON.stringify(post));
         delete post.comments[index].reply;
+        try {
+            replaceBoardPost(await persistExistingPost(post));
+        } catch (error) {
+            replaceBoardPost(previousPost);
+            alert(error.message || '답글 삭제에 실패했습니다.');
+            return;
+        }
         savePosts();
-        renderComments(post);
+        renderComments(boardPosts.find((item) => item.id === currentOpenPostId));
         renderBoard(currentSearchType, currentSearchQuery);
         updateDetailNavigation(post.id);
     };
@@ -1390,6 +1473,14 @@ function setupCommentStickerPicker() {
         if (!post || !boardDetailView) return;
         post.views = (post.views || 0) + 1;
         savePosts();
+        persistExistingPost(post).then((savedPost) => {
+            replaceBoardPost(savedPost);
+            if (currentOpenPostId === savedPost.id) {
+                document.getElementById('detailViews').innerText = savedPost.views || 0;
+                renderBoard(currentSearchType, currentSearchQuery);
+                updateDetailNavigation(savedPost.id);
+            }
+        }).catch(() => {});
         currentOpenPostId = id;
         activeCategory = post.category || boardCategories[0];
         document.getElementById('detailTitle').innerText = post.title || '제목 없음';
@@ -1457,18 +1548,33 @@ window.closeDetailModal = function () {
         restoreBoardDraft(post.id);
     };
 
-    function persistVotes() {
+    async function persistVotes(post, fallbackPost) {
         localStorage.setItem('liked_posts', JSON.stringify(likedPosts));
         localStorage.setItem('disliked_posts', JSON.stringify(dislikedPosts));
+        try {
+            if (post) {
+                replaceBoardPost(await persistExistingPost(post));
+            }
+        } catch (error) {
+            if (fallbackPost) {
+                replaceBoardPost(fallbackPost);
+            }
+            alert(error.message || '추천 상태 저장에 실패했습니다.');
+            return false;
+        }
         savePosts();
         renderBoard(currentSearchType, currentSearchQuery);
         updateDetailNavigation(currentOpenPostId);
+        return true;
     }
 
-    window.toggleLike = function () {
+    window.toggleLike = async function () {
         if (!currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post) return;
+        const previousPost = JSON.parse(JSON.stringify(post));
+        const previousLikedPosts = [...likedPosts];
+        const previousDislikedPosts = [...dislikedPosts];
         if (likedPosts.includes(post.id)) {
             post.likes = Math.max(0, (post.likes || 0) - 1);
             likedPosts = likedPosts.filter((id) => id !== post.id);
@@ -1481,13 +1587,21 @@ window.closeDetailModal = function () {
             }
         }
         updateVoteUI(post);
-        persistVotes();
+        const success = await persistVotes(post, previousPost);
+        if (!success) {
+            likedPosts = previousLikedPosts;
+            dislikedPosts = previousDislikedPosts;
+            updateVoteUI(previousPost);
+        }
     };
 
-    window.toggleDislike = function () {
+    window.toggleDislike = async function () {
         if (!currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         if (!post) return;
+        const previousPost = JSON.parse(JSON.stringify(post));
+        const previousLikedPosts = [...likedPosts];
+        const previousDislikedPosts = [...dislikedPosts];
         if (dislikedPosts.includes(post.id)) {
             post.dislikes = Math.max(0, (post.dislikes || 0) - 1);
             dislikedPosts = dislikedPosts.filter((id) => id !== post.id);
@@ -1500,10 +1614,15 @@ window.closeDetailModal = function () {
             }
         }
         updateVoteUI(post);
-        persistVotes();
+        const success = await persistVotes(post, previousPost);
+        if (!success) {
+            likedPosts = previousLikedPosts;
+            dislikedPosts = previousDislikedPosts;
+            updateVoteUI(previousPost);
+        }
     };
 
-document.getElementById('commentForm').onsubmit = function (event) {
+document.getElementById('commentForm').onsubmit = async function (event) {
     event.preventDefault();
     if (!ensureBoardReady() || !currentOpenPostId) return;
     const input = document.getElementById('commentInput');
@@ -1511,6 +1630,7 @@ document.getElementById('commentForm').onsubmit = function (event) {
     if (!text) return;
     const post = boardPosts.find((item) => item.id === currentOpenPostId);
     if (!post) return;
+    const previousPost = JSON.parse(JSON.stringify(post));
     post.comments = Array.isArray(post.comments) ? post.comments : [];
     post.comments.push({ author: currentUser, text, date: new Date().toLocaleString('ko-KR') });
         if (typeof window.createUserNotification === 'function' && post.author && post.author !== currentUser) {
@@ -1521,8 +1641,15 @@ document.getElementById('commentForm').onsubmit = function (event) {
                 link: `board.html?id=${post.id}`
             });
         }
+    try {
+        replaceBoardPost(await persistExistingPost(post));
+    } catch (error) {
+        replaceBoardPost(previousPost);
+        alert(error.message || '댓글 저장에 실패했습니다.');
+        return;
+    }
     savePosts();
-    renderComments(post);
+    renderComments(boardPosts.find((item) => item.id === currentOpenPostId));
     input.value = '';
     closeCommentStickerPanel();
     renderBoard(currentSearchType, currentSearchQuery);
@@ -1590,10 +1717,14 @@ document.getElementById('richEditor').addEventListener('click', (event) => {
         if (!post) return;
         if (post.author !== currentUser && currentUser !== 'admin') return;
         if (!confirm('이 게시글을 삭제하시겠습니까?')) return;
-        boardPosts = boardPosts.filter((item) => item.id !== currentOpenPostId);
-        savePosts();
-        closeDetailModal();
-        renderBoard(currentSearchType, currentSearchQuery);
+        deletePostFromServer(currentOpenPostId).then(() => {
+            boardPosts = boardPosts.filter((item) => item.id !== currentOpenPostId);
+            savePosts();
+            closeDetailModal();
+            renderBoard(currentSearchType, currentSearchQuery);
+        }).catch((error) => {
+            alert(error.message || '게시글 삭제에 실패했습니다.');
+        });
     };
 
     document.getElementById('boardCategoryMenu').addEventListener('click', (event) => {
@@ -1626,11 +1757,20 @@ document.getElementById('richEditor').addEventListener('click', (event) => {
         }
 
         loadBoardCategories();
-        boardPosts = safeParse(localStorage.getItem('board_posts') || '[]', []).map(normalizePost);
+        let loadedFromServer = false;
+        try {
+            boardPosts = await fetchBoardPostsFromServer();
+            loadedFromServer = true;
+        } catch (error) {
+            boardPosts = safeParse(localStorage.getItem('board_posts') || '[]', []).map(normalizePost);
+        }
         if (!boardPosts.length) {
             ensureSeedPosts();
-            savePosts();
+            if (!loadedFromServer) {
+                savePosts();
+            }
         }
+        savePosts();
 
         renderCategoryControls();
         renderBoard(currentSearchType, currentSearchQuery);
