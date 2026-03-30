@@ -7,17 +7,27 @@ type LeaderboardPanelProps = {
   entries: LeaderboardEntry[];
   sortMode: LeaderboardSortMode;
   onSortChange: (mode: LeaderboardSortMode) => void;
+  isRemote?: boolean;
 };
 
-export function LeaderboardPanel({ entries, sortMode, onSortChange }: LeaderboardPanelProps) {
+export function LeaderboardPanel({
+  entries,
+  sortMode,
+  onSortChange,
+  isRemote = false,
+}: LeaderboardPanelProps) {
   const sortedEntries = [...entries].sort((left, right) =>
     sortMode === 'returnRate' ? right.returnRate - left.returnRate : right.netWorth - left.netWorth,
   );
 
   return (
     <Panel
-      title="랭킹 프리뷰"
-      subtitle="친구 3명 경쟁 구조를 붙이기 쉽도록 현재는 로컬 프리뷰 형태의 리더보드를 유지하고 있습니다."
+      title="실시간 랭킹"
+      subtitle={
+        isRemote
+          ? '서버에 저장된 참가자 최신 스냅샷을 기준으로 자산과 수익률을 함께 보여줍니다.'
+          : '로컬 프리뷰 데이터를 기반으로 현재 화면용 리더보드를 보여줍니다.'
+      }
       icon={<Trophy className="ss-h-5 ss-w-5" />}
       action={
         <div className="ss-inline-flex ss-rounded-full ss-border ss-border-white/10 ss-bg-white/5 ss-p-1">
@@ -64,7 +74,9 @@ export function LeaderboardPanel({ entries, sortMode, onSortChange }: Leaderboar
                 <p className="ss-mt-1 ss-text-xs ss-text-slate-400">
                   {entry.focusSectors.length > 0
                     ? entry.focusSectors.join(' · ')
-                    : '현재 플레이어'}
+                    : entry.kind === 'current-user'
+                      ? '현재 플레이어'
+                      : '참가자'}
                 </p>
               </div>
             </div>
@@ -93,8 +105,9 @@ export function LeaderboardPanel({ entries, sortMode, onSortChange }: Leaderboar
         ))}
 
         <div className="ss-ui-soft-card ss-rounded-[22px] ss-p-4 ss-text-xs ss-leading-6 ss-text-slate-400">
-          현재는 로컬 프리뷰 랭킹입니다. 이후 멀티플레이 연결 시 플레이어별 자산, 포트폴리오,
-          시즌 기록, 친구 리더보드로 자연스럽게 확장할 수 있습니다.
+          {isRemote
+            ? '현재는 관리자 전용 멀티 참가 구조로 열려 있으며, 참가자별 최신 스냅샷과 랭킹 요약만 서버에 저장해서 저장소 부담을 최소화하고 있습니다.'
+            : '현재는 로컬 프리뷰 리더보드입니다. 서버 참가 세션과 연결되면 실시간 참가자 기준으로 자연스럽게 확장됩니다.'}
         </div>
       </div>
     </Panel>

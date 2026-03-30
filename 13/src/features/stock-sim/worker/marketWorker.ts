@@ -270,6 +270,12 @@ function handleMessage(message: MarketWorkerInboundMessage) {
       initializeSimulation(message.payload.persistedSnapshot);
       return;
 
+    case 'HYDRATE_PERSISTED_SNAPSHOT':
+      initializeSimulation(message.payload.persistedSnapshot);
+      publishSnapshot('manual', undefined, true);
+      publishPersistenceSnapshot(true);
+      return;
+
     case 'START_SIMULATION':
       updateRuntimeState(
         (current) => ({

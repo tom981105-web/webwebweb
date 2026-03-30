@@ -20,6 +20,8 @@ const { uploadBackupToR2 } = require('./r2-backup');
 const LIVE_DB_KEY = 'system/database.json';
 const BOARD_POST_STATE_PREFIX = 'system/board-posts/';
 const BOARD_DRAFT_STATE_PREFIX = 'system/board-drafts/';
+const STOCK_SIM_PARTICIPANT_LIMIT = 12;
+const STOCK_SIM_STALE_MS = 1000 * 60 * 60 * 24 * 14;
 
 const app = express();
 app.use(cors());
@@ -301,6 +303,193 @@ function normalizeAiPromptEntries(value) {
             updatedAt: String(prompt && prompt.updatedAt || prompt && prompt.createdAt || inferredDate || '')
         };
     });
+}
+
+function getStockSimSummaryTimestamp(value) {
+    const timestamp = Date.parse(String(value || ''));
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function getStockSimFocusSectorsFromSnapshot(snapshot) {
+    const simulation = snapshot && snapshot.simulation && typeof snapshot.simulation === 'object'
+        ? snapshot.simulation
+        : {};
+    const stocks = Array.isArray(simulation.stocks) ? simulation.stocks : [];
+    const holdings = simulation.player && Array.isArray(simulation.player.holdings)
+        ? simulation.player.holdings
+        : [];
+    const stockMap = new Map(
+        stocks.map((stock) => [
+            String(stock && stock.id || ''),
+            {
+                sector: String(stock && stock.sector || ''),
+                currentPrice: Number(stock && stock.currentPrice || 0)
+            }
+        ])
+    );
+    const sectorScores = new Map();
+
+    holdings.forEach((holding) => {
+        const stockInfo = stockMap.get(String(holding && holding.stockId || ''));
+        if (!stockInfo || !stockInfo.sector) return;
+        const score = Number(holding && holding.quantity || 0) * Number(stockInfo.currentPrice || 0);
+        sectorScores.set(stockInfo.sector, (sectorScores.get(stockInfo.sector) || 0) + score);
+    });
+
+    return Array.from(sectorScores.entries())
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 3)
+        .map(([sector]) => sector);
+}
+
+function createEmptyStockSimState() {
+    return {
+        roomId: 'main',
+        updatedAt: '',
+        participants: {}
+    };
+}
+
+function createStockSimSummaryFromSnapshot(userId, snapshot, previousSummary, usersSource = {}) {
+    const simulation = snapshot && snapshot.simulation && typeof snapshot.simulation === 'object'
+        ? snapshot.simulation
+        : {};
+    const leaderboard = Array.isArray(simulation.leaderboard) ? simulation.leaderboard : [];
+    const currentUserEntry = leaderboard.find((entry) => entry && entry.kind === 'current-user');
+    const player = simulation.player && typeof simulation.player === 'object' ? simulation.player : {};
+    const cash = Number(player.cash || 0);
+    const netWorth = Number(currentUserEntry && currentUserEntry.netWorth);
+    const returnRate = Number(currentUserEntry && currentUserEntry.returnRate);
+    const normalizedNetWorth = Number.isFinite(netWorth) ? netWorth : cash;
+    const normalizedReturnRate = Number.isFinite(returnRate) ? returnRate : 0;
+    const previousReturnRate = previousSummary && Number.isFinite(Number(previousSummary.returnRate))
+        ? Number(previousSummary.returnRate)
+        : normalizedReturnRate;
+    const user = usersSource && usersSource[userId] ? usersSource[userId] : null;
+    const displayName = String(
+        user && (user.nickname || user.displayName || userId) || userId
+    ).trim() || userId;
+
+    return {
+        userId,
+        name: displayName,
+        cash,
+        netWorth: normalizedNetWorth,
+        returnRate: normalizedReturnRate,
+        tick: Number(simulation.tick || 0),
+        focusSectors: getStockSimFocusSectorsFromSnapshot(snapshot),
+        lastDelta: normalizedReturnRate - previousReturnRate,
+        savedAt: Number(snapshot && snapshot.savedAt || Date.now()),
+        updatedAt: new Date().toISOString()
+    };
+}
+
+function normalizeStockSimParticipant(userId, participant, usersSource = {}) {
+    if (!participant || typeof participant !== 'object') return null;
+
+    const snapshot =
+        participant.snapshot && typeof participant.snapshot === 'object'
+            ? participant.snapshot
+            : null;
+    if (!snapshot || !snapshot.simulation || typeof snapshot.simulation !== 'object') {
+        return null;
+    }
+
+    const previousSummary =
+        participant.summary && typeof participant.summary === 'object'
+            ? participant.summary
+            : null;
+    const summary = createStockSimSummaryFromSnapshot(userId, snapshot, previousSummary, usersSource);
+
+    return {
+        userId,
+        updatedAt: String(participant.updatedAt || summary.updatedAt || ''),
+        lastActiveAt: String(participant.lastActiveAt || participant.updatedAt || summary.updatedAt || ''),
+        snapshot,
+        summary
+    };
+}
+
+function normalizeStockSimState(value, usersSource = {}) {
+    const source = value && typeof value === 'object' ? value : {};
+    const participants = {};
+    const participantSource =
+        source.participants && typeof source.participants === 'object'
+            ? source.participants
+            : {};
+    const staleThreshold = Date.now() - STOCK_SIM_STALE_MS;
+
+    Object.entries(participantSource).forEach(([userId, participant]) => {
+        const normalized = normalizeStockSimParticipant(String(userId || '').trim(), participant, usersSource);
+        if (!normalized || !normalized.userId) return;
+
+        const lastActiveAt = getStockSimSummaryTimestamp(normalized.lastActiveAt || normalized.updatedAt);
+        if (lastActiveAt && lastActiveAt < staleThreshold) {
+            return;
+        }
+
+        participants[normalized.userId] = normalized;
+    });
+
+    const trimmedParticipants = Object.fromEntries(
+        Object.entries(participants)
+            .sort((left, right) => {
+                const rightTimestamp = getStockSimSummaryTimestamp(right[1].lastActiveAt || right[1].updatedAt);
+                const leftTimestamp = getStockSimSummaryTimestamp(left[1].lastActiveAt || left[1].updatedAt);
+                return rightTimestamp - leftTimestamp;
+            })
+            .slice(0, STOCK_SIM_PARTICIPANT_LIMIT)
+    );
+
+    return {
+        roomId: String(source.roomId || 'main'),
+        updatedAt: String(source.updatedAt || ''),
+        participants: trimmedParticipants
+    };
+}
+
+function createStockSimLeaderboardEntries(currentUserId) {
+    const participants = state.stockSim && state.stockSim.participants && typeof state.stockSim.participants === 'object'
+        ? Object.values(state.stockSim.participants)
+        : [];
+
+    return participants
+        .map((participant) => {
+            const userId = String(participant && participant.userId || '');
+            const summary = participant && participant.summary && typeof participant.summary === 'object'
+                ? participant.summary
+                : {};
+            return {
+                id: `stock-sim-${userId}`,
+                name: String(summary.name || userId || '참가자'),
+                kind: currentUserId && userId.toLowerCase() === currentUserId.toLowerCase()
+                    ? 'current-user'
+                    : 'friend-preview',
+                netWorth: Number(summary.netWorth || 0),
+                returnRate: Number(summary.returnRate || 0),
+                style: state.users && state.users[userId] && state.users[userId].isAdmin
+                    ? '실시간 관리자'
+                    : '실시간 참가자',
+                focusSectors: Array.isArray(summary.focusSectors) ? summary.focusSectors : [],
+                volatility: 0,
+                lastDelta: Number(summary.lastDelta || 0),
+                tick: Number(summary.tick || 0),
+                updatedAt: String(summary.updatedAt || participant.updatedAt || '')
+            };
+        })
+        .sort((left, right) => {
+            if (right.netWorth !== left.netWorth) {
+                return right.netWorth - left.netWorth;
+            }
+            return getStockSimSummaryTimestamp(right.updatedAt) - getStockSimSummaryTimestamp(left.updatedAt);
+        });
+}
+
+function canAccessStockSim(userId) {
+    const normalizedUserId = String(userId || '').trim();
+    if (!normalizedUserId) return false;
+    const userEntry = state.users && state.users[normalizedUserId] ? state.users[normalizedUserId] : null;
+    return Boolean(userEntry && userEntry.isAdmin);
 }
 
 function normalizeBanners(value) {
@@ -619,8 +808,9 @@ function getBannerUploadPaths(banners) {
 
 function normalizeRawDb(raw) {
     const categories = normalizeCategories(safeParseJson(raw.board_categories, raw.board_categories || []));
+    const users = normalizeUsers(safeParseJson(raw.users_db, raw.users_db || {}));
     const normalized = {
-        users: normalizeUsers(safeParseJson(raw.users_db, raw.users_db || {})),
+        users,
         board: {
             categories,
             posts: normalizeBoardPosts(safeParseJson(raw.board_posts, raw.board_posts || []), categories),
@@ -640,6 +830,7 @@ function normalizeRawDb(raw) {
             intervalSeconds: Number.isFinite(Number(raw.login_hero_interval_seconds)) ? Math.min(120, Math.max(3, Number(raw.login_hero_interval_seconds))) : 10,
             randomOrder: Boolean(raw.login_hero_random_order)
         },
+        stockSim: normalizeStockSimState(safeParseJson(raw.stock_sim_state, raw.stock_sim_state || {}), users),
         currentUser: raw.current_user || null,
         notifications: safeParseJson(raw.user_notifications, raw.user_notifications || {}),
         reuseInviteCode: raw.settings_reuse_code === true || raw.settings_reuse_code === 'true' || raw.settings_reuse_code === 1 || raw.settings_reuse_code === '1'
@@ -664,6 +855,7 @@ function createLegacyPayloadFromState(state) {
         login_hero_images: state.loginHero.images,
         login_hero_interval_seconds: state.loginHero.intervalSeconds,
         login_hero_random_order: state.loginHero.randomOrder,
+        stock_sim_state: state.stockSim,
         user_notifications: state.notifications,
         settings_reuse_code: state.reuseInviteCode,
         __meta: {
@@ -1456,6 +1648,99 @@ app.get('/api/ai/prompts', (req, res) => {
     res.json({
         success: true,
         prompts: normalizeAiPromptEntries(state.ai.prompts)
+    });
+});
+
+app.get('/api/stock-sim/session', (req, res) => {
+    reloadDb();
+    const userId = String(req.query.userId || '').trim();
+
+    if (!canAccessStockSim(userId)) {
+        return res.status(403).json({
+            success: false,
+            message: '현재는 관리자만 접근할 수 있습니다.'
+        });
+    }
+
+    state.stockSim = normalizeStockSimState(state.stockSim, state.users);
+    const participant = state.stockSim.participants[userId] || null;
+
+    return res.json({
+        success: true,
+        roomId: state.stockSim.roomId || 'main',
+        participantCount: Object.keys(state.stockSim.participants || {}).length,
+        leaderboard: createStockSimLeaderboardEntries(userId),
+        participant
+    });
+});
+
+app.put('/api/stock-sim/session', async (req, res) => {
+    reloadDb();
+    const userId = String(req.body && req.body.userId || '').trim();
+
+    if (!canAccessStockSim(userId)) {
+        return res.status(403).json({
+            success: false,
+            message: '현재는 관리자만 접근할 수 있습니다.'
+        });
+    }
+
+    const snapshot =
+        req.body && req.body.snapshot && typeof req.body.snapshot === 'object'
+            ? req.body.snapshot
+            : null;
+
+    if (!snapshot || !snapshot.simulation || typeof snapshot.simulation !== 'object') {
+        return res.status(400).json({
+            success: false,
+            message: '저장할 시뮬레이션 스냅샷이 없습니다.'
+        });
+    }
+
+    const previousParticipant = state.stockSim && state.stockSim.participants
+        ? state.stockSim.participants[userId]
+        : null;
+    const previousSummary = previousParticipant && previousParticipant.summary
+        ? previousParticipant.summary
+        : null;
+    const previousSavedAt = Number(previousSummary && previousSummary.savedAt || 0);
+    const incomingSavedAt = Number(snapshot && snapshot.savedAt || 0);
+
+    if (previousParticipant && previousSavedAt && incomingSavedAt && incomingSavedAt <= previousSavedAt) {
+        return res.json({
+            success: true,
+            roomId: state.stockSim.roomId || 'main',
+            participantCount: Object.keys((state.stockSim && state.stockSim.participants) || {}).length,
+            leaderboard: createStockSimLeaderboardEntries(userId),
+            participant: previousParticipant
+        });
+    }
+
+    const nowIso = new Date().toISOString();
+
+    state.stockSim = normalizeStockSimState({
+        ...(state.stockSim || createEmptyStockSimState()),
+        updatedAt: nowIso,
+        participants: {
+            ...((state.stockSim && state.stockSim.participants) || {}),
+            [userId]: {
+                userId,
+                updatedAt: nowIso,
+                lastActiveAt: nowIso,
+                snapshot,
+                summary: createStockSimSummaryFromSnapshot(userId, snapshot, previousSummary, state.users)
+            }
+        }
+    }, state.users);
+
+    await persistDb({ deferRemote: true, skipBoardRepair: true });
+
+    return res.json({
+        success: true,
+        roomId: state.stockSim.roomId || 'main',
+        participantCount: Object.keys(state.stockSim.participants || {}).length,
+        leaderboard: createStockSimLeaderboardEntries(userId),
+        participant: state.stockSim.participants[userId] || null
     });
 });
 

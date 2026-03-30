@@ -23,6 +23,12 @@ export type MarketWorkerInboundMessage =
         persistedSnapshot: PersistedSimulationSnapshot | null;
       };
     }
+  | {
+      type: 'HYDRATE_PERSISTED_SNAPSHOT';
+      payload: {
+        persistedSnapshot: PersistedSimulationSnapshot | null;
+      };
+    }
   | { type: 'START_SIMULATION' }
   | { type: 'PAUSE_SIMULATION' }
   | { type: 'RESET_SIMULATION' }

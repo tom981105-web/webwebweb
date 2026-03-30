@@ -9,6 +9,7 @@ import type {
   StockSortMode,
   ToastMessage,
   UiState,
+  LeaderboardEntry,
 } from '@/features/stock-sim/types';
 import { sectors } from '@/features/stock-sim/types';
 
@@ -65,6 +66,7 @@ export type SimulationUiStore = {
   ui: UiState;
   runtime: RuntimeState;
   toasts: ToastMessage[];
+  remoteLeaderboard: LeaderboardEntry[];
   actions: {
     hydrateUi: (ui: Partial<UiState>) => void;
     setSnapshot: (snapshot: SimulationUiSnapshot) => void;
@@ -78,6 +80,7 @@ export type SimulationUiStore = {
     setStockSort: (sort: StockSortMode) => void;
     setLeaderboardSort: (sort: LeaderboardSortMode) => void;
     setChartTimeframe: (timeframe: ChartTimeframe) => void;
+    setRemoteLeaderboard: (entries: LeaderboardEntry[]) => void;
     updatePersistenceState: (
       savedAt: number | null,
       status: RuntimeState['persistenceStatus'],
@@ -91,6 +94,7 @@ export const useSimulationUiStore = create<SimulationUiStore>((set) => ({
   ui: createDefaultUiState(),
   runtime: createDefaultRuntime(),
   toasts: [],
+  remoteLeaderboard: [],
   actions: {
     hydrateUi: (ui) =>
       set((state) => ({
@@ -199,6 +203,14 @@ export const useSimulationUiStore = create<SimulationUiStore>((set) => ({
         ui: {
           ...state.ui,
           chartTimeframe: timeframe,
+        },
+      })),
+    setRemoteLeaderboard: (entries) =>
+      set((state) => ({
+        remoteLeaderboard: entries,
+        runtime: {
+          ...state.runtime,
+          leaderboardMode: entries.length > 0 ? 'remote' : 'preview',
         },
       })),
     updatePersistenceState: (savedAt, status, hydratedFrom) =>
