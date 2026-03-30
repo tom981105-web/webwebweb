@@ -42,6 +42,23 @@ app.use((req, res, next) => {
 
 ensureDataLayout();
 
+const STOCK_SIM_DIST_DIR = path.resolve(APP_DIR, '13', 'dist');
+
+app.use('/stock-sim-app', express.static(STOCK_SIM_DIST_DIR, {
+    index: false,
+    setHeaders(res, filePath) {
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            return;
+        }
+        res.setHeader('Cache-Control', 'public, max-age=600');
+    }
+}));
+
+app.get(['/stock-sim-app', '/stock-sim-app/'], (req, res) => {
+    res.sendFile(path.join(STOCK_SIM_DIST_DIR, 'index.html'));
+});
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.static(path.resolve(APP_DIR)));
 
