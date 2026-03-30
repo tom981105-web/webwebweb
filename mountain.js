@@ -761,22 +761,25 @@ window.deleteMountain = async function(id) {
     if (!mountain || !canManageMountain(mountain)) return;
     if (!confirm('이 산 기록을 삭제하시겠습니까? 삭제하면 되돌릴 수 없습니다.')) return;
 
-    try {
-        await deleteMountainOnServer(id);
-    } catch (error) {
-        alert(error.message || '산 기록 삭제에 실패했습니다.');
-        return;
-    }
-
-    const updated = getNormalizedMountainsCache()
-        .filter((item) => item.id !== id);
+    const previousMountains = getNormalizedMountainsCache();
+    const updated = previousMountains.filter((item) => item.id !== id);
 
     mountainsMutationVersion += 1;
     saveMountains(updated);
     map.closePopup();
+    closeMtDetailModal();
     renderMarkers();
     renderMountainBoard();
-    closeMtDetailModal();
+
+    try {
+        await deleteMountainOnServer(id);
+    } catch (error) {
+        saveMountains(previousMountains);
+        renderMarkers();
+        renderMountainBoard();
+        alert(error.message || '산 기록 삭제에 실패했습니다.');
+        return;
+    }
     void refreshMountainsFromServer({ attempts: 1, delayMs: 100 }).catch(() => {});
 };
 
