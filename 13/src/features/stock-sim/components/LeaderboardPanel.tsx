@@ -19,11 +19,12 @@ export function LeaderboardPanel({
   isLoading = false,
 }: LeaderboardPanelProps) {
   const hiddenPreviewIds = new Set(['friend-hana', 'friend-jin']);
-  const sortedEntries = entries
-    .filter((entry) => {
+  const filteredEntries = entries.filter((entry) => {
       const normalizedId = String(entry.id || '').replace(/^stock-sim-/, '');
-      return !hiddenPreviewIds.has(normalizedId) && entry.kind === 'current-user';
-    })
+      return !hiddenPreviewIds.has(normalizedId);
+    });
+  const hasOtherParticipants = filteredEntries.some((entry) => entry.kind !== 'current-user');
+  const sortedEntries = (hasOtherParticipants ? filteredEntries : [])
     .sort((left, right) =>
       sortMode === 'returnRate'
         ? right.returnRate - left.returnRate
@@ -73,7 +74,7 @@ export function LeaderboardPanel({
 
         {!isLoading && sortedEntries.length === 0 ? (
           <div className="ss-ui-soft-card-strong ss-rounded-[22px] ss-p-5 ss-text-sm ss-leading-7 ss-text-slate-300/82">
-            아직 서버 랭킹 데이터가 없습니다. 첫 스냅샷이 저장되면 여기에 바로 표시됩니다.
+            아직 함께 보일 다른 참가자가 없습니다. 다른 참가자가 들어오면 내 순위와 함께 바로 표시됩니다.
           </div>
         ) : null}
 
