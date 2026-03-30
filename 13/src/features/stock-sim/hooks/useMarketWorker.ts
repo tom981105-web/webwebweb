@@ -45,6 +45,7 @@ export function useMarketWorker() {
   const idleCallbackRef = useRef<number | null>(null);
   const remoteSaveTimeoutRef = useRef(0);
   const remoteSaveInFlightRef = useRef(false);
+  const initialRemoteSaveQueuedRef = useRef(false);
 
   const setSnapshot = useSimulationUiStore((state) => state.actions.setSnapshot);
   const setWorkerReady = useSimulationUiStore((state) => state.actions.setWorkerReady);
@@ -191,7 +192,12 @@ export function useMarketWorker() {
             getSnapshotSavedAt(message.payload.snapshot),
           );
           schedulePersistence();
-          scheduleRemotePersistence();
+          if (!initialRemoteSaveQueuedRef.current) {
+            initialRemoteSaveQueuedRef.current = true;
+            void flushRemoteSession();
+          } else {
+            scheduleRemotePersistence();
+          }
           return;
 
         case 'WORKER_ERROR':
@@ -258,7 +264,11 @@ export function useMarketWorker() {
         return;
       }
 
-      applyRemoteSession(session);
+      if (session) {
+        applyRemoteSession(session);
+      } else {
+        setRemoteLeaderboard([]);
+      }
     };
 
     void syncRemoteSession();

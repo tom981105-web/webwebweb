@@ -292,6 +292,7 @@ export interface RuntimeState {
   hydratedFrom: 'primary' | 'backup' | 'fresh';
   multiplayerMode: 'local-preview' | 'api-ready';
   leaderboardMode: 'preview' | 'remote';
+  remoteLeaderboardReady: boolean;
   workerStatus: 'booting' | 'ready' | 'error';
   workerError: string | null;
   lastWorkerMessageAt: number | null;

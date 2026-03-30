@@ -24,6 +24,7 @@ function createDefaultRuntime(): RuntimeState {
     hydratedFrom: 'fresh',
     multiplayerMode: 'api-ready',
     leaderboardMode: 'preview',
+    remoteLeaderboardReady: false,
     workerStatus: 'booting',
     workerError: null,
     lastWorkerMessageAt: null,
@@ -210,7 +211,8 @@ export const useSimulationUiStore = create<SimulationUiStore>((set) => ({
         remoteLeaderboard: entries,
         runtime: {
           ...state.runtime,
-          leaderboardMode: entries.length > 0 ? 'remote' : 'preview',
+          leaderboardMode: 'remote',
+          remoteLeaderboardReady: true,
         },
       })),
     updatePersistenceState: (savedAt, status, hydratedFrom) =>

@@ -225,18 +225,20 @@ const ConnectedNews = memo(function ConnectedNews({
 });
 
 const ConnectedLeaderboard = memo(function ConnectedLeaderboard() {
-  const fallbackEntries = useSimulationUiStore((state) => state.snapshot?.leaderboard ?? []);
   const remoteEntries = useSimulationUiStore((state) => state.remoteLeaderboard);
+  const remoteLeaderboardReady = useSimulationUiStore(
+    (state) => state.runtime.remoteLeaderboardReady,
+  );
   const sortMode = useSimulationUiStore((state) => state.ui.leaderboardSort);
   const onSortChange = useSimulationUiStore((state) => state.actions.setLeaderboardSort);
-  const entries = remoteEntries.length > 0 ? remoteEntries : fallbackEntries;
 
   return (
     <LeaderboardPanel
-      entries={entries}
+      entries={remoteEntries}
       sortMode={sortMode}
       onSortChange={onSortChange}
-      isRemote={remoteEntries.length > 0}
+      isRemote
+      isLoading={!remoteLeaderboardReady}
     />
   );
 });

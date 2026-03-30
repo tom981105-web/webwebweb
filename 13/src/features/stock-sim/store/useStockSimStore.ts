@@ -26,6 +26,7 @@ function createInitialRuntime(): RuntimeState {
     hydratedFrom: 'fresh',
     multiplayerMode: 'api-ready',
     leaderboardMode: 'preview',
+    remoteLeaderboardReady: false,
     workerStatus: 'ready',
     workerError: null,
     lastWorkerMessageAt: null,
