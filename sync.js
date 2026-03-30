@@ -2,7 +2,7 @@
 (function () {
     let resolveInitialSync;
     const volatileState = Object.create(null);
-    const REMOTE_PUSH_EXCLUDED_KEYS = new Set(['current_user', 'board_posts', 'board_drafts']);
+    const REMOTE_PUSH_EXCLUDED_KEYS = new Set(['current_user', 'board_posts', 'board_drafts', 'mountains_db']);
     const VOLATILE_ONLY_KEYS = new Set(['board_posts', 'board_drafts']);
     const quotaLimitedKeys = new Set();
     const initialSyncPromise = new Promise((resolve) => {
