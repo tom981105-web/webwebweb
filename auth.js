@@ -1106,10 +1106,9 @@ function handleLogin(id, pw) {
     const userKey = Object.keys(users).find((key) => key.toLowerCase() === normalizedId.toLowerCase());
 
     if (userKey && users[userKey].password === normalizedPw) {
-        localStorage.setItem('current_user', userKey);
         users[userKey].lastLogin = new Date().toLocaleString('ko-KR');
         localStorage.setItem('users_db', JSON.stringify(users));
-        window.location.href = 'index.html';
+        finalizeLoginSession(userKey);
         return true;
     }
 
@@ -1176,8 +1175,7 @@ async function handleLoginRequest(id, pw) {
         if (result.users && typeof result.users === 'object') {
             localStorage.setItem('users_db', JSON.stringify(result.users));
         }
-        localStorage.setItem('current_user', result.userId);
-        window.location.href = 'index.html';
+        finalizeLoginSession(result.userId);
         return true;
     } catch (error) {
         if (getAuthApiBase()) {
@@ -1186,6 +1184,27 @@ async function handleLoginRequest(id, pw) {
         }
         return handleLogin(normalizedId, normalizedPw);
     }
+}
+
+function finalizeLoginSession(userId) {
+    const normalizedUserId = String(userId || '').trim();
+    if (!normalizedUserId) return;
+
+    localStorage.setItem('current_user', normalizedUserId);
+    window.dispatchEvent(new CustomEvent('auth:login-success', {
+        detail: {
+            userId: normalizedUserId
+        }
+    }));
+
+    const targetUrl = new URL('index.html', window.location.href).href;
+    window.location.replace(targetUrl);
+
+    window.setTimeout(() => {
+        if (window.location.pathname.toLowerCase().endsWith('login.html')) {
+            window.location.href = targetUrl;
+        }
+    }, 120);
 }
 
 function injectLogoutButton() {
@@ -1320,6 +1339,7 @@ function injectLogoutButton() {
 
 checkAuth();
 window.addEventListener('sync:initial-complete', checkAuth);
+window.addEventListener('auth:login-success', checkAuth);
 
 window.getCurrentUserProfile = getCurrentUserProfile;
 window.claimDailyAttendance = claimDailyAttendance;

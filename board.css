@@ -580,6 +580,18 @@ body {
     text-align: center;
 }
 
+.board-loading-row:hover {
+    background: transparent !important;
+}
+
+.board-loading-cell {
+    padding: 56px 20px !important;
+    text-align: center !important;
+    color: rgba(47, 31, 24, 0.62) !important;
+    font-size: 1rem !important;
+    line-height: 1.7;
+}
+
 .board-table tbody tr {
     transition: background 0.24s ease, transform 0.24s ease;
 }

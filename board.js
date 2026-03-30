@@ -345,7 +345,7 @@
 
     function ensureBoardReady() {
         if (boardReady) return true;
-        alert('게시판 데이터를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.');
+        alert('잠시만 기다려주시면 곧 게시물이 올라옵니다.');
         return false;
     }
 
@@ -1184,6 +1184,17 @@ function setupCommentStickerPicker() {
         );
     }
 
+    function renderBoardLoadingState(message = '잠시만 기다려주시면 곧 게시물이 올라옵니다.') {
+        const tbody = document.getElementById('boardBody');
+        const pinnedNotice = document.getElementById('boardPinnedNotice');
+        if (!tbody) return;
+        tbody.innerHTML = `<tr class="board-loading-row"><td colspan="7" class="board-loading-cell">${escapeHtml(message)}</td></tr>`;
+        if (pinnedNotice) {
+            pinnedNotice.style.display = 'none';
+            pinnedNotice.innerHTML = '';
+        }
+    }
+
     function renderBoard(filterType = '', filterQuery = '') {
         const tbody = document.getElementById('boardBody');
         const pinnedNotice = document.getElementById('boardPinnedNotice');
@@ -2006,6 +2017,8 @@ document.getElementById('richEditor').addEventListener('click', (event) => {
 
     async function initializeBoard() {
         loadBoardCategories();
+        renderCategoryControls();
+        renderBoardLoadingState();
         try {
             const meta = await retryAsync(() => fetchBoardMetaFromServer(), 4, 300);
             if (Array.isArray(meta.categories) && meta.categories.length === 4) {

@@ -246,6 +246,13 @@
             box-shadow: 0 16px 28px rgba(159, 79, 46, 0.2);
         }
 
+        .btn-submit:disabled {
+            cursor: wait;
+            opacity: 0.72;
+            transform: none;
+            box-shadow: none;
+        }
+
         .invite-notice {
             font-size: 0.84rem;
             color: #9f4f2e;
@@ -412,9 +419,12 @@
 
         document.getElementById('loginForm').onsubmit = async (e) => {
             e.preventDefault();
-            if (window.waitForInitialSync) {
-                await window.waitForInitialSync();
+            const submitButton = document.querySelector('#loginForm .btn-submit');
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = '로그인 중...';
             }
+            try {
             if (typeof window.handleLoginRequest === 'function') {
                 await window.handleLoginRequest(
                     document.getElementById('loginId').value,
@@ -423,14 +433,22 @@
                 return;
             }
             handleLogin(document.getElementById('loginId').value, document.getElementById('loginPw').value);
+            } finally {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = '로그인';
+                }
+            }
         };
 
         document.getElementById('signupForm').onsubmit = async (e) => {
             e.preventDefault();
-
-            if (window.waitForInitialSync) {
-                await window.waitForInitialSync();
+            const submitButton = document.querySelector('#signupForm .btn-submit');
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = '회원가입 중...';
             }
+            try {
 
             const pw = document.getElementById('signupPw').value;
             const pwConfirm = document.getElementById('signupPwConfirm').value;
@@ -456,6 +474,12 @@
                 document.getElementById('signupForm').reset();
                 pwMatchMessage.textContent = '';
                 switchTab('login');
+            }
+            } finally {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                    submitButton.textContent = '회원가입';
+                }
             }
         };
 
