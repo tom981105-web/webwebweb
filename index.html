@@ -141,10 +141,35 @@
 
         function formatPostDate(dateString) {
             if (!dateString) return '-';
-            const [datePart, timePart] = String(dateString).split(' ');
+            const rawValue = String(dateString).trim();
+            const normalizedValue = rawValue.includes('T') ? rawValue : rawValue.replace(' ', 'T');
+            const parsedDate = new Date(normalizedValue);
+
+            if (!Number.isNaN(parsedDate.getTime())) {
+                const now = new Date();
+                const isToday = parsedDate.getFullYear() === now.getFullYear()
+                    && parsedDate.getMonth() === now.getMonth()
+                    && parsedDate.getDate() === now.getDate();
+
+                if (isToday) {
+                    return parsedDate.toLocaleTimeString('ko-KR', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                }
+
+                return parsedDate.toLocaleDateString('ko-KR', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                }).replace(/\.\s?/g, '-').replace(/-$/, '');
+            }
+
+            const [datePart, timePart] = rawValue.split(' ');
             const today = new Date().toISOString().split('T')[0];
-            if (datePart === today && timePart) return timePart;
-            return datePart || dateString;
+            if (datePart === today && timePart) return timePart.slice(0, 5);
+            return datePart || rawValue;
         }
 
         function getCommentCount(post) {
