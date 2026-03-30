@@ -631,21 +631,53 @@
             return ['카테고리 1', '카테고리 2', '카테고리 3', '카테고리 4'];
         }
 
-        function renderBoardCategoryFields() {
-            const categories = getBoardCategoriesSafe();
+        async function renderBoardCategoryFields() {
+            let categories = getBoardCategoriesSafe();
+            try {
+                const response = await fetch(getApiUrl('/api/admin/state?t=' + Date.now()), { cache: 'no-store' });
+                const result = await response.json().catch(() => ({}));
+                if (response.ok && Array.isArray(result.boardCategories) && result.boardCategories.length === 4) {
+                    categories = result.boardCategories.map((item, index) => String(item || '').trim() || `카테고리 ${index + 1}`);
+                    Storage.prototype.setItem.call(localStorage, 'board_categories', JSON.stringify(categories));
+                }
+            } catch (error) {
+            }
             categories.forEach((name, index) => {
                 const input = document.getElementById(`boardCategory${index + 1}`);
                 if (input) input.value = name;
             });
         }
 
-        function saveBoardCategories() {
-            const categories = Array.from({ length: 4 }, (_, index) => {
+        async function saveBoardCategories() {
+            const nextCategories = Array.from({ length: 4 }, (_, index) => {
                 const input = document.getElementById(`boardCategory${index + 1}`);
                 return String(input && input.value ? input.value : '').trim() || `카테고리 ${index + 1}`;
             });
-            localStorage.setItem('board_categories', JSON.stringify(categories));
-            alert('게시판 카테고리를 저장했습니다.');
+            const saveButton = document.getElementById('saveBoardCategoriesButton');
+            if (saveButton) {
+                saveButton.disabled = true;
+                saveButton.textContent = '저장 중...';
+            }
+            try {
+                const response = await fetch(getApiUrl('/api/admin/board-categories'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ categories: nextCategories })
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.success === false || !Array.isArray(result.categories)) {
+                    throw new Error(result.message || '게시판 카테고리 저장에 실패했습니다.');
+                }
+                Storage.prototype.setItem.call(localStorage, 'board_categories', JSON.stringify(result.categories));
+                alert('게시판 카테고리를 저장했습니다.');
+            } catch (error) {
+                alert(error.message || '게시판 카테고리 저장에 실패했습니다.');
+            } finally {
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.textContent = '카테고리 저장';
+                }
+            }
         }
 
         function setCloudBadge(id, mode, text) {

@@ -182,6 +182,46 @@ function normalizeBoardDrafts(value, categories) {
     return normalized;
 }
 
+function remapBoardCategoriesInState(nextCategories) {
+    const previousCategories = Array.isArray(state.board && state.board.categories)
+        ? state.board.categories.slice()
+        : DEFAULT_CATEGORIES.slice();
+    const normalizedNextCategories = normalizeCategories(nextCategories);
+
+    const remapCategoryName = (value) => {
+        const raw = String(value || '').trim();
+        const matchedIndex = previousCategories.findIndex((entry) => entry === raw);
+        if (matchedIndex >= 0) {
+            return normalizedNextCategories[matchedIndex] || normalizedNextCategories[0];
+        }
+        if (normalizedNextCategories.includes(raw)) {
+            return raw;
+        }
+        return normalizedNextCategories[0];
+    };
+
+    state.board.categories = normalizedNextCategories;
+    state.board.posts = normalizeBoardPosts(
+        state.board.posts.map((post) => ({
+            ...post,
+            category: remapCategoryName(post.category)
+        })),
+        state.board.categories
+    );
+    state.board.drafts = normalizeBoardDrafts(
+        Object.fromEntries(
+            Object.entries(state.board.drafts || {}).map(([key, draft]) => [
+                key,
+                {
+                    ...draft,
+                    category: remapCategoryName(draft && draft.category)
+                }
+            ])
+        ),
+        state.board.categories
+    );
+}
+
 function normalizeMountainRecords(value) {
     const mountains = Array.isArray(value) ? value : [];
     return mountains.map((mountain) => {
@@ -933,8 +973,7 @@ function applyLegacySyncWrite(key, value) {
         state.mountains = normalizeMountainRecords(safeParseJson(value, []));
         break;
     case 'board_categories':
-        state.board.categories = normalizeCategories(safeParseJson(value, []));
-        state.board.posts = normalizeBoardPosts(state.board.posts, state.board.categories);
+        remapBoardCategoriesInState(safeParseJson(value, []));
         break;
     case 'login_hero_images': {
         const nextImages = normalizeLoginHeroImages(Array.isArray(value) ? value : safeParseJson(value, []));
@@ -1494,6 +1533,17 @@ app.get('/api/admin/state', (req, res) => {
         boardCategories: state.board.categories,
         banners: state.banners,
         loginHero: state.loginHero
+    });
+});
+
+app.post('/api/admin/board-categories', async (req, res) => {
+    reloadDb();
+    const categories = normalizeCategories(req.body && req.body.categories);
+    remapBoardCategoriesInState(categories);
+    await persistDb({ deferRemote: true });
+    res.json({
+        success: true,
+        categories: state.board.categories
     });
 });
 
