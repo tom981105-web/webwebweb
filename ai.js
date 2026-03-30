@@ -37,6 +37,8 @@ const defaultPrompts = [
     { id: 1, title: '블로그 포스팅 작성', category: '블로그', recommendedAi: 'ChatGPT', description: 'SEO에 최적화된 블로그 글을 작성해주는 프롬프트입니다.', text: '당신은 10년차 전문 블로그 마케터입니다.\n다음에 주어지는 주제로 SEO에 최적화된 블로그 포스트를 작성해주세요.\n\n[조건]\n1. 제목은 클릭 유도할 수 있게 매력적으로 짓기\n2. 서론, 본론, 결론 구조로 작성\n3. 관련 해시태그 5개 마지막에 추가\n\n주제: ' },
     { id: 2, title: '코드 리팩토링 및 주석', category: '코딩', recommendedAi: 'Claude 3.5', description: '가독성과 성능을 높이기 위해 코드를 리팩토링하는 프롬프트.', text: '다음 코드를 분석하고 더 깔끔하고 성능이 좋게 리팩토링 해주세요.\n그리고 각 핵심 변경 사항에 대해 왜 이렇게 변경했는지 자세한 주석도 함께 달아주세요.\n\n```\n(여기에 코드 입력)\n```' }
 ];
+const AI_CATEGORY_OPTIONS = ['텍스트', '이미지', '오디오', '비디오', '코딩', '기타'];
+const PROMPT_CATEGORY_OPTIONS = ['블로그', '코딩', '이미지', '업무', '기타'];
 let promptData = [];
 let promptFilter = '전체';
 let promptSort = 'latest';
@@ -55,13 +57,34 @@ function normalizeRecommendedAi(value) {
     return [];
 }
 
+function normalizeCategoryList(value, fallbackOptions = []) {
+    const source = Array.isArray(value)
+        ? value
+        : String(value || '')
+            .split(',')
+            .map((entry) => entry.trim())
+            .filter(Boolean);
+
+    const unique = [];
+    source.forEach((entry) => {
+        const normalized = String(entry || '').trim();
+        if (!normalized || unique.includes(normalized)) return;
+        unique.push(normalized);
+    });
+
+    return unique.length ? unique : (fallbackOptions[0] ? [fallbackOptions[0]] : []);
+}
+
 function normalizePromptEntry(prompt) {
     const numericId = Number(prompt && prompt.id);
     const id = Number.isFinite(numericId) ? numericId : Date.now();
     const inferredDate = id > 1000000000000 ? new Date(id).toISOString() : '';
+    const categories = normalizeCategoryList(prompt && (prompt.categories || prompt.category), PROMPT_CATEGORY_OPTIONS);
     return {
         ...prompt,
         id,
+        category: categories[0] || PROMPT_CATEGORY_OPTIONS[0],
+        categories,
         author: (prompt && prompt.author ? String(prompt.author).trim() : 'admin') || 'admin',
         recommendedAi: normalizeRecommendedAi(prompt && prompt.recommendedAi),
         createdAt: (prompt && prompt.createdAt) || inferredDate || '',
@@ -70,10 +93,33 @@ function normalizePromptEntry(prompt) {
 }
 
 function normalizeAiEntry(ai) {
+    const categories = normalizeCategoryList(ai && (ai.categories || ai.category), AI_CATEGORY_OPTIONS);
     return {
         ...ai,
+        category: categories[0] || AI_CATEGORY_OPTIONS[0],
+        categories,
         author: (ai && ai.author ? String(ai.author).trim() : 'admin') || 'admin'
     };
+}
+
+function getSelectedCheckboxValues(name) {
+    return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((input) => input.value);
+}
+
+function renderCategoryCheckboxGroup(containerId, inputName, options, selectedValues = []) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const selected = normalizeCategoryList(selectedValues, options);
+    container.innerHTML = options.map((option) => {
+        const checked = selected.includes(option) ? 'checked' : '';
+        return `
+            <label class="ai-checkbox-chip">
+                <input type="checkbox" name="${inputName}" value="${option}" ${checked}>
+                <span class="ai-checkbox-text">${option}</span>
+            </label>
+        `;
+    }).join('');
 }
 
 function getCurrentAiUser() {
@@ -161,7 +207,7 @@ function isImageLogoValue(value) {
 
 function getCategories() {
     // Unique categories from data
-    const categories = new Set(aiData.map(ai => ai.category));
+    const categories = new Set(aiData.flatMap(ai => normalizeCategoryList(ai.categories || ai.category, AI_CATEGORY_OPTIONS)));
     return ['전체', ...Array.from(categories)];
 }
 
@@ -187,18 +233,22 @@ function renderCards() {
     
     const filteredData = currentFilter === '전체' 
         ? aiData 
-        : aiData.filter(ai => ai.category === currentFilter);
+        : aiData.filter(ai => normalizeCategoryList(ai.categories || ai.category, AI_CATEGORY_OPTIONS).includes(currentFilter));
         
     filteredData.forEach(ai => {
         const card = document.createElement('div');
         card.className = 'ai-item-card';
         card.onclick = () => openViewModal(ai);
         
+        const categoryChips = normalizeCategoryList(ai.categories || ai.category, AI_CATEGORY_OPTIONS)
+            .map((category) => `<span class="preview-category">${category}</span>`)
+            .join('');
+
         card.innerHTML = `
             <div class="ai-item-logo">${renderLogo(ai.logo)}</div>
             <div class="ai-item-title">${ai.name}</div>
             <div class="ai-item-preview">
-                <span class="preview-category">${ai.category}</span>
+                <div class="preview-category-group">${categoryChips}</div>
                 <p class="preview-desc">${ai.description}</p>
             </div>
         `;
@@ -213,6 +263,7 @@ function setupEventListeners() {
         aiForm.reset();
         document.getElementById('logoPreview').innerHTML = '';
         document.getElementById('formModalTitle').textContent = '새로운 AI 추가';
+        renderCategoryCheckboxGroup('aiCategoryList', 'aiCategoryChoice', AI_CATEGORY_OPTIONS, [AI_CATEGORY_OPTIONS[0]]);
         openModal(formModal);
     };
 
@@ -256,10 +307,11 @@ function setupEventListeners() {
             aiData = aiData.filter(a => a.id !== editingId);
             saveData();
             closeModal(viewModal);
+            const remainingInCategory = aiData.filter(a => normalizeCategoryList(a.categories || a.category, AI_CATEGORY_OPTIONS).includes(currentFilter));
             
             // 만약 현재 필터에 해당하는 항목이 하나도 안남게 되면 '전체'로 돌아가기
             const RemainingInCategory = aiData.filter(a => a.category === currentFilter);
-            if(currentFilter !== '전체' && RemainingInCategory.length === 0) {
+            if(currentFilter !== '전체' && remainingInCategory.length === 0) {
                 currentFilter = '전체';
             }
             
@@ -272,16 +324,22 @@ function setupEventListeners() {
     aiForm.onsubmit = (e) => {
         e.preventDefault();
         const logoValue = document.getElementById('aiLogo').value.trim();
+        const selectedCategories = getSelectedCheckboxValues('aiCategoryChoice');
         if (!isImageLogoValue(logoValue)) {
             alert('AI 로고는 이미지 주소나 이미지 파일만 사용할 수 있습니다.');
             return;
         }
-        
+        if (!selectedCategories.length) {
+            alert('AI 카테고리를 하나 이상 선택해 주세요.');
+            return;
+        }
+
         const newAi = {
             id: editingId ? editingId : Date.now(),
             name: document.getElementById('aiName').value,
             logo: logoValue,
-            category: document.getElementById('aiCategory').value,
+            category: selectedCategories[0],
+            categories: selectedCategories,
             url: document.getElementById('aiUrl').value,
             description: document.getElementById('aiDescription').value,
             author: editingId ? ((aiData.find(a => a.id === editingId) || {}).author || getCurrentAiUser() || 'admin') : (getCurrentAiUser() || 'admin')
@@ -290,10 +348,10 @@ function setupEventListeners() {
         if (editingId) {
             // Update
             const index = aiData.findIndex(a => a.id === editingId);
-            if(index !== -1) aiData[index] = newAi;
+            if(index !== -1) aiData[index] = normalizeAiEntry(newAi);
         } else {
             // Add
-            aiData.push(newAi);
+            aiData.push(normalizeAiEntry(newAi));
         }
 
         saveData();
@@ -315,7 +373,7 @@ function openViewModal(ai) {
     editingId = ai.id;
     document.getElementById('viewLogo').innerHTML = renderLogo(ai.logo);
     document.getElementById('viewTitle').textContent = ai.name;
-    document.getElementById('viewCategory').textContent = ai.category;
+    document.getElementById('viewCategory').textContent = normalizeCategoryList(ai.categories || ai.category, AI_CATEGORY_OPTIONS).join(' · ');
     document.getElementById('viewDescription').textContent = ai.description;
     document.getElementById('viewUrl').href = Math.random() ? ai.url : '#'; // Just ensuring it has a link
     document.getElementById('viewUrl').href = ai.url;
@@ -341,17 +399,7 @@ function openEditModal(id) {
     document.getElementById('aiUrl').value = ai.url;
     document.getElementById('aiDescription').value = ai.description;
     
-    // Check if category exists in select, if not add it
-    const catSelect = document.getElementById('aiCategory');
-    let exists = false;
-    for(let opt of catSelect.options) {
-        if(opt.value === ai.category) exists = true;
-    }
-    if(!exists) {
-        const newOpt = new Option(ai.category, ai.category);
-        catSelect.add(newOpt);
-    }
-    catSelect.value = ai.category;
+    renderCategoryCheckboxGroup('aiCategoryList', 'aiCategoryChoice', AI_CATEGORY_OPTIONS, normalizeCategoryList(ai.categories || ai.category, AI_CATEGORY_OPTIONS));
     
     document.getElementById('formModalTitle').textContent = 'AI 정보 수정';
     openModal(formModal);
@@ -413,18 +461,17 @@ function setupDropZone() {
 /* ==================== PROMPT LOGIC ==================== */
 
 function renderPromptFilters() {
-    const categories = new Set(promptData.map(p => p.category));
+    const categories = Array.from(new Set(promptData.flatMap(p => normalizeCategoryList(p.categories || p.category, PROMPT_CATEGORY_OPTIONS))));
     const filterSelect = document.getElementById('promptFilter');
     
-    for(let cat of categories) {
-        let exists = false;
-        for(let opt of filterSelect.options) {
-            if(opt.value === cat) exists = true;
-        }
-        if(!exists) {
-            filterSelect.add(new Option(cat, cat));
-        }
+    filterSelect.innerHTML = '<option value="?꾩껜">?꾩껜 移댄뀒怨좊━</option>';
+    categories.forEach((cat) => {
+        filterSelect.add(new Option(cat, cat));
+    });
+    if (!['?꾩껜', ...categories].includes(promptFilter)) {
+        promptFilter = '?꾩껜';
     }
+    filterSelect.value = promptFilter;
 }
 
 function renderPromptCards() {
@@ -445,7 +492,7 @@ function renderPromptCards() {
     
     // Filter
     if (promptFilter !== '전체') {
-        filtered = filtered.filter(p => p.category === promptFilter);
+        filtered = filtered.filter(p => normalizeCategoryList(p.categories || p.category, PROMPT_CATEGORY_OPTIONS).includes(promptFilter));
     }
     
     // Sort
@@ -461,11 +508,15 @@ function renderPromptCards() {
         card.className = 'prompt-card';
         card.onclick = () => openViewPromptModal(p);
         
+        const categoryChips = normalizeCategoryList(p.categories || p.category, PROMPT_CATEGORY_OPTIONS)
+            .map((category) => `<div class="prompt-card-category">${category}</div>`)
+            .join('');
+
         card.innerHTML = `
             <div class="prompt-card-header">
                 <div class="prompt-card-title">${p.title}</div>
                 <div style="display:flex; gap: 6px; flex-wrap:wrap; justify-content:flex-end;">
-                    <div class="prompt-card-category">${p.category}</div>
+                    ${categoryChips}
                     ${recommendedList.length > 0 ? recommendedList.map(aiName => {
                         const targetAi = aiData.find(a => a.name === aiName);
                         let logoSafe = '🤖';
@@ -515,6 +566,7 @@ function setupPromptEventListeners() {
         editingPromptId = null;
         document.getElementById('promptForm').reset();
         renderDynamicAiCheckboxes();
+        renderCategoryCheckboxGroup('promptCategoryList', 'promptCategoryChoice', PROMPT_CATEGORY_OPTIONS, [PROMPT_CATEGORY_OPTIONS[0]]);
         document.getElementById('formPromptModalTitle').textContent = '새로운 프롬프트 추가';
         openModal(document.getElementById('formPromptModal'));
     };
@@ -585,11 +637,17 @@ function setupPromptEventListeners() {
         
         const checkboxes = document.querySelectorAll('input[name="promptAi"]:checked');
         const selectedAIs = Array.from(checkboxes).map(cb => cb.value);
+        const selectedCategories = getSelectedCheckboxValues('promptCategoryChoice');
+        if (!selectedCategories.length) {
+            alert('프롬프트 카테고리를 하나 이상 선택해 주세요.');
+            return;
+        }
 
         const newPrompt = {
             id: editingPromptId ? editingPromptId : Date.now(),
             title: document.getElementById('promptTitle').value,
-            category: document.getElementById('promptCategory').value,
+            category: selectedCategories[0],
+            categories: selectedCategories,
             recommendedAi: selectedAIs,
             description: document.getElementById('promptDescription').value,
             text: document.getElementById('promptText').value,
@@ -600,9 +658,9 @@ function setupPromptEventListeners() {
 
         if (editingPromptId) {
             const index = promptData.findIndex(p => p.id === editingPromptId);
-            if(index !== -1) promptData[index] = newPrompt;
+            if(index !== -1) promptData[index] = normalizePromptEntry(newPrompt);
         } else {
-            promptData.push(newPrompt);
+            promptData.push(normalizePromptEntry(newPrompt));
         }
 
         savePromptData();
@@ -621,7 +679,7 @@ function openViewPromptModal(p) {
     editingPromptId = p.id;
     const recommendedList = normalizeRecommendedAi(p.recommendedAi);
     document.getElementById('viewPromptTitle').textContent = p.title;
-    document.getElementById('viewPromptCategory').textContent = p.category;
+    document.getElementById('viewPromptCategory').textContent = normalizeCategoryList(p.categories || p.category, PROMPT_CATEGORY_OPTIONS).join(' · ');
     
     const recommendedElem = document.getElementById('viewPromptRecommendedAi');
     if (recommendedList.length > 0) {
@@ -688,13 +746,7 @@ function openEditPromptModal(id) {
     document.getElementById('promptDescription').value = p.description;
     document.getElementById('promptText').value = p.text;
     
-    const catSelect = document.getElementById('promptCategory');
-    let exists = false;
-    for(let opt of catSelect.options) {
-        if(opt.value === p.category) exists = true;
-    }
-    if(!exists) catSelect.add(new Option(p.category, p.category));
-    catSelect.value = p.category;
+    renderCategoryCheckboxGroup('promptCategoryList', 'promptCategoryChoice', PROMPT_CATEGORY_OPTIONS, normalizeCategoryList(p.categories || p.category, PROMPT_CATEGORY_OPTIONS));
     
     document.getElementById('formPromptModalTitle').textContent = '프롬프트 수정';
     openModal(document.getElementById('formPromptModal'));
