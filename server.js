@@ -208,6 +208,26 @@ function normalizeMountainRecords(value) {
     });
 }
 
+function normalizeAiPromptEntries(value) {
+    const prompts = Array.isArray(value) ? value : [];
+    return prompts.map((prompt) => {
+        const numericId = Number(prompt && prompt.id);
+        const id = Number.isFinite(numericId) ? numericId : Date.now();
+        const inferredDate = id > 1000000000000 ? new Date(id).toISOString() : '';
+        return {
+            ...prompt,
+            id,
+            title: String(prompt && prompt.title || ''),
+            category: String(prompt && prompt.category || '기타'),
+            description: String(prompt && prompt.description || ''),
+            text: String(prompt && prompt.text || ''),
+            author: String(prompt && prompt.author || 'admin').trim() || 'admin',
+            createdAt: String(prompt && prompt.createdAt || inferredDate || ''),
+            updatedAt: String(prompt && prompt.updatedAt || prompt && prompt.createdAt || inferredDate || '')
+        };
+    });
+}
+
 function normalizeBanners(value) {
     return value && typeof value === 'object'
         ? value
@@ -536,7 +556,7 @@ function normalizeRawDb(raw) {
         inviteCodes: safeParseJson(raw.invite_codes, raw.invite_codes || ['FRIENDS2026']),
         ai: {
             directory: safeParseJson(raw.my_ai_directory, raw.my_ai_directory || []),
-            prompts: safeParseJson(raw.my_prompt_directory, raw.my_prompt_directory || [])
+            prompts: normalizeAiPromptEntries(safeParseJson(raw.my_prompt_directory, raw.my_prompt_directory || []))
         },
         mountains: normalizeMountainRecords(safeParseJson(raw.mountains_db, raw.mountains_db || [])),
         banners: normalizeBannerState(safeParseJson(raw.site_banners, raw.site_banners || {})),
@@ -907,7 +927,7 @@ function applyLegacySyncWrite(key, value) {
         state.ai.directory = safeParseJson(value, []);
         break;
     case 'my_prompt_directory':
-        state.ai.prompts = safeParseJson(value, []);
+        state.ai.prompts = normalizeAiPromptEntries(safeParseJson(value, []));
         break;
     case 'mountains_db':
         state.mountains = normalizeMountainRecords(safeParseJson(value, []));
@@ -1355,6 +1375,13 @@ app.get('/api/mountains', (req, res) => {
     res.json({
         success: true,
         mountains: normalizeMountainRecords(state.mountains)
+    });
+});
+
+app.get('/api/ai/prompts', (req, res) => {
+    res.json({
+        success: true,
+        prompts: normalizeAiPromptEntries(state.ai.prompts)
     });
 });
 

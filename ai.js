@@ -56,10 +56,16 @@ function normalizeRecommendedAi(value) {
 }
 
 function normalizePromptEntry(prompt) {
+    const numericId = Number(prompt && prompt.id);
+    const id = Number.isFinite(numericId) ? numericId : Date.now();
+    const inferredDate = id > 1000000000000 ? new Date(id).toISOString() : '';
     return {
         ...prompt,
+        id,
         author: (prompt && prompt.author ? String(prompt.author).trim() : 'admin') || 'admin',
-        recommendedAi: normalizeRecommendedAi(prompt && prompt.recommendedAi)
+        recommendedAi: normalizeRecommendedAi(prompt && prompt.recommendedAi),
+        createdAt: (prompt && prompt.createdAt) || inferredDate || '',
+        updatedAt: (prompt && prompt.updatedAt) || (prompt && prompt.createdAt) || inferredDate || ''
     };
 }
 
@@ -587,7 +593,9 @@ function setupPromptEventListeners() {
             recommendedAi: selectedAIs,
             description: document.getElementById('promptDescription').value,
             text: document.getElementById('promptText').value,
-            author: editingPromptId ? ((promptData.find(p => p.id === editingPromptId) || {}).author || getCurrentAiUser() || 'admin') : (getCurrentAiUser() || 'admin')
+            author: editingPromptId ? ((promptData.find(p => p.id === editingPromptId) || {}).author || getCurrentAiUser() || 'admin') : (getCurrentAiUser() || 'admin'),
+            createdAt: editingPromptId ? ((promptData.find(p => p.id === editingPromptId) || {}).createdAt || new Date().toISOString()) : new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
 
         if (editingPromptId) {
@@ -694,3 +702,14 @@ function openEditPromptModal(id) {
 
 // Run
 init();
+
+const aiPageParams = new URLSearchParams(window.location.search);
+const initialPromptId = Number(aiPageParams.get('prompt'));
+if (Number.isFinite(initialPromptId) && initialPromptId > 0) {
+    setTimeout(() => {
+        const targetPrompt = promptData.find((prompt) => Number(prompt.id) === initialPromptId);
+        if (targetPrompt) {
+            openViewPromptModal(targetPrompt);
+        }
+    }, 0);
+}

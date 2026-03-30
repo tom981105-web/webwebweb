@@ -209,6 +209,108 @@
             });
         }
 
+        function escapeRecentHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getRecentItemTimestamp(value, fallback = 0) {
+            if (!value) return fallback;
+            const parsed = Date.parse(String(value).replace(' ', 'T'));
+            return Number.isFinite(parsed) ? parsed : fallback;
+        }
+
+        function formatRecentDateLabel(value) {
+            if (!value) return '-';
+            return formatPostDate(String(value).replace('T', ' '));
+        }
+
+        async function renderRecentPosts() {
+            const postsList = document.getElementById('recentPostsList');
+            let boardPosts = [];
+            let mountainPosts = [];
+            let aiPrompts = [];
+
+            try {
+                const result = await retryFetchJson('/api/board/posts');
+                if (Array.isArray(result.posts)) boardPosts = result.posts;
+            } catch (error) {
+            }
+
+            try {
+                const result = await retryFetchJson('/api/mountains');
+                if (Array.isArray(result.mountains)) mountainPosts = result.mountains;
+            } catch (error) {
+            }
+
+            try {
+                const result = await retryFetchJson('/api/ai/prompts');
+                if (Array.isArray(result.prompts)) aiPrompts = result.prompts;
+            } catch (error) {
+            }
+
+            const feedItems = [];
+
+            boardPosts.forEach((post) => {
+                const commentCount = getCommentCount(post);
+                feedItems.push({
+                    type: post.isNotice ? '공지' : ((Number(post.likes || 0) >= 10) ? '인기' : '자유'),
+                    title: post.title || '제목 없음',
+                    author: getDisplayName(post.author),
+                    dateLabel: formatRecentDateLabel(post.date),
+                    href: `board.html?id=${post.id}`,
+                    extraHtml: commentCount > 0 ? `<span style="color:#9f4f2e; font-size:0.85rem; margin-left:6px; font-weight:700;">[${commentCount}]</span>` : '',
+                    sortKey: getRecentItemTimestamp(post.date, Number(post.id || 0))
+                });
+            });
+
+            mountainPosts.forEach((mountain) => {
+                feedItems.push({
+                    type: '산행',
+                    title: mountain.title || mountain.name || '산행 기록',
+                    author: getDisplayName(mountain.author),
+                    dateLabel: formatRecentDateLabel(mountain.updatedAt || mountain.createdAt || mountain.date),
+                    href: `mountain.html?id=${encodeURIComponent(mountain.id)}`,
+                    extraHtml: '',
+                    sortKey: getRecentItemTimestamp(mountain.updatedAt || mountain.createdAt || mountain.date, 0)
+                });
+            });
+
+            aiPrompts.forEach((prompt) => {
+                feedItems.push({
+                    type: 'AI',
+                    title: prompt.title || '프롬프트',
+                    author: getDisplayName(prompt.author),
+                    dateLabel: formatRecentDateLabel(prompt.updatedAt || prompt.createdAt || ''),
+                    href: `ai.html?prompt=${encodeURIComponent(prompt.id)}`,
+                    extraHtml: '',
+                    sortKey: getRecentItemTimestamp(prompt.updatedAt || prompt.createdAt || '', Number(prompt.id || 0))
+                });
+            });
+
+            if (!feedItems.length) {
+                postsList.innerHTML = '<div style="padding:20px 0; color:#6f5a47; text-align:center;">理쒓렐 ?깅줉??寃뚯떆湲???놁뒿?덈떎. 泥?湲???④꺼蹂댁꽭??</div>';
+                return;
+            }
+
+            const sorted = feedItems.sort((a, b) => b.sortKey - a.sortKey).slice(0, 5);
+            postsList.innerHTML = '';
+            sorted.forEach((entry) => {
+                const item = document.createElement('div');
+                item.className = 'post-item';
+                item.innerHTML = `
+                    <span class="post-tag">${escapeRecentHtml(entry.type)}</span>
+                    <a href="${entry.href}" class="post-title">${escapeRecentHtml(entry.title)}${entry.extraHtml}</a>
+                    <span class="post-date"><span style="color:#8f755d; margin-right:8px;">${escapeRecentHtml(entry.author)}</span>${escapeRecentHtml(entry.dateLabel)}</span>
+                `;
+                postsList.appendChild(item);
+            });
+        }
+
         function getBannerState() {
             const defaults = {
                 top: { title: '우리들의 아지트', desc: '우리끼리 모여 자유롭게 이야기하는 공간', bg: '' },

@@ -207,6 +207,11 @@ document.addEventListener('DOMContentLoaded', () => {
     renderMountainBoard();
     mountainBoardBootstrapped = true;
 
+    const initialMountainId = new URLSearchParams(window.location.search).get('id');
+    if (initialMountainId) {
+        setTimeout(() => openMtDetailById(initialMountainId), 0);
+    }
+
     void refreshMountainsFromServer().catch(() => {});
 });
 
