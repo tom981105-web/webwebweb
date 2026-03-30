@@ -5,6 +5,10 @@ let mountainsCache = [];
 let mountainBoardBootstrapped = false;
 let mountainsRefreshToken = 0;
 let mountainsMutationVersion = 0;
+const MOUNTAIN_PENDING_DELETE_KEY = 'mountain_pending_deletes';
+let mountainPendingDeleteIds = null;
+let mountainDeleteFlushPromise = null;
+let mountainPhotoResizeSession = null;
 
 function getApiBase() {
     if (window.location.protocol === 'file:') {
@@ -38,6 +42,95 @@ async function retryAsync(task, attempts = 4, delayMs = 300) {
         }
     }
     throw lastError || new Error('요청에 실패했습니다.');
+}
+
+function loadPendingMountainDeleteIds() {
+    const parsed = safeParse(localStorage.getItem(MOUNTAIN_PENDING_DELETE_KEY) || '[]', []);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+        .map((value) => String(value || '').trim())
+        .filter(Boolean);
+}
+
+function getPendingMountainDeleteIds() {
+    if (!Array.isArray(mountainPendingDeleteIds)) {
+        mountainPendingDeleteIds = loadPendingMountainDeleteIds();
+    }
+    return mountainPendingDeleteIds;
+}
+
+function persistPendingMountainDeleteIds() {
+    try {
+        localStorage.setItem(MOUNTAIN_PENDING_DELETE_KEY, JSON.stringify(getPendingMountainDeleteIds()));
+    } catch (error) {
+        // ignore storage failures
+    }
+}
+
+function isMountainDeletePending(id) {
+    return getPendingMountainDeleteIds().includes(String(id || '').trim());
+}
+
+function queueMountainDelete(id) {
+    const normalizedId = String(id || '').trim();
+    if (!normalizedId) return;
+    const pendingIds = getPendingMountainDeleteIds();
+    if (!pendingIds.includes(normalizedId)) {
+        pendingIds.push(normalizedId);
+        persistPendingMountainDeleteIds();
+    }
+}
+
+function dequeueMountainDelete(id) {
+    const normalizedId = String(id || '').trim();
+    if (!normalizedId) return;
+    mountainPendingDeleteIds = getPendingMountainDeleteIds().filter((entry) => entry !== normalizedId);
+    persistPendingMountainDeleteIds();
+}
+
+function filterVisibleMountains(list) {
+    const pendingIds = new Set(getPendingMountainDeleteIds());
+    return (Array.isArray(list) ? list : []).filter((mountain) => !pendingIds.has(String(mountain.id || '').trim()));
+}
+
+function getVisibleMountains() {
+    return filterVisibleMountains(getNormalizedMountainsCache());
+}
+
+function isTransientMountainDeleteError(error) {
+    const message = String(error && error.message ? error.message : error || '').toLowerCase();
+    return message.includes('failed to fetch')
+        || message.includes('networkerror')
+        || message.includes('load failed')
+        || message.includes('network request failed');
+}
+
+async function flushPendingMountainDeletes() {
+    if (mountainDeleteFlushPromise) {
+        return mountainDeleteFlushPromise;
+    }
+
+    mountainDeleteFlushPromise = (async () => {
+        const snapshot = [...getPendingMountainDeleteIds()];
+        for (const id of snapshot) {
+            try {
+                await deleteMountainOnServer(id);
+                dequeueMountainDelete(id);
+            } catch (error) {
+                if (isTransientMountainDeleteError(error)) {
+                    return;
+                }
+                dequeueMountainDelete(id);
+                throw error;
+            }
+        }
+    })();
+
+    try {
+        await mountainDeleteFlushPromise;
+    } finally {
+        mountainDeleteFlushPromise = null;
+    }
 }
 
 const initialMountains = [
@@ -124,13 +217,18 @@ async function updateMountainOnServer(id, payload) {
 }
 
 async function deleteMountainOnServer(id) {
-    const response = await fetch(getApiUrl(`/api/mountains/${encodeURIComponent(id)}`), {
-        method: 'DELETE'
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || result.success === false) {
-        throw new Error(result.message || '산 기록 삭제에 실패했습니다.');
-    }
+    await retryAsync(async () => {
+        const response = await fetch(getApiUrl(`/api/mountains/${encodeURIComponent(id)}`), {
+            method: 'DELETE',
+            cache: 'no-store',
+            keepalive: true
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || result.success === false) {
+            throw new Error(result.message || '산 기록 삭제에 실패했습니다.');
+        }
+        return true;
+    }, 2, 220);
 }
 
 async function refreshMountainsFromServer(options = {}) {
@@ -138,7 +236,9 @@ async function refreshMountainsFromServer(options = {}) {
     const delayMs = Number.isFinite(Number(options.delayMs)) ? Number(options.delayMs) : 150;
     const refreshToken = ++mountainsRefreshToken;
     const startedMutationVersion = mountainsMutationVersion;
-    const nextMountains = (await retryAsync(() => fetchMountainsFromServer(), attempts, delayMs)).map(normalizeMountainRecord);
+    const nextMountains = filterVisibleMountains(
+        (await retryAsync(() => fetchMountainsFromServer(), attempts, delayMs)).map(normalizeMountainRecord)
+    );
     if (refreshToken !== mountainsRefreshToken || startedMutationVersion !== mountainsMutationVersion) {
         return getNormalizedMountainsCache();
     }
@@ -219,7 +319,13 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => openMtDetailById(initialMountainId), 0);
     }
 
+    void flushPendingMountainDeletes().catch(() => {});
     void refreshMountainsFromServer().catch(() => {});
+});
+
+window.addEventListener('online', () => {
+    void flushPendingMountainDeletes().catch(() => {});
+    void refreshMountainsFromServer({ attempts: 1, delayMs: 100 }).catch(() => {});
 });
 
 function renderMarkers() {
@@ -227,7 +333,7 @@ function renderMarkers() {
     markers.forEach(m => map.removeLayer(m));
     markers = [];
 
-    const mountains = getNormalizedMountainsCache();
+    const mountains = getVisibleMountains();
 
     mountains.forEach(mtn => {
         // Red Map Marker for Leaflet
@@ -627,6 +733,61 @@ function getMountainAuthorName(authorId) {
 
 let pendingMountainPhotos = [];
 
+function stopMountainPhotoResize() {
+    if (!mountainPhotoResizeSession) return;
+    window.removeEventListener('pointermove', handleMountainPhotoResizeMove);
+    window.removeEventListener('pointerup', stopMountainPhotoResize);
+    window.removeEventListener('pointercancel', stopMountainPhotoResize);
+    mountainPhotoResizeSession = null;
+}
+
+function handleMountainPhotoResizeMove(event) {
+    if (!mountainPhotoResizeSession) return;
+    event.preventDefault();
+
+    const { index, startX, startWidth } = mountainPhotoResizeSession;
+    const current = normalizeMountainPhotoEntry(pendingMountainPhotos[index]);
+    if (!current) {
+        stopMountainPhotoResize();
+        return;
+    }
+
+    const nextWidth = clampMountainPhotoWidth(startWidth + (event.clientX - startX));
+    pendingMountainPhotos[index] = {
+        ...current,
+        width: nextWidth
+    };
+
+    const resizable = document.querySelector(`.mountain-photo-resizable[data-index="${index}"]`);
+    if (resizable) {
+        resizable.style.width = `${nextWidth}px`;
+    }
+
+    const label = document.querySelector(`.mountain-photo-preview-card[data-index="${index}"] .mountain-photo-size-label`);
+    if (label) {
+        label.textContent = `${nextWidth}px`;
+    }
+}
+
+window.startMountainPhotoResize = function(event, index) {
+    const current = normalizeMountainPhotoEntry(pendingMountainPhotos[index]);
+    if (!current) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    stopMountainPhotoResize();
+
+    mountainPhotoResizeSession = {
+        index,
+        startX: event.clientX,
+        startWidth: getMountainPhotoWidth(current)
+    };
+
+    window.addEventListener('pointermove', handleMountainPhotoResizeMove);
+    window.addEventListener('pointerup', stopMountainPhotoResize);
+    window.addEventListener('pointercancel', stopMountainPhotoResize);
+};
+
 function ensureMountainPhotoPreviewGrid() {
     const dropZone = document.getElementById('photoDropZone');
     if (!dropZone) return null;
@@ -652,29 +813,29 @@ function renderMountainPhotoPreviews() {
     preview.style.display = 'none';
     preview.src = '';
     if (!pendingMountainPhotos.length) {
+        stopMountainPhotoResize();
         grid.innerHTML = '';
         dropText.style.display = 'block';
         return;
     }
     dropText.style.display = 'none';
     grid.innerHTML = pendingMountainPhotos.map((photo, index) => `
-        <div class="mountain-photo-preview-card">
+        <div class="mountain-photo-preview-card" data-index="${index}">
             <div class="mountain-photo-preview-frame">
-                <img src="${escapeHtml(getMountainPhotoUrl(photo))}" class="mountain-photo-preview-image" style="max-width:min(100%, ${getMountainPhotoWidth(photo)}px);" alt="산행 사진 ${index + 1}">
+                <div class="mountain-photo-resizable" data-index="${index}" style="width:${getMountainPhotoWidth(photo)}px;">
+                    <img src="${escapeHtml(getMountainPhotoUrl(photo))}" class="mountain-photo-preview-image" alt="산행 사진 ${index + 1}">
+                    <button
+                        type="button"
+                        class="mountain-photo-resize-handle"
+                        onpointerdown="startMountainPhotoResize(event, ${index})"
+                        aria-label="산행 사진 ${index + 1} 크기 조절"
+                    ></button>
+                </div>
                 <button type="button" onclick="removeMountainPhoto(${index})" class="mountain-photo-remove-btn">×</button>
             </div>
             <div class="mountain-photo-size-controls">
                 <span class="mountain-photo-size-label">${getMountainPhotoWidth(photo)}px</span>
-                <input
-                    type="range"
-                    class="mountain-photo-size-slider"
-                    min="180"
-                    max="520"
-                    step="10"
-                    value="${getMountainPhotoWidth(photo)}"
-                    oninput="setMountainPhotoWidth(${index}, this.value)"
-                    aria-label="산행 사진 ${index + 1} 크기 조절"
-                >
+                <span class="mountain-photo-size-hint">모서리를 잡아 원하는 크기로 조절</span>
             </div>
         </div>
     `).join('');
@@ -693,16 +854,6 @@ function addMountainPhoto(photoUrl) {
 
 window.removeMountainPhoto = function(index) {
     pendingMountainPhotos.splice(index, 1);
-    renderMountainPhotoPreviews();
-};
-
-window.setMountainPhotoWidth = function(index, nextWidth) {
-    const current = normalizeMountainPhotoEntry(pendingMountainPhotos[index]);
-    if (!current) return;
-    pendingMountainPhotos[index] = {
-        ...current,
-        width: clampMountainPhotoWidth(nextWidth)
-    };
     renderMountainPhotoPreviews();
 };
 
@@ -773,6 +924,7 @@ window.deleteMountain = async function(id) {
     const updated = previousMountains.filter((item) => item.id !== id);
 
     mountainsMutationVersion += 1;
+    queueMountainDelete(id);
     saveMountains(updated);
     map.closePopup();
     closeMtDetailModal();
@@ -780,8 +932,9 @@ window.deleteMountain = async function(id) {
     renderMountainBoard();
 
     try {
-        await deleteMountainOnServer(id);
+        await flushPendingMountainDeletes();
     } catch (error) {
+        dequeueMountainDelete(id);
         saveMountains(previousMountains);
         renderMarkers();
         renderMountainBoard();
@@ -851,7 +1004,7 @@ function renderMountainBoard() {
     const grid = document.getElementById('mountainBoardGrid');
     if (!grid) return;
 
-      const mountains = getNormalizedMountainsCache()
+      const mountains = getVisibleMountains()
           .sort((a, b) => new Date(b.updatedAt || b.createdAt || b.date) - new Date(a.updatedAt || a.createdAt || a.date));
 
     if (!mountains.length) {
