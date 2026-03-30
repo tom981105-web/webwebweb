@@ -22,7 +22,7 @@ export function LeaderboardPanel({
   const sortedEntries = entries
     .filter((entry) => {
       const normalizedId = String(entry.id || '').replace(/^stock-sim-/, '');
-      return !hiddenPreviewIds.has(normalizedId);
+      return !hiddenPreviewIds.has(normalizedId) && entry.kind === 'current-user';
     })
     .sort((left, right) =>
       sortMode === 'returnRate'
