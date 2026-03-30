@@ -3,6 +3,8 @@ let map;
 let markers = [];
 let mountainsCache = [];
 let mountainBoardBootstrapped = false;
+let mountainsRefreshToken = 0;
+let mountainsMutationVersion = 0;
 
 function getApiBase() {
     if (window.location.protocol === 'file:') {
@@ -134,7 +136,12 @@ async function deleteMountainOnServer(id) {
 async function refreshMountainsFromServer(options = {}) {
     const attempts = Number.isFinite(Number(options.attempts)) ? Number(options.attempts) : 2;
     const delayMs = Number.isFinite(Number(options.delayMs)) ? Number(options.delayMs) : 150;
+    const refreshToken = ++mountainsRefreshToken;
+    const startedMutationVersion = mountainsMutationVersion;
     const nextMountains = (await retryAsync(() => fetchMountainsFromServer(), attempts, delayMs)).map(normalizeMountainRecord);
+    if (refreshToken !== mountainsRefreshToken || startedMutationVersion !== mountainsMutationVersion) {
+        return getNormalizedMountainsCache();
+    }
     const previousSerialized = JSON.stringify(getNormalizedMountainsCache());
     const nextSerialized = JSON.stringify(nextMountains);
     mountainsCache = nextMountains;
@@ -764,11 +771,13 @@ window.deleteMountain = async function(id) {
     const updated = getNormalizedMountainsCache()
         .filter((item) => item.id !== id);
 
+    mountainsMutationVersion += 1;
     saveMountains(updated);
     map.closePopup();
     renderMarkers();
     renderMountainBoard();
     closeMtDetailModal();
+    void refreshMountainsFromServer({ attempts: 1, delayMs: 100 }).catch(() => {});
 };
 
 document.getElementById('mountainForm').onsubmit = async (e) => {
@@ -814,10 +823,12 @@ document.getElementById('mountainForm').onsubmit = async (e) => {
         ? mountains.map((mountain) => mountain.id === editId ? savedRecord : mountain)
         : [savedRecord, ...mountains];
 
+    mountainsMutationVersion += 1;
     saveMountains(nextMountains);
     renderMarkers();
     renderMountainBoard();
     closeAddModal();
+    void refreshMountainsFromServer({ attempts: 1, delayMs: 100 }).catch(() => {});
 
     map.flyTo([parseFloat(savedRecord.lat), parseFloat(savedRecord.lng)], 11, {
         animate: true,
