@@ -158,7 +158,7 @@ function createStockFromBlueprint(blueprint: StockBlueprint, listedDay = 1): Sto
     distressScore: blueprint.archetype === 'distressed' ? 0.44 : 0,
     listedDay,
     ipoDaysRemaining: 0,
-    themeTag: blueprint.archetype === 'theme' ? 'Theme premium' : null,
+    themeTag: blueprint.archetype === 'theme' ? '초기 테마 프리미엄' : null,
     themeIntensity: blueprint.archetype === 'theme' ? 0.14 : 0,
     themeUntilTick: 0,
     bubblePhase: 'idle',
@@ -419,6 +419,7 @@ export function createInitialWorldState(
     marketSentiment: marketMood,
     sectorFlows: Object.fromEntries(sectors.map((sector) => [sector, 0])) as Record<Sector, number>,
     activeTheme: null,
+    lastIpoDay: 0,
     haltedCount: 0,
     warningCount: 0,
     delistedCount: 0,
@@ -485,6 +486,7 @@ export function normalizeWorldState(
       return accumulator;
     }, {} as Record<Sector, number>),
     activeTheme: typeof world?.activeTheme === 'string' ? world.activeTheme : null,
+    lastIpoDay: Math.max(0, Math.round(Number(world?.lastIpoDay ?? seeded.lastIpoDay))),
     haltedCount: Math.max(0, Math.round(Number(world?.haltedCount ?? 0))),
     warningCount: Math.max(0, Math.round(Number(world?.warningCount ?? 0))),
     delistedCount: Math.max(0, Math.round(Number(world?.delistedCount ?? 0))),
@@ -678,7 +680,7 @@ export function normalizeSimulationState(simulation: SimulationState): Simulatio
     player: {
       ...simulation.player,
       id: simulation.player?.id || 'local-player',
-      name: String(simulation.player?.name || 'Player'),
+      name: String(simulation.player?.name || '플레이어'),
       cash: Math.max(0, Number(simulation.player?.cash || INITIAL_PLAYER_CASH)),
       holdings: Array.isArray(simulation.player?.holdings) ? simulation.player.holdings : [],
       realizedPnL: Number(simulation.player?.realizedPnL || 0),
@@ -703,11 +705,11 @@ export function normalizeSimulationState(simulation: SimulationState): Simulatio
       : [
           {
             id: 'local-player',
-            name: 'Player',
+            name: '플레이어',
             kind: 'current-user',
             netWorth: INITIAL_PLAYER_CASH,
             returnRate: 0,
-            style: 'Local trader',
+            style: '실시간 참가자',
             focusSectors: [],
             volatility: 0,
             lastDelta: 0,
@@ -741,7 +743,7 @@ export function createInitialSimulationState(): SimulationState {
     stocks,
     player: {
       id: 'local-player',
-      name: 'Player',
+      name: '플레이어',
       cash: INITIAL_PLAYER_CASH,
       holdings: [],
       realizedPnL: 0,
@@ -755,11 +757,11 @@ export function createInitialSimulationState(): SimulationState {
     leaderboard: [
       {
         id: 'local-player',
-        name: 'Player',
+        name: '플레이어',
         kind: 'current-user',
         netWorth: INITIAL_PLAYER_CASH,
         returnRate: 0,
-        style: 'Local trader',
+        style: '실시간 참가자',
         focusSectors: [],
         volatility: 0,
         lastDelta: 0,

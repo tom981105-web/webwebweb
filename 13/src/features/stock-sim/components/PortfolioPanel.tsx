@@ -6,6 +6,7 @@ import {
   formatCurrency,
   formatPercent,
   formatPrice,
+  getSectorLabel,
 } from '@/features/stock-sim/utils/formatters';
 import {
   calculateHoldingPnL,
@@ -165,7 +166,7 @@ const PortfolioRow = memo(function PortfolioRow({
             <span className="ss-rounded-full ss-bg-white/8 ss-px-2 ss-py-0.5 ss-text-[11px] ss-text-slate-300">
               {stock.ticker}
             </span>
-            <span className="ss-ui-chip ss-ui-chip-info">{stock.sector}</span>
+            <span className="ss-ui-chip ss-ui-chip-info">{getSectorLabel(stock.sector)}</span>
           </div>
           <div className="ss-mt-2 ss-space-y-1">
             <div className="ss-flex ss-items-center ss-justify-between ss-text-xs ss-text-slate-400">
@@ -208,7 +209,7 @@ const PortfolioRow = memo(function PortfolioRow({
           <span className="ss-rounded-full ss-bg-white/8 ss-px-2 ss-py-0.5 ss-text-[11px] ss-text-slate-300">
             {stock.ticker}
           </span>
-          <span className="ss-ui-chip ss-ui-chip-info">{stock.sector}</span>
+          <span className="ss-ui-chip ss-ui-chip-info">{getSectorLabel(stock.sector)}</span>
         </div>
 
         <div className="ss-grid ss-grid-cols-2 ss-gap-3">

@@ -75,6 +75,7 @@ type StockTransitionResult = {
   stocks: Stock[];
   events: MarketEvent[];
   activityLog: ActivityItem[];
+  lastIpoDay?: number;
 };
 
 const SESSION_OPEN_MINUTES = 9 * 60;
@@ -82,34 +83,49 @@ const SESSION_OPENING_END = 10 * 60;
 const SESSION_CLOSING_START = 15 * 60 + 10;
 const SESSION_CLOSING_END = 15 * 60 + 30;
 
+const SECTOR_LABELS: Record<Sector, string> = {
+  AI: '인공지능',
+  Semiconductor: '반도체',
+  Robotics: '로보틱스',
+  Space: '우주항공',
+  Bio: '바이오',
+  Battery: '배터리',
+  Game: '게임',
+  Platform: '플랫폼',
+  Logistics: '물류',
+  Energy: '에너지',
+  Entertainment: '엔터',
+  Defense: '방산',
+};
+
 const THEME_NAMES: Record<Sector, string[]> = {
-  AI: ['AI inference cluster', 'Autonomous agent rush', 'Robot supply chain'],
-  Semiconductor: ['Memory upcycle', 'Advanced package rush', 'Foundry bottleneck'],
-  Robotics: ['Factory automation boom', 'Humanoid contract wave', 'Defense robotics bid'],
-  Space: ['Launch window mania', 'Satellite network expansion', 'Space payload bid'],
-  Bio: ['Clinical catalyst', 'Rare disease momentum', 'Platform biotech surge'],
-  Battery: ['Solid-state momentum', 'Recycling breakthrough', 'Grid storage bid'],
-  Game: ['Global launch theme', 'Platform update hype', 'Creator ecosystem rally'],
-  Platform: ['Ad-tech recovery', 'Cloud subscription boom', 'Marketplace expansion'],
-  Logistics: ['Freight recovery', 'Cold chain theme', 'Last-mile automation'],
-  Energy: ['Power grid upgrade', 'Hydrogen narrative', 'Refinery margin swing'],
-  Entertainment: ['Streaming content rally', 'Concert demand spike', 'Character IP rush'],
-  Defense: ['Export contract buzz', 'Drone procurement wave', 'Naval upgrade cycle'],
+  AI: ['AI ??? ??', '?? ???? ??', '?? ??? ??'],
+  Semiconductor: ['??? ?? ??', '?? ??? ??', '???? ?? ??'],
+  Robotics: ['?? ??? ??', '????? ??', '?? ?? ??'],
+  Space: ['?? ?? ???', '??? ??', '?? ??? ??'],
+  Bio: ['?? ???', '???? ???', '??? ??? ??'],
+  Battery: ['??? ???', '????? ??', '???? ??'],
+  Game: ['?? ?? ??', '??? ????', '??? ??? ??'],
+  Platform: ['?? ?? ??', '???? ?? ??', '?????? ??'],
+  Logistics: ['?? ?? ??', '???? ??', '????? ???'],
+  Energy: ['??? ?? ??', '?? ?? ??', '???? ??'],
+  Entertainment: ['??? ?? ??', '?? ?? ??', '??? IP ??'],
+  Defense: ['?? ?? ??', '?? ?? ??', '?? ??? ???'],
 };
 
 const REBUILD_NAMES: Record<Sector, string[]> = {
-  AI: ['Neural Forge', 'Signal Foundry', 'Aether Logic'],
-  Semiconductor: ['Vector Silicon', 'Nano Junction', 'Prime Wafer'],
-  Robotics: ['Motion Arc', 'Servo Harbor', 'Atlas Motion'],
-  Space: ['Orbital Rise', 'Nova Launch', 'Blue Trajectory'],
-  Bio: ['Helix Bloom', 'Cell Frontier', 'Medi Origin'],
-  Battery: ['Core Volt', 'Ion Harbor', 'Next Cell'],
-  Game: ['Pixel Harbor', 'Play Realm', 'Level Spark'],
-  Platform: ['Link Harbor', 'Axis Platform', 'Nexus Grid'],
-  Logistics: ['Route Harbor', 'Cargo Flow', 'Swift Lane'],
-  Energy: ['Grid Pulse', 'Nova Energy', 'Solar Crest'],
-  Entertainment: ['Stage Bloom', 'Prism Story', 'Idol Harbor'],
-  Defense: ['Shield Axis', 'Sentinel Forge', 'Iron Harbor'],
+  AI: ['????', '??????', '?????'],
+  Semiconductor: ['?????', '????', '??????'],
+  Robotics: ['????', '????', '??????'],
+  Space: ['??????', '????', '????'],
+  Bio: ['?????', '?????', '?????'],
+  Battery: ['????', '?????', '????'],
+  Game: ['????', '?????', '?????'],
+  Platform: ['????', '??????', '??????'],
+  Logistics: ['????', '?????', '??????'],
+  Energy: ['?????', '?????', '??????'],
+  Entertainment: ['??????', '??????', '?????'],
+  Defense: ['?????', '?????', '?????'],
 };
 
 function getDailyLimits(referencePrice: number) {
@@ -305,11 +321,12 @@ function getStockEventImpulse(stock: Stock, events: MarketEvent[]) {
 function createThemeEvent(simulation: SimulationState) {
   const sector = pickRandom(sectors);
   const themeName = pickRandom(THEME_NAMES[sector]);
+  const sectorLabel = SECTOR_LABELS[sector];
   return createEvent(
     'theme',
     'sector',
     `${themeName} 부상`,
-    `${sector} 섹터에 자금이 몰리며 테마 순환이 강화되고 있습니다.`,
+    `${sectorLabel} 섹터에 자금이 몰리며 테마 순환이 강화되고 있습니다.`,
     randomBetween(0.28, 0.56),
     randomInt(THEME_EVENT_MIN_DURATION, THEME_EVENT_MAX_DURATION),
     simulation.tick,
@@ -456,7 +473,7 @@ function createIpoBlueprint(sector: Sector): StockBlueprint {
     ticker: createTickerFromSector(sector),
     name,
     sector,
-    description: `${sector} 섹터에서 새롭게 상장한 종목입니다.`,
+    description: `${SECTOR_LABELS[sector]} ???? ??? ???? ?? ?? ?? ?????.`,
     archetype,
     basePrice,
     volatility,
@@ -467,7 +484,8 @@ function createIpoBlueprint(sector: Sector): StockBlueprint {
     sharesOutstanding: randomInt(12_000_000, 84_000_000),
     aiAffinity: randomBetween(0.3, 0.88),
     newsSensitivity: randomBetween(0.4, 0.92),
-    collapseRisk: archetype === 'distressed' ? randomBetween(0.5, 0.9) : randomBetween(0.12, 0.46),
+    collapseRisk:
+      archetype === 'distressed' ? randomBetween(0.5, 0.9) : randomBetween(0.12, 0.46),
   };
 }
 
@@ -1258,24 +1276,28 @@ function maybeSpawnIpo(
   events: MarketEvent[],
   activityLog: ActivityItem[],
 ): StockTransitionResult {
-  if (stocks.length >= MAX_LISTED_STOCKS || !chance(STOCK_IPO_CHANCE)) {
-    return { stocks, events, activityLog };
+  const activeListedCount = stocks.filter((stock) => stock.status !== 'DELISTED').length;
+  const hasVacancy = activeListedCount < MAX_LISTED_STOCKS;
+
+  if (!hasVacancy || simulation.world.lastIpoDay >= simulation.world.dayCount || !chance(STOCK_IPO_CHANCE)) {
+    return { stocks, events, activityLog, lastIpoDay: simulation.world.lastIpoDay };
   }
 
   const sector = chance(0.55) ? pickDominantSector(simulation.sectorMood) : pickRandom(sectors);
+  const sectorLabel = SECTOR_LABELS[sector];
   const blueprint = createIpoBlueprint(sector);
   const stock = createStockFromBlueprint(blueprint, simulation.world.dayCount);
   const event = createEvent(
     'ipo',
     'stock',
-    `${stock.name} 신규 상장`,
-    `${stock.name}(${stock.ticker})가 ${sector} 섹터에 신규 상장했습니다. 초기 변동성이 높아 주의가 필요합니다.`,
+    `${stock.name} ?? ??`,
+    `${stock.name}(${stock.ticker})? ${sectorLabel} ??? ?? ??????. ?? ???? ?? ??? ?????.`,
     randomBetween(0.18, 0.34),
     randomInt(40, 90),
     simulation.tick,
     [stock.id],
     [sector],
-    { themeTag: '신규 상장' },
+    { themeTag: '?? ??' },
   );
 
   return {
@@ -1283,8 +1305,9 @@ function maybeSpawnIpo(
     events: appendEvent(events, event),
     activityLog: appendActivity(
       activityLog,
-      createActivity('IPO 등장', `${stock.name}이(가) ${sector} 섹터에 새로 상장했습니다.`, simulation.tick, 'positive'),
+      createActivity('IPO ??', `${stock.name}? ${sectorLabel} ??? ?? ??????.`, simulation.tick, 'positive'),
     ),
+    lastIpoDay: simulation.world.dayCount,
   };
 }
 
@@ -1313,6 +1336,7 @@ function maybeSpawnRebuild(
   const target = pickRandom(candidates);
   const sectorsExceptCurrent = sectors.filter((sector) => sector !== target.sector);
   const nextSector = chance(0.55) ? pickDominantSector(simulation.sectorMood) : pickRandom(sectorsExceptCurrent);
+  const nextSectorLabel = SECTOR_LABELS[nextSector];
   const nextName = pickRandom(REBUILD_NAMES[nextSector]);
   const nextTicker = createTickerFromSector(nextSector);
   const nextArchetype: StockArchetype = chance(0.6) ? 'growth' : 'theme';
@@ -1322,8 +1346,8 @@ function maybeSpawnRebuild(
     ticker: nextTicker,
     sector: nextSector,
     archetype: nextArchetype,
-    description: `${nextSector} 테마로 체질을 개선한 리빌딩 종목입니다.`,
-    themeTag: '리빌딩',
+    description: `${nextSectorLabel} ??? ??? ??? ??? ?????.`,
+    themeTag: '???',
     themeIntensity: clamp(target.themeIntensity + 0.42, 0, 2),
     themeUntilTick: simulation.tick + randomInt(160, 320),
     status: 'NORMAL' as const,
@@ -1338,14 +1362,14 @@ function maybeSpawnRebuild(
   const event = createEvent(
     'reverse-merger',
     'stock',
-    `${target.name} 리빌딩`,
-    `${target.name}이(가) ${nextSector} 중심 기업으로 재편되며 ${nextName}(으)로 사명을 변경했습니다.`,
+    `${target.name} ???`,
+    `${target.name}? ${nextSectorLabel} ?? ???? ??? ??? ${nextName}(?)? ??? ??????.`,
     randomBetween(0.2, 0.42),
     randomInt(120, 240),
     simulation.tick,
     [target.id],
     [nextSector],
-    { themeTag: '리빌딩' },
+    { themeTag: '???' },
   );
 
   return {
@@ -1353,7 +1377,7 @@ function maybeSpawnRebuild(
     events: appendEvent(events, event),
     activityLog: appendActivity(
       activityLog,
-      createActivity('우회상장/리빌딩', `${target.name}이(가) ${nextName}(으)로 재편됐습니다.`, simulation.tick, 'positive'),
+      createActivity('????/???', `${target.name}? ${nextName}(?)? ? ??????.`, simulation.tick, 'positive'),
     ),
   };
 }
@@ -1608,6 +1632,13 @@ function stepOneTick(simulation: SimulationState, timestamp: number) {
   nextStocks = ipoState.stocks;
   nextEvents = ipoState.events;
   nextActivity = ipoState.activityLog;
+  working = {
+    ...working,
+    world: {
+      ...working.world,
+      lastIpoDay: ipoState.lastIpoDay ?? working.world.lastIpoDay,
+    },
+  };
 
   const rebuildState = maybeSpawnRebuild(working, nextStocks, nextEvents, nextActivity);
   nextStocks = rebuildState.stocks;

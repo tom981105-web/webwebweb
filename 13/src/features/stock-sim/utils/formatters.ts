@@ -2,6 +2,7 @@ import type {
   AiArchetype,
   DayPhase,
   MarketRegime,
+  Sector,
   StockArchetype,
   StockLimitState,
   StockStatus,
@@ -26,6 +27,21 @@ const compactFormatter = new Intl.NumberFormat('ko-KR', {
   maximumFractionDigits: 1,
 });
 
+const SECTOR_LABELS: Record<Sector, string> = {
+  AI: '인공지능',
+  Semiconductor: '반도체',
+  Robotics: '로보틱스',
+  Space: '우주항공',
+  Bio: '바이오',
+  Battery: '배터리',
+  Game: '게임',
+  Platform: '플랫폼',
+  Logistics: '물류',
+  Energy: '에너지',
+  Entertainment: '엔터',
+  Defense: '방산',
+};
+
 const MARKET_MOOD_LABELS = [
   { min: 0.55, label: '과열 랠리' },
   { min: 0.2, label: '매수 우위' },
@@ -45,11 +61,11 @@ const MARKET_REGIME_LABELS: Record<MarketRegime, string> = {
 
 const MARKET_REGIME_DESCRIPTIONS: Record<MarketRegime, string> = {
   accumulation: '조용한 매집과 분산 매수가 누적되는 구간입니다.',
-  markup: '주도주에 자금이 몰리며 상승 압력이 확장되는 구간입니다.',
-  rotation: '섹터 간 자금 이동이 잦아지며 순환매가 강해진 구간입니다.',
-  distribution: '강한 종목에서 차익 실현이 늘어나며 공급이 많아지는 구간입니다.',
-  panic: '위험회피 심리가 커지며 변동성과 하락 압력이 높아진 구간입니다.',
-  rebound: '급락 이후 저가 매수가 유입되며 반등을 시도하는 구간입니다.',
+  markup: '주도주에 자금이 몰리며 상승 탄력이 확장되는 구간입니다.',
+  rotation: '섹터 간 자금 이동이 잦아지며 순환매가 강화되는 구간입니다.',
+  distribution: '강한 종목에서 차익 실현이 늘어나고 공급이 많아지는 구간입니다.',
+  panic: '위험 회피 심리가 커지며 변동성과 하락 압력이 높아진 구간입니다.',
+  rebound: '급락 이후 저가 매수가 유입되고 반등을 시도하는 구간입니다.',
 };
 
 const ARCHETYPE_LABELS: Record<AiArchetype, string> = {
@@ -91,11 +107,11 @@ const DAY_PHASE_LABELS: Record<DayPhase, string> = {
 };
 
 const TRAIT_LABELS: Record<StockTrait, string> = {
-  stable: '안정적',
-  'news-sensitive': '이슈 민감',
+  stable: '안정형',
+  'news-sensitive': '뉴스 민감',
   'ai-favorite': 'AI 선호',
-  speculative: '투기적',
-  defensive: '방어적',
+  speculative: '투기형',
+  defensive: '방어형',
   'theme-heavy': '테마 강함',
   'trend-heavy': '추세 강함',
   'volume-spike': '거래량 급증',
@@ -130,6 +146,10 @@ export function formatPercent(value: number, digits = 2) {
 export function formatSignedNumber(value: number, digits = 0) {
   const prefix = value > 0 ? '+' : '';
   return `${prefix}${value.toFixed(digits)}`;
+}
+
+export function getSectorLabel(sector: Sector) {
+  return SECTOR_LABELS[sector] ?? sector;
 }
 
 export function getMarketMoodLabel(mood: number) {
@@ -230,7 +250,7 @@ export function formatMarketClock(totalMinutes: number) {
     .padStart(2, '0');
   const minutes = (normalized % 60).toString().padStart(2, '0');
 
-  return `Day ${day} · ${hours}:${minutes}`;
+  return `${day}일차 ${hours}:${minutes}`;
 }
 
 function hasFinalConsonant(value: string) {

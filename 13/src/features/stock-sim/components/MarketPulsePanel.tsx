@@ -11,12 +11,14 @@ import {
 import { Panel } from '@/features/stock-sim/components/Panel';
 import type {
   MarketWorldState,
+  Sector,
   StockSummary,
   VolatilityLeaderSnapshot,
 } from '@/features/stock-sim/types';
 import {
   formatPercent,
   formatPrice,
+  getSectorLabel,
   getMarketMoodLabel,
   getMarketRegimeDescription,
   getMarketRegimeLabel,
@@ -159,13 +161,13 @@ export function MarketPulsePanel({
               <div>
                 <p className="ss-ui-kpi-label ss-text-[12px]">주도 섹터</p>
                 <p className="ss-mt-1 ss-text-[16px] ss-font-semibold ss-text-white">
-                  {world.dominantSector}
+                  {getSectorLabel(world.dominantSector)}
                 </p>
               </div>
               <MoveRight className="ss-h-4 ss-w-4 ss-text-cyan-100" />
             </div>
             <p className="ss-mt-3 ss-text-[11px] ss-text-slate-300/78">
-              AI 집중 {world.aiFocusSector}
+              AI 집중 {getSectorLabel(world.aiFocusSector)}
             </p>
           </article>
 
@@ -201,7 +203,7 @@ export function MarketPulsePanel({
               <div key={sector} className="ss-ui-soft-card ss-rounded-[14px] ss-p-3">
                 <div className="ss-flex ss-items-center ss-justify-between ss-gap-2">
                   <div className="ss-flex ss-items-center ss-gap-1">
-                    <span className="ss-text-[13px] ss-font-medium ss-text-white">{sector}</span>
+                    <span className="ss-text-[13px] ss-font-medium ss-text-white">{getSectorLabel(sector as Sector)}</span>
                     {sector === world.aiFocusSector ? <StatusChip label="AI 집중" tone="neutral" /> : null}
                     {sector === world.dominantSector ? <StatusChip label="주도" tone="positive" /> : null}
                   </div>
@@ -250,7 +252,7 @@ export function MarketPulsePanel({
                       <p className="ss-truncate ss-text-sm ss-font-medium ss-text-white">{stock.name}</p>
                       <div className="ss-mt-1 ss-flex ss-flex-wrap ss-items-center ss-gap-1.5">
                         <span className="ss-text-[11px] ss-text-slate-400">
-                          {stock.ticker} · {stock.sector} · {getStockArchetypeLabel(stock.archetype)}
+                          {stock.ticker} · {getSectorLabel(stock.sector)} · {getStockArchetypeLabel(stock.archetype)}
                         </span>
                         <StatusChip label={getStockStatusLabel(stock.status)} tone={getStatusTone(stock)} />
                         {stock.dailyLimitState !== 'normal' ? (
@@ -290,7 +292,7 @@ export function MarketPulsePanel({
                     <p className="ss-truncate ss-text-sm ss-font-medium ss-text-white">{stock.name}</p>
                     <div className="ss-mt-1 ss-flex ss-flex-wrap ss-items-center ss-gap-1.5">
                       <span className="ss-text-[11px] ss-text-slate-400">
-                        {stock.ticker} · {stock.sector}
+                        {stock.ticker} · {getSectorLabel(stock.sector)}
                       </span>
                       <StatusChip
                         label={getStockStatusLabel(stock.status)}
@@ -359,12 +361,12 @@ export function MarketPulsePanel({
           <div className="ss-mt-2.5 ss-grid ss-gap-2 sm:ss-grid-cols-2">
             <div className="ss-ui-soft-card ss-rounded-[16px] ss-p-2.5">
               <p className="ss-ui-kpi-label">가장 강한 흐름</p>
-              <p className="ss-mt-1 ss-text-sm ss-font-semibold ss-text-white">{strongest?.[0] ?? '-'}</p>
+              <p className="ss-mt-1 ss-text-sm ss-font-semibold ss-text-white">{strongest ? getSectorLabel(strongest[0] as Sector) : '-'}</p>
               <p className="ss-mt-1 ss-text-[10px] ss-ui-number-up">{formatPercent((strongest?.[1] ?? 0) * 12, 1)}</p>
             </div>
             <div className="ss-ui-soft-card ss-rounded-[16px] ss-p-2.5">
               <p className="ss-ui-kpi-label">가장 약한 흐름</p>
-              <p className="ss-mt-1 ss-text-sm ss-font-semibold ss-text-white">{weakest?.[0] ?? '-'}</p>
+              <p className="ss-mt-1 ss-text-sm ss-font-semibold ss-text-white">{weakest ? getSectorLabel(weakest[0] as Sector) : '-'}</p>
               <p className="ss-mt-1 ss-text-[10px] ss-ui-number-down">{formatPercent((weakest?.[1] ?? 0) * 12, 1)}</p>
             </div>
           </div>

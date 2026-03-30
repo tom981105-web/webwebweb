@@ -47,23 +47,23 @@ export const TRADING_HALT_MAX_TICKS = 26;
 export const STOCK_WARNING_THRESHOLD = 0.9;
 export const STOCK_DELIST_THRESHOLD = 1.9;
 export const STOCK_BUBBLE_CHANCE = 0.01;
-export const STOCK_IPO_CHANCE = 0.003;
+export const STOCK_IPO_CHANCE = 1;
 export const STOCK_REBUILD_CHANCE = 0.0018;
-export const MAX_LISTED_STOCKS = 24;
+export const MAX_LISTED_STOCKS = 16;
 
 export const MARKET_MOOD_LABELS = [
-  { min: 0.55, label: 'Overheated Rally' },
-  { min: 0.2, label: 'Bullish Bid' },
-  { min: -0.2, label: 'Balanced Range' },
-  { min: -0.55, label: 'Risk-Off Drift' },
-  { min: Number.NEGATIVE_INFINITY, label: 'Fear Wave' },
+  { min: 0.55, label: '과열 랠리' },
+  { min: 0.2, label: '매수 우위' },
+  { min: -0.2, label: '중립 균형' },
+  { min: -0.55, label: '리스크 오프' },
+  { min: Number.NEGATIVE_INFINITY, label: '공포 확산' },
 ] as const;
 
 export const MARKET_REGIME_LABELS = {
-  accumulation: 'Accumulation',
-  markup: 'Markup',
-  rotation: 'Rotation',
-  distribution: 'Distribution',
-  panic: 'Panic',
-  rebound: 'Rebound',
+  accumulation: '매집 구간',
+  markup: '상승 확장',
+  rotation: '섹터 순환',
+  distribution: '차익 실현',
+  panic: '패닉 구간',
+  rebound: '반등 시도',
 } as const;

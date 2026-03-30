@@ -21,6 +21,7 @@ import {
   formatCompactNumber,
   formatPercent,
   formatPrice,
+  getSectorLabel,
   getLimitStateLabel,
   getStockArchetypeLabel,
   getStockStatusLabel,
@@ -153,7 +154,7 @@ const StockCard = memo(function StockCard({
           <p className="ss-mt-1 ss-truncate ss-text-[11px] ss-font-medium ss-tracking-[0.08em] ss-text-slate-300">
             {stock.ticker}
           </p>
-          <p className="ss-mt-1 ss-text-[11px] ss-font-medium ss-text-slate-400">{stock.sector}</p>
+          <p className="ss-mt-1 ss-text-[11px] ss-font-medium ss-text-slate-400">{getSectorLabel(stock.sector)}</p>
         </div>
         <span
           className={`ss-shrink-0 ss-rounded-full ss-px-2 ss-py-1 ss-text-[11px] ss-font-semibold ${
@@ -331,7 +332,7 @@ export function StockListPanel({
                 : 'ss-border-white/10 ss-bg-white/5 ss-text-slate-200 hover:ss-bg-white/10'
             }`}
           >
-            {sector}
+            {getSectorLabel(sector)}
           </button>
         ))}
       </div>
@@ -353,7 +354,7 @@ export function StockListPanel({
           </button>
         ))}
         <span className="ss-ml-auto ss-text-xs ss-text-slate-300/78">
-          {sectorFilter === 'ALL' ? '전체 시장' : `${sectorFilter} 섹터`} · {getSortLabel(sortMode)} 정렬
+          {sectorFilter === 'ALL' ? '전체 시장' : `${getSectorLabel(sectorFilter)} 섹터`} · {getSortLabel(sortMode)} 정렬
         </span>
       </div>
 

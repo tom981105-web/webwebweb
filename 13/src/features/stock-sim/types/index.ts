@@ -289,6 +289,7 @@ export interface MarketWorldState {
   marketSentiment: number;
   sectorFlows: Record<Sector, number>;
   activeTheme: string | null;
+  lastIpoDay: number;
   haltedCount: number;
   warningCount: number;
   delistedCount: number;

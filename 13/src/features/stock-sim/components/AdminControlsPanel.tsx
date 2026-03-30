@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Pause, Play, RotateCcw, ShieldCheck, Waves, X } from 'lucide-react';
 import { Panel } from '@/features/stock-sim/components/Panel';
-import type { RuntimeState, SpeedSetting } from '@/features/stock-sim/types';
+import type { RuntimeState, Sector, SpeedSetting } from '@/features/stock-sim/types';
+import { getSectorLabel } from '@/features/stock-sim/utils/formatters';
 
 type AdminControlsPanelProps = {
   isRunning: boolean;
@@ -116,7 +117,7 @@ export function AdminControlsPanel({
 
         <div className="ss-grid ss-gap-2 sm:ss-grid-cols-3 xl:ss-grid-cols-1">
           <MiniStat label="시장 심리" value={marketMoodLabel} />
-          <MiniStat label="주도 섹터" value={dominantSector} />
+          <MiniStat label="주도 섹터" value={getSectorLabel(dominantSector as Sector)} />
           <MiniStat label="엔진 상태" value={`${speed}배속 · 틱 ${tick.toLocaleString('ko-KR')}`} />
         </div>
       </div>

@@ -41,6 +41,7 @@ import {
   formatCurrency,
   formatPercent,
   formatPrice,
+  getSectorLabel,
   getTraitLabel,
 } from '@/features/stock-sim/utils/formatters';
 
@@ -236,7 +237,7 @@ export const StockDetailPanel = memo(function StockDetailPanel({
             <div className="ss-flex ss-flex-col ss-gap-5 xl:ss-flex-row xl:ss-items-start xl:ss-justify-between">
               <div className="ss-min-w-0">
                 <div className="ss-flex ss-flex-wrap ss-items-center ss-gap-2">
-                  <span className="ss-ui-chip ss-ui-chip-info">{stock.sector}</span>
+                  <span className="ss-ui-chip ss-ui-chip-info">{getSectorLabel(stock.sector)}</span>
                   {stock.traits.map((trait) => (
                     <span key={trait} className="ss-ui-chip">
                       {getTraitLabel(trait)}

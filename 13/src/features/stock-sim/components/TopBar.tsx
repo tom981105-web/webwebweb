@@ -11,11 +11,12 @@ import {
   Wallet,
   Waves,
 } from 'lucide-react';
-import type { RuntimeState } from '@/features/stock-sim/types';
+import type { RuntimeState, Sector } from '@/features/stock-sim/types';
 import {
   formatCurrency,
   formatPercent,
   formatRelativeTime,
+  getSectorLabel,
 } from '@/features/stock-sim/utils/formatters';
 
 type TopBarProps = {
@@ -195,8 +196,8 @@ export function TopBar({
           <MiniStat label="가상 시각" value={marketClock} emphasis />
           <MiniStat label="시장 심리" value={marketMoodLabel} />
           <MiniStat label="시장 구간" value={marketRegimeLabel} />
-          <MiniStat label="주도 섹터" value={dominantSector} />
-          <MiniStat label="AI 집중 섹터" value={aiFocusSector} />
+          <MiniStat label="주도 섹터" value={getSectorLabel(dominantSector as Sector)} />
+          <MiniStat label="AI 집중 섹터" value={getSectorLabel(aiFocusSector as Sector)} />
           <MiniStat label="활성 테마" value={activeTheme || '없음'} />
           <MiniStat label="거래정지" value={`${haltedCount}개`} />
           <MiniStat label="관리/퇴출" value={`${warningCount} / ${delistedCount}`} />
