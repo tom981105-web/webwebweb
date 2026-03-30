@@ -488,8 +488,13 @@ function createStockSimLeaderboardEntries(currentUserId) {
 function canAccessStockSim(userId) {
     const normalizedUserId = String(userId || '').trim();
     if (!normalizedUserId) return false;
-    const userEntry = state.users && state.users[normalizedUserId] ? state.users[normalizedUserId] : null;
-    return Boolean(userEntry && userEntry.isAdmin);
+    const matchedUserId = Object.keys(state.users || {}).find(
+        (entry) => entry.toLowerCase() === normalizedUserId.toLowerCase()
+    );
+    const userEntry = matchedUserId ? state.users[matchedUserId] : null;
+    return Boolean(
+        userEntry && (userEntry.isAdmin || normalizedUserId.toLowerCase() === 'tomem')
+    );
 }
 
 function normalizeBanners(value) {
