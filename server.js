@@ -804,7 +804,9 @@ async function persistDb(options = {}) {
     clearTimeout(deferredDbPersistTimer);
     deferredDbPersistTimer = null;
     hasPendingDeferredDbPersist = false;
-    await repairBoardPostsInState();
+    if (!options.skipBoardRepair) {
+        await repairBoardPostsInState();
+    }
     refreshRawDbFromState();
     flushRawDbToDisk();
 
@@ -814,6 +816,14 @@ async function persistDb(options = {}) {
     }
 
     await mirrorDatabaseToRemote();
+}
+
+function persistDbInBackground(options = {}) {
+    setTimeout(() => {
+        persistDb(options).catch((error) => {
+            console.error('[Persist] 백그라운드 저장에 실패했습니다.', error);
+        });
+    }, 0);
 }
 
 function migrateLoginHeroStorageIfNeeded() {
@@ -1011,8 +1021,6 @@ app.post('/api/auth/signup', async (req, res) => {
 });
 
 app.post('/api/auth/login', async (req, res) => {
-    reloadDb();
-
     const id = String(req.body && req.body.id ? req.body.id : '').trim();
     const password = String(req.body && req.body.password ? req.body.password : '').trim();
     const userKey = Object.keys(state.users).find((key) => key.toLowerCase() === id.toLowerCase());
@@ -1027,13 +1035,17 @@ app.post('/api/auth/login', async (req, res) => {
     };
     state.users = normalizeUsers(state.users);
     state.currentUser = userKey;
-    await persistDb();
 
     res.json({
         success: true,
         userId: userKey,
         user: state.users[userKey],
         users: state.users
+    });
+
+    persistDbInBackground({
+        deferRemote: true,
+        skipBoardRepair: true
     });
 });
 
