@@ -20,6 +20,9 @@ import {
   getMarketMoodLabel,
   getMarketRegimeDescription,
   getMarketRegimeLabel,
+  getStockStatusLabel,
+  getLimitStateLabel,
+  getStockArchetypeLabel,
 } from '@/features/stock-sim/utils/formatters';
 
 type MarketPulsePanelProps = {
@@ -52,6 +55,31 @@ function getMoodBarClass(value: number) {
   return 'ss-bg-gradient-to-r ss-from-slate-300 ss-to-cyan-300';
 }
 
+function StatusChip({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: 'neutral' | 'positive' | 'negative' | 'warning';
+}) {
+  const className =
+    tone === 'positive'
+      ? 'ss-ui-chip ss-ui-chip-positive'
+      : tone === 'negative'
+        ? 'ss-ui-chip ss-ui-chip-negative'
+        : tone === 'warning'
+          ? 'ss-ui-chip ss-border-amber-300/18 ss-bg-amber-300/10 ss-text-amber-50'
+          : 'ss-ui-chip';
+
+  return <span className={className}>{label}</span>;
+}
+
+function getStatusTone(stock: Pick<StockSummary, 'status'>) {
+  if (stock.status === 'WARNING') return 'warning' as const;
+  if (stock.status === 'HALTED' || stock.status === 'DELISTED') return 'negative' as const;
+  return 'neutral' as const;
+}
+
 export function MarketPulsePanel({
   world,
   marketMood,
@@ -70,7 +98,7 @@ export function MarketPulsePanel({
   return (
     <Panel
       title="시장 펄스"
-      subtitle="시장 심리와 섹터 순환, 오늘의 강한 흐름을 한 번에 읽을 수 있도록 정리했습니다."
+      subtitle="시장 심리, 섹터 자금 흐름, 오늘의 테마와 과열 종목을 한 번에 살펴볼 수 있습니다."
       icon={<Sparkles className="ss-h-5 ss-w-5" />}
       action={
         <button
@@ -114,7 +142,7 @@ export function MarketPulsePanel({
           <article className="ss-ui-soft-card ss-rounded-[18px] ss-p-3">
             <div className="ss-flex ss-items-center ss-justify-between ss-gap-3">
               <div>
-                <p className="ss-ui-kpi-label ss-text-[12px]">시장 국면</p>
+                <p className="ss-ui-kpi-label ss-text-[12px]">시장 구간</p>
                 <p className="ss-mt-1 ss-text-[16px] ss-font-semibold ss-text-white">
                   {getMarketRegimeLabel(world.regime)}
                 </p>
@@ -144,15 +172,15 @@ export function MarketPulsePanel({
           <article className="ss-ui-soft-card ss-rounded-[18px] ss-p-3">
             <div className="ss-flex ss-items-center ss-justify-between ss-gap-3">
               <div>
-                <p className="ss-ui-kpi-label ss-text-[12px]">냉각 섹터</p>
+                <p className="ss-ui-kpi-label ss-text-[12px]">활성 테마</p>
                 <p className="ss-mt-1 ss-text-[16px] ss-font-semibold ss-text-white">
-                  {world.coolingSector}
+                  {world.activeTheme || '없음'}
                 </p>
               </div>
               <Flame className="ss-h-4 ss-w-4 ss-text-amber-200" />
             </div>
             <p className="ss-mt-3 ss-text-[11px] ss-text-slate-300/78">
-              차익 실현과 매도 압력이 강한 구간
+              거래정지 {world.haltedCount} · 관리 {world.warningCount} · 상장폐지 {world.delistedCount}
             </p>
           </article>
         </div>
@@ -160,8 +188,10 @@ export function MarketPulsePanel({
         <section className="ss-ui-soft-card ss-rounded-[18px] ss-p-3.5">
           <div className="ss-flex ss-items-center ss-justify-between ss-gap-3">
             <div>
-              <p className="ss-ui-kpi-label ss-text-[12px]">섹터 순환 보드</p>
-              <p className="ss-mt-1 ss-text-[12px] ss-text-slate-300/80">상위 섹터 흐름 요약</p>
+              <p className="ss-ui-kpi-label ss-text-[12px]">섹터 자금 흐름</p>
+              <p className="ss-mt-1 ss-text-[12px] ss-text-slate-300/80">
+                테마, 이벤트, 시장 심리를 반영한 자금 흐름 강도를 보여줍니다.
+              </p>
             </div>
             <span className="ss-ui-chip ss-ui-chip-info">실시간</span>
           </div>
@@ -172,12 +202,8 @@ export function MarketPulsePanel({
                 <div className="ss-flex ss-items-center ss-justify-between ss-gap-2">
                   <div className="ss-flex ss-items-center ss-gap-1">
                     <span className="ss-text-[13px] ss-font-medium ss-text-white">{sector}</span>
-                    {sector === world.aiFocusSector ? (
-                      <span className="ss-ui-chip ss-ui-chip-info">AI</span>
-                    ) : null}
-                    {sector === world.dominantSector ? (
-                      <span className="ss-ui-chip ss-ui-chip-positive">주도</span>
-                    ) : null}
+                    {sector === world.aiFocusSector ? <StatusChip label="AI 집중" tone="neutral" /> : null}
+                    {sector === world.dominantSector ? <StatusChip label="주도" tone="positive" /> : null}
                   </div>
                   <span
                     className={`ss-text-[11px] ss-font-semibold ${
@@ -213,7 +239,7 @@ export function MarketPulsePanel({
             <div className="ss-space-y-2">
               {hotStocks.map((stock) => {
                 const changeRate =
-                  ((stock.currentPrice - stock.previousPrice) / stock.previousPrice) * 100;
+                  ((stock.currentPrice - stock.previousPrice) / Math.max(stock.previousPrice, 1)) * 100;
 
                 return (
                   <div
@@ -221,22 +247,25 @@ export function MarketPulsePanel({
                     className="ss-ui-soft-card ss-flex ss-items-center ss-justify-between ss-rounded-[16px] ss-px-3 ss-py-2.5"
                   >
                     <div className="ss-min-w-0">
-                      <p className="ss-truncate ss-text-sm ss-font-medium ss-text-white">
-                        {stock.name}
-                      </p>
-                      <p className="ss-mt-1 ss-text-[11px] ss-text-slate-400">
-                        {stock.ticker} · {stock.sector}
-                      </p>
+                      <p className="ss-truncate ss-text-sm ss-font-medium ss-text-white">{stock.name}</p>
+                      <div className="ss-mt-1 ss-flex ss-flex-wrap ss-items-center ss-gap-1.5">
+                        <span className="ss-text-[11px] ss-text-slate-400">
+                          {stock.ticker} · {stock.sector} · {getStockArchetypeLabel(stock.archetype)}
+                        </span>
+                        <StatusChip label={getStockStatusLabel(stock.status)} tone={getStatusTone(stock)} />
+                        {stock.dailyLimitState !== 'normal' ? (
+                          <StatusChip
+                            label={getLimitStateLabel(stock.dailyLimitState)}
+                            tone={stock.dailyLimitState === 'upper-limit' ? 'positive' : 'negative'}
+                          />
+                        ) : null}
+                        {stock.ipoDaysRemaining > 0 ? <StatusChip label="신규 상장" tone="warning" /> : null}
+                        {stock.themeTag ? <StatusChip label={stock.themeTag} tone="warning" /> : null}
+                      </div>
                     </div>
                     <div className="ss-text-right">
-                      <p className="ss-text-sm ss-text-slate-100">
-                        {formatPrice(stock.currentPrice)}
-                      </p>
-                      <p
-                        className={`ss-mt-1 ss-text-[11px] ${
-                          changeRate >= 0 ? 'ss-ui-number-up' : 'ss-ui-number-down'
-                        }`}
-                      >
+                      <p className="ss-text-sm ss-text-slate-100">{formatPrice(stock.currentPrice)}</p>
+                      <p className={`ss-mt-1 ss-text-[11px] ${changeRate >= 0 ? 'ss-ui-number-up' : 'ss-ui-number-down'}`}>
                         {formatPercent(changeRate)}
                       </p>
                     </div>
@@ -258,16 +287,26 @@ export function MarketPulsePanel({
                   className="ss-ui-soft-card ss-flex ss-items-center ss-justify-between ss-rounded-[16px] ss-px-3 ss-py-2.5"
                 >
                   <div className="ss-min-w-0">
-                    <p className="ss-truncate ss-text-sm ss-font-medium ss-text-white">
-                      {stock.name}
-                    </p>
-                    <p className="ss-mt-1 ss-text-[11px] ss-text-slate-400">
-                      {stock.ticker} · {stock.sector}
-                    </p>
+                    <p className="ss-truncate ss-text-sm ss-font-medium ss-text-white">{stock.name}</p>
+                    <div className="ss-mt-1 ss-flex ss-flex-wrap ss-items-center ss-gap-1.5">
+                      <span className="ss-text-[11px] ss-text-slate-400">
+                        {stock.ticker} · {stock.sector}
+                      </span>
+                      <StatusChip
+                        label={getStockStatusLabel(stock.status)}
+                        tone={
+                          stock.status === 'WARNING'
+                            ? 'warning'
+                            : stock.status === 'HALTED' || stock.status === 'DELISTED'
+                              ? 'negative'
+                              : 'neutral'
+                        }
+                      />
+                    </div>
                   </div>
                   <div className="ss-text-right">
                     <p className="ss-text-sm ss-text-slate-100">{formatPrice(stock.range)}</p>
-                    <p className="ss-mt-1 ss-text-[11px] ss-text-slate-400">최근 120틱 범위</p>
+                    <p className="ss-mt-1 ss-text-[11px] ss-text-slate-400">최근 범위</p>
                   </div>
                 </div>
               ))}
@@ -280,7 +319,7 @@ export function MarketPulsePanel({
             <div>
               <p className="ss-ui-kpi-label">시장 지표</p>
               <p className="ss-mt-1 ss-text-[11px] ss-text-slate-300/78">
-                유동성, 변동성, 회전율
+                유동성, 변동성, 회전율과 섹터 강도 비교로 오늘 시장의 결을 읽습니다.
               </p>
             </div>
             <BarChart3 className="ss-h-4 ss-w-4 ss-text-cyan-100" />
@@ -320,21 +359,13 @@ export function MarketPulsePanel({
           <div className="ss-mt-2.5 ss-grid ss-gap-2 sm:ss-grid-cols-2">
             <div className="ss-ui-soft-card ss-rounded-[16px] ss-p-2.5">
               <p className="ss-ui-kpi-label">가장 강한 흐름</p>
-              <p className="ss-mt-1 ss-text-sm ss-font-semibold ss-text-white">
-                {strongest?.[0] ?? '-'}
-              </p>
-              <p className="ss-mt-1 ss-text-[10px] ss-ui-number-up">
-                {formatPercent((strongest?.[1] ?? 0) * 12, 1)}
-              </p>
+              <p className="ss-mt-1 ss-text-sm ss-font-semibold ss-text-white">{strongest?.[0] ?? '-'}</p>
+              <p className="ss-mt-1 ss-text-[10px] ss-ui-number-up">{formatPercent((strongest?.[1] ?? 0) * 12, 1)}</p>
             </div>
             <div className="ss-ui-soft-card ss-rounded-[16px] ss-p-2.5">
               <p className="ss-ui-kpi-label">가장 약한 흐름</p>
-              <p className="ss-mt-1 ss-text-sm ss-font-semibold ss-text-white">
-                {weakest?.[0] ?? '-'}
-              </p>
-              <p className="ss-mt-1 ss-text-[10px] ss-ui-number-down">
-                {formatPercent((weakest?.[1] ?? 0) * 12, 1)}
-              </p>
+              <p className="ss-mt-1 ss-text-sm ss-font-semibold ss-text-white">{weakest?.[0] ?? '-'}</p>
+              <p className="ss-mt-1 ss-text-[10px] ss-ui-number-down">{formatPercent((weakest?.[1] ?? 0) * 12, 1)}</p>
             </div>
           </div>
         </section>

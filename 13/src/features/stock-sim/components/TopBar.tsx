@@ -6,7 +6,6 @@ import {
   House,
   RadioTower,
   Save,
-  ShieldCheck,
   TrendingDown,
   TrendingUp,
   Wallet,
@@ -31,8 +30,13 @@ type TopBarProps = {
   marketRegimeLabel: string;
   marketRegimeDescription: string;
   marketClock: string;
+  dayPhaseLabel: string;
   dominantSector: string;
   aiFocusSector: string;
+  activeTheme: string | null;
+  haltedCount: number;
+  warningCount: number;
+  delistedCount: number;
   runtime: RuntimeState;
 };
 
@@ -90,11 +94,21 @@ function getPersistenceTone(runtime: RuntimeState) {
   return 'ss-border-cyan-300/18 ss-bg-cyan-300/10 ss-text-cyan-50';
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function MiniStat({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
   return (
     <div className="ss-ui-soft-card ss-rounded-[18px] ss-px-4 ss-py-3">
       <p className="ss-ui-kpi-label">{label}</p>
-      <p className="ss-mt-1 ss-text-sm ss-font-semibold ss-text-white">{value}</p>
+      <p className={`ss-mt-1 ss-text-sm ss-font-semibold ${emphasis ? 'ss-text-cyan-50' : 'ss-text-white'}`}>
+        {value}
+      </p>
     </div>
   );
 }
@@ -111,8 +125,13 @@ export function TopBar({
   marketRegimeLabel,
   marketRegimeDescription,
   marketClock,
+  dayPhaseLabel,
   dominantSector,
   aiFocusSector,
+  activeTheme,
+  haltedCount,
+  warningCount,
+  delistedCount,
   runtime,
 }: TopBarProps) {
   const pnlPositive = unrealizedPnL >= 0;
@@ -125,120 +144,106 @@ export function TopBar({
   return (
     <div className="ss-ui-panel-surface ss-rounded-[28px] ss-p-4 lg:ss-p-5">
       <div className="ss-flex ss-flex-col ss-gap-4">
-        <div className="ss-flex ss-flex-col ss-gap-4">
-          <div className="ss-flex ss-flex-wrap ss-items-center ss-gap-2">
-            <span className="ss-ui-chip ss-ui-chip-info">
-              <RadioTower className="ss-h-3.5 ss-w-3.5" />
-              실시간 시장
-            </span>
-            <span className="ss-ui-chip">
-              <ShieldCheck className="ss-h-3.5 ss-w-3.5" />
-              관리자 전용
-            </span>
-            <span className={`ss-ui-chip ${getPersistenceTone(runtime)}`}>
-              <Save className="ss-h-3.5 ss-w-3.5" />
-              자동 저장 {formatRelativeTime(runtime.lastSavedAt)}
-            </span>
+        <div className="ss-flex ss-flex-wrap ss-items-center ss-gap-2">
+          <span className="ss-ui-chip ss-ui-chip-info">
+            <RadioTower className="ss-h-3.5 ss-w-3.5" />
+            영속 시장 가동 중
+          </span>
+          <span className="ss-ui-chip">
+            <Clock3 className="ss-h-3.5 ss-w-3.5" />
+            {dayPhaseLabel}
+          </span>
+          <span className={`ss-ui-chip ${getPersistenceTone(runtime)}`}>
+            <Save className="ss-h-3.5 ss-w-3.5" />
+            최근 저장 {formatRelativeTime(runtime.lastSavedAt)}
+          </span>
+        </div>
+
+        <div className="ss-flex ss-flex-col ss-gap-4 xl:ss-flex-row xl:ss-items-end xl:ss-justify-between">
+          <div className="ss-min-w-0">
+            <div className="ss-flex ss-flex-wrap ss-items-end ss-gap-3">
+              <h1 className="ss-font-display ss-text-[1.45rem] ss-font-semibold ss-text-white lg:ss-text-[1.8rem]">
+                영원히 움직이는 가상 주식시장
+              </h1>
+              <span className={`ss-ui-chip ${isRunning ? 'ss-ui-chip-positive' : 'ss-ui-chip-negative'}`}>
+                {isRunning ? `${speed}배속 운영 중` : '일시 정지'}
+              </span>
+            </div>
+            <p className="ss-mt-2 ss-max-w-3xl ss-text-sm ss-leading-6 ss-text-slate-300/80">
+              {marketRegimeDescription}
+            </p>
           </div>
 
-          <div className="ss-flex ss-flex-col ss-gap-3 xl:ss-flex-row xl:ss-items-end xl:ss-justify-between">
-            <div className="ss-min-w-0">
-              <div className="ss-flex ss-flex-wrap ss-items-end ss-gap-3">
-                <h1 className="ss-font-display ss-text-[1.45rem] ss-font-semibold ss-text-white lg:ss-text-[1.8rem]">
-                  라이브 마켓 대시보드
-                </h1>
-                <span className={`ss-ui-chip ${isRunning ? 'ss-ui-chip-positive' : 'ss-ui-chip-negative'}`}>
-                  {isRunning ? `${speed}배속 운영 중` : '일시 정지'}
-                </span>
-              </div>
-              <p className="ss-mt-2 ss-max-w-3xl ss-text-sm ss-leading-6 ss-text-slate-300/80">
-                {marketRegimeDescription}
-              </p>
-            </div>
-
-            <div className="ss-flex ss-flex-col ss-items-start ss-gap-2">
-              <a
-                href={homeUrl}
-                className="ss-inline-flex ss-items-center ss-gap-2 ss-self-start ss-rounded-full ss-border ss-border-white/12 ss-bg-white/6 ss-px-4 ss-py-2 ss-text-sm ss-font-medium ss-text-white ss-no-underline ss-transition hover:ss-bg-white/10"
-              >
-                <House className="ss-h-4 ss-w-4 ss-text-cyan-100" />
-                홈으로
-              </a>
-              <div className="ss-ui-soft-card ss-inline-flex ss-items-center ss-gap-3 ss-self-start ss-rounded-full ss-px-4 ss-py-2.5">
-                <Activity className="ss-h-4 ss-w-4 ss-text-cyan-100" />
-                <span className="ss-text-sm ss-font-medium ss-text-white">
-                  엔진 상태 {speed}배속 · 틱 {tick.toLocaleString('ko-KR')}
-                </span>
-              </div>
+          <div className="ss-flex ss-flex-col ss-items-start ss-gap-2">
+            <a
+              href={homeUrl}
+              className="ss-inline-flex ss-items-center ss-gap-2 ss-self-start ss-rounded-full ss-border ss-border-white/12 ss-bg-white/6 ss-px-4 ss-py-2 ss-text-sm ss-font-medium ss-text-white ss-no-underline ss-transition hover:ss-bg-white/10"
+            >
+              <House className="ss-h-4 ss-w-4 ss-text-cyan-100" />
+              홈으로
+            </a>
+            <div className="ss-ui-soft-card ss-inline-flex ss-items-center ss-gap-3 ss-self-start ss-rounded-full ss-px-4 ss-py-2.5">
+              <Activity className="ss-h-4 ss-w-4 ss-text-cyan-100" />
+              <span className="ss-text-sm ss-font-medium ss-text-white">
+                엔진 상태 {speed}배속 · 틱 {tick.toLocaleString('ko-KR')}
+              </span>
             </div>
           </div>
+        </div>
 
-          <div className="ss-grid ss-gap-3 sm:ss-grid-cols-2 xl:ss-grid-cols-4">
-            <MiniStat label="시장 시계" value={marketClock} />
-            <MiniStat label="시장 분위기" value={marketMoodLabel} />
-            <MiniStat label="주도 섹터" value={dominantSector} />
-            <MiniStat label="AI 집중 섹터" value={aiFocusSector} />
-          </div>
+        <div className="ss-grid ss-gap-3 sm:ss-grid-cols-2 xl:ss-grid-cols-4 2xl:ss-grid-cols-8">
+          <MiniStat label="가상 시각" value={marketClock} emphasis />
+          <MiniStat label="시장 심리" value={marketMoodLabel} />
+          <MiniStat label="시장 구간" value={marketRegimeLabel} />
+          <MiniStat label="주도 섹터" value={dominantSector} />
+          <MiniStat label="AI 집중 섹터" value={aiFocusSector} />
+          <MiniStat label="활성 테마" value={activeTheme || '없음'} />
+          <MiniStat label="거래정지" value={`${haltedCount}개`} />
+          <MiniStat label="관리/퇴출" value={`${warningCount} / ${delistedCount}`} />
         </div>
 
         <div className="ss-grid ss-gap-3 sm:ss-grid-cols-2 lg:ss-grid-cols-3 2xl:ss-grid-cols-6">
           <MetricCard
             label="보유 현금"
             value={formatCurrency(cash)}
-            hint="즉시 주문 가능한 현금"
+            hint="즉시 주문에 사용할 수 있는 현금"
             accent="cyan"
             icon={<Wallet className="ss-h-4.5 ss-w-4.5" />}
           />
           <MetricCard
             label="총 자산"
             value={formatCurrency(totalAssets)}
-            hint="현금과 평가 자산 합계"
+            hint="현금과 보유 종목 가치를 합친 값"
             accent="amber"
             icon={<Gauge className="ss-h-4.5 ss-w-4.5" />}
           />
           <MetricCard
             label="평가 손익"
             value={`${pnlPositive ? '+' : ''}${formatCurrency(unrealizedPnL)}`}
-            hint="현재 보유 종목 기준"
+            hint="현재 보유 포지션 기준 평가 손익"
             accent={pnlPositive ? 'lime' : 'rose'}
-            icon={
-              pnlPositive ? (
-                <TrendingUp className="ss-h-4.5 ss-w-4.5" />
-              ) : (
-                <TrendingDown className="ss-h-4.5 ss-w-4.5" />
-              )
-            }
+            icon={pnlPositive ? <TrendingUp className="ss-h-4.5 ss-w-4.5" /> : <TrendingDown className="ss-h-4.5 ss-w-4.5" />}
           />
           <MetricCard
             label="수익률"
             value={formatPercent(returnRate)}
-            hint="초기 자본 대비 변화"
+            hint="초기 자본 대비 누적 수익률"
             accent={returnPositive ? 'lime' : 'rose'}
-            icon={
-              returnPositive ? (
-                <TrendingUp className="ss-h-4.5 ss-w-4.5" />
-              ) : (
-                <TrendingDown className="ss-h-4.5 ss-w-4.5" />
-              )
-            }
+            icon={returnPositive ? <TrendingUp className="ss-h-4.5 ss-w-4.5" /> : <TrendingDown className="ss-h-4.5 ss-w-4.5" />}
           />
           <MetricCard
-            label="시장 국면"
+            label="시장 흐름"
             value={marketRegimeLabel}
-            hint="현재 시장 흐름 요약"
+            hint="현재 시장의 전체 흐름과 자금 성격"
             accent="slate"
             icon={<Waves className="ss-h-4.5 ss-w-4.5" />}
           />
           <MetricCard
             label="저장 상태"
             value={formatRelativeTime(runtime.lastSavedAt)}
-            hint={
-              runtime.hydratedFrom === 'backup'
-                ? '백업 데이터에서 복구됨'
-                : '현재 상태가 이어지고 있음'
-            }
+            hint={runtime.hydratedFrom === 'backup' ? '백업 상태에서 복구된 세션입니다.' : '진행 상태가 계속 저장되고 있습니다.'}
             accent="slate"
-            icon={<Clock3 className="ss-h-4.5 ss-w-4.5" />}
+            icon={<Save className="ss-h-4.5 ss-w-4.5" />}
           />
         </div>
       </div>

@@ -12,9 +12,27 @@ function getCurrentSiteUser() {
   }
 }
 
+function getCurrentUserRecord(currentUser: string) {
+  if (typeof window === 'undefined' || !currentUser) {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem('users_db');
+    if (!raw) return null;
+    const users = JSON.parse(raw) as Record<string, { status?: string; isAdmin?: boolean }>;
+    const key = Object.keys(users || {}).find(
+      (entry) => entry.toLowerCase() === currentUser.trim().toLowerCase(),
+    );
+    return key ? users[key] : null;
+  } catch {
+    return null;
+  }
+}
+
 function canAccessStockSim(currentUser: string) {
-  const normalizedUser = String(currentUser || '').trim().toLowerCase();
-  return normalizedUser === 'admin' || normalizedUser === 'tomem';
+  const userRecord = getCurrentUserRecord(currentUser);
+  return Boolean(userRecord && (userRecord.isAdmin || userRecord.status === 'regular'));
 }
 
 function getRootUrl(path: string) {
@@ -28,9 +46,12 @@ function getRootUrl(path: string) {
 function AccessBlocked() {
   const currentUser = getCurrentSiteUser();
   const isLoggedIn = Boolean(currentUser);
+  const userRecord = getCurrentUserRecord(currentUser);
   const message = isLoggedIn
-    ? '현재 이 기능은 관리자와 tomem 계정만 사용할 수 있습니다.'
-    : '로그인 후 접근할 수 있으며, 현재는 관리자와 tomem 계정에만 열려 있습니다.';
+    ? userRecord?.status === 'pending'
+      ? '승인된 회원만 주식장에 입장할 수 있습니다. 관리자 승인 후 다시 시도해 주세요.'
+      : '현재 계정은 주식장 이용 권한이 없습니다.'
+    : '로그인 후 승인된 회원 계정으로 접속해 주세요.';
 
   return (
     <div className="stock-sim-shell ss-relative ss-flex ss-min-h-dvh ss-items-center ss-justify-center ss-overflow-hidden">

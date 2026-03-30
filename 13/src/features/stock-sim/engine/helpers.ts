@@ -1,10 +1,13 @@
 import {
   AI_DECISION_INTERVAL_MAX,
   AI_DECISION_INTERVAL_MIN,
+  DAILY_PRICE_LIMIT_RATIO,
   DEFAULT_SELECTED_STOCK_ID,
   EVENT_MAX_DURATION,
   EVENT_MIN_DURATION,
   INITIAL_PLAYER_CASH,
+  MARKET_DAY_MINUTES,
+  MARKET_DAY_START_MINUTES,
   MAX_PRICE_HISTORY,
   STARTING_MARKET_MOOD,
   VIRTUAL_MINUTES_PER_TICK,
@@ -24,10 +27,13 @@ import type {
   Sector,
   SimulationState,
   Stock,
+  StockBlueprint,
+  StockStatus,
   Trade,
 } from '@/features/stock-sim/types';
 import { sectors } from '@/features/stock-sim/types';
-import { getSeoulClockMinutes } from '@/features/stock-sim/utils/formatters';
+
+export { sectors };
 
 export function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -45,11 +51,11 @@ export function chance(probability: number) {
   return Math.random() < probability;
 }
 
-export function pickRandom<T>(items: T[]) {
+export function pickRandom<T>(items: readonly T[]) {
   return items[randomInt(0, items.length - 1)];
 }
 
-export function sampleUnique<T>(items: T[], count: number) {
+export function sampleUnique<T>(items: readonly T[], count: number) {
   const pool = [...items];
   const result: T[] = [];
 
@@ -74,19 +80,29 @@ export function uid(prefix: string) {
 }
 
 export function roundPrice(value: number) {
-  return Math.max(5, Math.round(value * 100) / 100);
+  return Math.max(1, Math.round(value * 100) / 100);
 }
 
 export function trimHistory<T>(history: T[]) {
   return history.slice(-MAX_PRICE_HISTORY);
 }
 
+function normalizeDailyLimits(referencePrice: number) {
+  const upper = roundPrice(referencePrice * (1 + DAILY_PRICE_LIMIT_RATIO));
+  const lower = roundPrice(referencePrice * (1 - DAILY_PRICE_LIMIT_RATIO));
+
+  return {
+    upper: Math.max(referencePrice, upper),
+    lower: Math.max(1, Math.min(referencePrice, lower)),
+  };
+}
+
 function generateStartingHistory(basePrice: number, volatility: number) {
   const history: number[] = [];
   let cursor = basePrice * randomBetween(0.96, 1.04);
 
-  for (let index = 0; index < Math.min(MAX_PRICE_HISTORY, 1_440); index += 1) {
-    const delta = randomBetween(-0.013, 0.013) * (0.5 + volatility * 0.7);
+  for (let index = 0; index < Math.min(MAX_PRICE_HISTORY, 720); index += 1) {
+    const delta = randomBetween(-0.012, 0.012) * (0.45 + volatility * 0.72);
     cursor = roundPrice(cursor * (1 + delta));
     history.push(cursor);
   }
@@ -94,28 +110,66 @@ function generateStartingHistory(basePrice: number, volatility: number) {
   return trimHistory(history);
 }
 
-export function createInitialStocks() {
-  return stockBlueprints.map<Stock>((blueprint) => {
-    const priceHistory = generateStartingHistory(blueprint.basePrice, blueprint.volatility);
-    const currentPrice = priceHistory.at(-1) ?? blueprint.basePrice;
-    const previousPrice = priceHistory.at(-2) ?? currentPrice;
-    const volumeHistory = trimHistory(
-      priceHistory.map(() => Math.round(randomBetween(4_500, 18_000))),
-    );
-    const tradeCountHistory = trimHistory(
-      priceHistory.map(() => Math.round(randomBetween(0, 7))),
-    );
+function pickDefaultStatus(archetype: StockBlueprint['archetype']): StockStatus {
+  if (archetype === 'distressed') {
+    return 'WARNING';
+  }
 
-    return {
-      ...blueprint,
-      currentPrice,
-      previousPrice,
-      priceHistory,
-      volumeHistory,
-      tradeCountHistory,
-      lastVolume: randomBetween(18_000, 82_000),
-    };
-  });
+  return 'NORMAL';
+}
+
+function createStockFromBlueprint(blueprint: StockBlueprint, listedDay = 1): Stock {
+  const priceHistory = generateStartingHistory(blueprint.basePrice, blueprint.volatility);
+  const currentPrice = priceHistory.at(-1) ?? blueprint.basePrice;
+  const previousPrice = priceHistory.at(-2) ?? currentPrice;
+  const referencePrice = previousPrice || currentPrice || blueprint.basePrice;
+  const dailyLimits = normalizeDailyLimits(referencePrice);
+  const volumeHistory = trimHistory(
+    priceHistory.map(() => Math.round(randomBetween(4_500, 18_000))),
+  );
+  const tradeCountHistory = trimHistory(
+    priceHistory.map(() => Math.round(randomBetween(0, 8))),
+  );
+  const averageDailyVolume =
+    volumeHistory.reduce((total, value) => total + value, 0) / Math.max(1, volumeHistory.length);
+
+  return {
+    ...blueprint,
+    currentPrice,
+    previousPrice,
+    priceHistory,
+    volumeHistory,
+    tradeCountHistory,
+    lastVolume: volumeHistory.at(-1) ?? 0,
+    referencePrice,
+    lastClosePrice: referencePrice,
+    dayOpenPrice: currentPrice,
+    dayHighPrice: Math.max(currentPrice, referencePrice),
+    dayLowPrice: Math.min(currentPrice, referencePrice),
+    dailyUpperLimit: dailyLimits.upper,
+    dailyLowerLimit: dailyLimits.lower,
+    dailyLimitState: 'normal',
+    sessionVolume: 0,
+    averageDailyVolume,
+    status: pickDefaultStatus(blueprint.archetype),
+    haltRemainingTicks: 0,
+    haltReason: null,
+    warningScore: blueprint.archetype === 'distressed' ? 0.36 : 0,
+    distressScore: blueprint.archetype === 'distressed' ? 0.44 : 0,
+    listedDay,
+    ipoDaysRemaining: 0,
+    themeTag: blueprint.archetype === 'theme' ? 'Theme premium' : null,
+    themeIntensity: blueprint.archetype === 'theme' ? 0.14 : 0,
+    themeUntilTick: 0,
+    bubblePhase: 'idle',
+    bubbleTicksRemaining: 0,
+    bubbleAnchorPrice: currentPrice,
+    eventRisk: blueprint.collapseRisk,
+  };
+}
+
+export function createInitialStocks() {
+  return stockBlueprints.map((blueprint) => createStockFromBlueprint(blueprint, 1));
 }
 
 function getAiWatchlistSize(archetype: AiArchetype) {
@@ -284,26 +338,22 @@ export function pickDominantSector(sectorMood: Record<Sector, number>) {
 
 export function pickCoolingSector(sectorMood: Record<Sector, number>) {
   return (Object.entries(sectorMood) as [Sector, number][])
-    .sort((left, right) => left[1] - right[1])[0]?.[0] ?? '바이오';
+    .sort((left, right) => left[1] - right[1])[0]?.[0] ?? 'Bio';
 }
 
 function resolveRegimeFromMood(marketMood: number): MarketRegime {
   if (marketMood >= 0.48) {
     return 'markup';
   }
-
   if (marketMood >= 0.16) {
     return 'rotation';
   }
-
   if (marketMood <= -0.52) {
     return 'panic';
   }
-
   if (marketMood <= -0.18) {
     return 'distribution';
   }
-
   return 'accumulation';
 }
 
@@ -316,7 +366,7 @@ function createSeedTickTimestamps(historyLength: number, now: number) {
     return [now];
   }
 
-  const spanMs = 24 * 60 * 60 * 1_000;
+  const spanMs = historyLength * VIRTUAL_MINUTES_PER_TICK * 60_000;
   const stepMs = spanMs / Math.max(1, historyLength - 1);
 
   return trimHistory(
@@ -326,26 +376,39 @@ function createSeedTickTimestamps(historyLength: number, now: number) {
   );
 }
 
+function getDayPhase(dayTick: number): MarketWorldState['dayPhase'] {
+  if (dayTick < 180) {
+    return 'opening';
+  }
+  if (dayTick < 1_080) {
+    return 'session';
+  }
+  if (dayTick < 1_260) {
+    return 'closing';
+  }
+  return 'overnight';
+}
+
 export function createInitialWorldState(
   sectorMood: Record<Sector, number>,
   marketMood: number,
   now = Date.now(),
-  historyLength = Math.min(MAX_PRICE_HISTORY, 1_440),
+  historyLength = Math.min(MAX_PRICE_HISTORY, 720),
 ): MarketWorldState {
-  const marketClockMinutes = getSeoulClockMinutes(now);
   const tickTimestamps = createSeedTickTimestamps(historyLength, now);
-  const simulationElapsedMinutes = Math.max(
-    1,
-    Math.round(
-      ((tickTimestamps.at(-1) ?? now) - (tickTimestamps[0] ?? now)) / 60_000,
-    ),
-  );
+  const simulationElapsedMinutes = Math.max(1, historyLength * VIRTUAL_MINUTES_PER_TICK);
+  const totalSimulationMinutes = MARKET_DAY_START_MINUTES + simulationElapsedMinutes;
+  const dayTick = ((totalSimulationMinutes % MARKET_DAY_MINUTES) + MARKET_DAY_MINUTES) % MARKET_DAY_MINUTES;
+
   return {
     lastTickAt: now,
-    marketClockMinutes,
+    marketClockMinutes: dayTick,
     simulationElapsedMinutes,
+    totalSimulationMinutes,
     tickTimestamps,
-    dayCount: Math.max(1, Math.floor(simulationElapsedMinutes / 1_440) + 1),
+    dayCount: Math.max(1, Math.floor(totalSimulationMinutes / MARKET_DAY_MINUTES) + 1),
+    dayTick,
+    dayPhase: getDayPhase(dayTick),
     regime: resolveRegimeFromMood(marketMood),
     liquidityIndex: clamp(0.18 + marketMood * 0.24, -1, 1),
     volatilityIndex: clamp(0.22 + Math.abs(marketMood) * 0.28, 0, 1),
@@ -353,6 +416,12 @@ export function createInitialWorldState(
     dominantSector: pickDominantSector(sectorMood),
     coolingSector: pickCoolingSector(sectorMood),
     aiFocusSector: pickDominantSector(sectorMood),
+    marketSentiment: marketMood,
+    sectorFlows: Object.fromEntries(sectors.map((sector) => [sector, 0])) as Record<Sector, number>,
+    activeTheme: null,
+    haltedCount: 0,
+    warningCount: 0,
+    delistedCount: 0,
   };
 }
 
@@ -361,7 +430,7 @@ export function normalizeWorldState(
   sectorMood: Record<Sector, number>,
   marketMood: number,
   fallbackTime: number,
-  historyLength = Math.min(MAX_PRICE_HISTORY, 1_440),
+  historyLength = Math.min(MAX_PRICE_HISTORY, 720),
 ): MarketWorldState {
   const seeded = createInitialWorldState(sectorMood, marketMood, fallbackTime, historyLength);
   const sourceTimestamps = Array.isArray(world?.tickTimestamps)
@@ -374,27 +443,35 @@ export function normalizeWorldState(
           ...createSeedTickTimestamps(historyLength - sourceTimestamps.length, fallbackTime),
           ...sourceTimestamps,
         ].slice(-historyLength);
-  const derivedElapsedMinutes = Math.max(
-    1,
-    Math.round(
-      ((normalizedTickTimestamps.at(-1) ?? fallbackTime) -
-        (normalizedTickTimestamps[0] ?? fallbackTime)) /
-        60_000,
-    ),
-  );
+  const totalSimulationMinutes =
+    Number.isFinite(Number(world?.totalSimulationMinutes))
+      ? Number(world?.totalSimulationMinutes)
+      : seeded.totalSimulationMinutes;
+  const dayTick =
+    Number.isFinite(Number(world?.dayTick))
+      ? Number(world?.dayTick)
+      : ((totalSimulationMinutes % MARKET_DAY_MINUTES) + MARKET_DAY_MINUTES) % MARKET_DAY_MINUTES;
 
   return {
     ...seeded,
     ...world,
     lastTickAt: world?.lastTickAt ?? fallbackTime,
-    marketClockMinutes: world?.marketClockMinutes ?? seeded.marketClockMinutes,
-    simulationElapsedMinutes:
-      world?.simulationElapsedMinutes ??
-      derivedElapsedMinutes,
     tickTimestamps: normalizedTickTimestamps,
+    simulationElapsedMinutes:
+      Number.isFinite(Number(world?.simulationElapsedMinutes))
+        ? Number(world?.simulationElapsedMinutes)
+        : seeded.simulationElapsedMinutes,
+    totalSimulationMinutes,
+    marketClockMinutes:
+      Number.isFinite(Number(world?.marketClockMinutes))
+        ? Number(world?.marketClockMinutes)
+        : dayTick,
     dayCount:
-      world?.dayCount ??
-      Math.max(1, Math.floor(derivedElapsedMinutes / 1_440) + 1),
+      Number.isFinite(Number(world?.dayCount))
+        ? Math.max(1, Number(world?.dayCount))
+        : Math.max(1, Math.floor(totalSimulationMinutes / MARKET_DAY_MINUTES) + 1),
+    dayTick,
+    dayPhase: world?.dayPhase ?? getDayPhase(dayTick),
     regime: world?.regime ?? seeded.regime,
     liquidityIndex: clamp(world?.liquidityIndex ?? seeded.liquidityIndex, -1, 1),
     volatilityIndex: clamp(world?.volatilityIndex ?? seeded.volatilityIndex, 0, 1),
@@ -402,191 +479,243 @@ export function normalizeWorldState(
     dominantSector: world?.dominantSector ?? seeded.dominantSector,
     coolingSector: world?.coolingSector ?? seeded.coolingSector,
     aiFocusSector: world?.aiFocusSector ?? seeded.aiFocusSector,
+    marketSentiment: clamp(world?.marketSentiment ?? marketMood, -1, 1),
+    sectorFlows: sectors.reduce((accumulator, sector) => {
+      accumulator[sector] = clamp(Number(world?.sectorFlows?.[sector] ?? 0), -1, 1);
+      return accumulator;
+    }, {} as Record<Sector, number>),
+    activeTheme: typeof world?.activeTheme === 'string' ? world.activeTheme : null,
+    haltedCount: Math.max(0, Math.round(Number(world?.haltedCount ?? 0))),
+    warningCount: Math.max(0, Math.round(Number(world?.warningCount ?? 0))),
+    delistedCount: Math.max(0, Math.round(Number(world?.delistedCount ?? 0))),
   };
 }
 
-function hasCorruptedText(value: string | undefined) {
-  if (!value) {
-    return false;
-  }
+function normalizeStockFromBlueprint(stock: Stock, tick: number, currentDay: number): Stock {
+  const blueprint = stockBlueprints.find((candidate) => candidate.id === stock.id);
+  const base = blueprint ?? {
+    id: stock.id,
+    ticker: stock.ticker,
+    name: stock.name,
+    sector: stock.sector,
+    description: stock.description,
+    archetype: stock.archetype,
+    basePrice: stock.basePrice,
+    volatility: stock.volatility,
+    momentum: stock.momentum,
+    sentiment: stock.sentiment,
+    liquidity: stock.liquidity,
+    traits: stock.traits,
+    sharesOutstanding: stock.sharesOutstanding,
+    aiAffinity: stock.aiAffinity,
+    newsSensitivity: stock.newsSensitivity,
+    collapseRisk: stock.collapseRisk,
+  };
 
-  return /[\uF900-\uFAFF�]/.test(value);
-}
+  const normalizedPriceHistory = trimHistory(
+    Array.isArray(stock.priceHistory) && stock.priceHistory.length > 0
+      ? stock.priceHistory.map((value) => roundPrice(Number(value || base.basePrice)))
+      : [base.basePrice],
+  );
+  const currentPrice = roundPrice(Number(stock.currentPrice || normalizedPriceHistory.at(-1) || base.basePrice));
+  const previousPrice = roundPrice(
+    Number(stock.previousPrice || normalizedPriceHistory.at(-2) || currentPrice),
+  );
+  const referencePrice = roundPrice(
+    Number(stock.referencePrice || stock.lastClosePrice || previousPrice || currentPrice || base.basePrice),
+  );
+  const dailyLimits = normalizeDailyLimits(referencePrice);
+  const normalizedStatus =
+    stock.status === 'WARNING' || stock.status === 'HALTED' || stock.status === 'DELISTED'
+      ? stock.status
+      : pickDefaultStatus(base.archetype);
+  const volumeHistory = trimHistory(
+    Array.isArray(stock.volumeHistory) && stock.volumeHistory.length > 0
+      ? stock.volumeHistory.map((value) => Math.max(0, Math.round(Number(value || 0))))
+      : [Math.round(randomBetween(4_500, 18_000))],
+  );
+  const tradeCountHistory = trimHistory(
+    Array.isArray(stock.tradeCountHistory) && stock.tradeCountHistory.length > 0
+      ? stock.tradeCountHistory.map((value) => Math.max(0, Math.round(Number(value || 0))))
+      : [Math.round(randomBetween(0, 8))],
+  );
+  const averageDailyVolume =
+    volumeHistory.reduce((total, value) => total + value, 0) / Math.max(1, volumeHistory.length);
 
-function sanitizeTrade(trade: Trade, aiNameMap: Map<string, string>): Trade {
   return {
-    ...trade,
-    actorName:
-      trade.actorType === 'ai'
-        ? aiNameMap.get(trade.actorId) ?? trade.actorName
-        : hasCorruptedText(trade.actorName)
-          ? '플레이어'
-          : trade.actorName,
-    note: hasCorruptedText(trade.note) ? undefined : trade.note,
+    ...stock,
+    ...base,
+    currentPrice: normalizedStatus === 'DELISTED' ? 0 : currentPrice,
+    previousPrice: normalizedStatus === 'DELISTED' ? 0 : previousPrice,
+    priceHistory: normalizedStatus === 'DELISTED'
+      ? trimHistory([...normalizedPriceHistory.slice(0, -1), 0])
+      : normalizedPriceHistory,
+    volumeHistory,
+    tradeCountHistory,
+    lastVolume: Math.max(0, Number(stock.lastVolume || volumeHistory.at(-1) || 0)),
+    referencePrice,
+    lastClosePrice: roundPrice(Number(stock.lastClosePrice || referencePrice)),
+    dayOpenPrice: roundPrice(Number(stock.dayOpenPrice || currentPrice)),
+    dayHighPrice: roundPrice(Number(stock.dayHighPrice || Math.max(currentPrice, referencePrice))),
+    dayLowPrice: roundPrice(Number(stock.dayLowPrice || Math.min(currentPrice, referencePrice))),
+    dailyUpperLimit: roundPrice(Number(stock.dailyUpperLimit || dailyLimits.upper)),
+    dailyLowerLimit: roundPrice(Number(stock.dailyLowerLimit || dailyLimits.lower)),
+    dailyLimitState:
+      stock.dailyLimitState === 'upper-limit' || stock.dailyLimitState === 'lower-limit'
+        ? stock.dailyLimitState
+        : 'normal',
+    sessionVolume: Math.max(0, Number(stock.sessionVolume || 0)),
+    averageDailyVolume,
+    status: normalizedStatus,
+    haltRemainingTicks: Math.max(0, Math.round(Number(stock.haltRemainingTicks || 0))),
+    haltReason: stock.haltReason ? String(stock.haltReason) : null,
+    warningScore: clamp(Number(stock.warningScore || 0), 0, 3),
+    distressScore: clamp(Number(stock.distressScore || 0), 0, 3),
+    listedDay: Math.max(1, Math.round(Number(stock.listedDay || currentDay || 1))),
+    ipoDaysRemaining: Math.max(0, Math.round(Number(stock.ipoDaysRemaining || 0))),
+    themeTag: stock.themeTag ? String(stock.themeTag) : null,
+    themeIntensity: clamp(Number(stock.themeIntensity || 0), 0, 2),
+    themeUntilTick: Math.max(0, Math.round(Number(stock.themeUntilTick || tick || 0))),
+    bubblePhase:
+      stock.bubblePhase === 'build' ||
+      stock.bubblePhase === 'mania' ||
+      stock.bubblePhase === 'halted' ||
+      stock.bubblePhase === 'crash'
+        ? stock.bubblePhase
+        : 'idle',
+    bubbleTicksRemaining: Math.max(0, Math.round(Number(stock.bubbleTicksRemaining || 0))),
+    bubbleAnchorPrice: roundPrice(Number(stock.bubbleAnchorPrice || currentPrice)),
+    eventRisk: clamp(Number(stock.eventRisk || base.collapseRisk || 0), 0, 3),
   };
-}
-
-function sanitizeEvent(event: MarketEvent) {
-  return !hasCorruptedText(event.title) && !hasCorruptedText(event.description);
-}
-
-function sanitizeActivity(item: ActivityItem) {
-  return !hasCorruptedText(item.title) && !hasCorruptedText(item.description);
 }
 
 export function normalizeSimulationState(simulation: SimulationState): SimulationState {
-  const sectorMood = simulation.sectorMood ?? createSectorMoodMap();
-  const marketMood = simulation.marketMood ?? STARTING_MARKET_MOOD;
-  const stockBlueprintMap = new Map(stockBlueprints.map((blueprint) => [blueprint.id, blueprint]));
-  const stocks = simulation.stocks.map((stock) => {
-    const blueprint = stockBlueprintMap.get(stock.id);
-    const normalizedPriceHistory = trimHistory(stock.priceHistory);
-    const alignNumericHistory = (history: number[] | undefined, fallbackMin: number, fallbackMax: number) => {
-      const source = Array.isArray(history) ? trimHistory(history) : [];
-      const deficit = Math.max(0, normalizedPriceHistory.length - source.length);
-      const padding =
-        deficit > 0
-          ? Array.from({ length: deficit }, () => Math.round(randomBetween(fallbackMin, fallbackMax)))
-          : [];
-      return [...padding, ...source].slice(-normalizedPriceHistory.length);
-    };
-    const baseVolumeHistory = alignNumericHistory(stock.volumeHistory, 3_000, 12_000);
-    const baseTradeCountHistory = alignNumericHistory(stock.tradeCountHistory, 0, 4);
-
-    if (!blueprint) {
-      return {
-        ...stock,
-        priceHistory: normalizedPriceHistory,
-        volumeHistory: trimHistory(baseVolumeHistory),
-        tradeCountHistory: trimHistory(baseTradeCountHistory),
-      };
-    }
-
-    return {
-      ...stock,
-      ...blueprint,
-      priceHistory: normalizedPriceHistory,
-      volumeHistory: trimHistory(baseVolumeHistory),
-      tradeCountHistory: trimHistory(baseTradeCountHistory),
-    };
-  });
-  const world = normalizeWorldState(
+  const sectorMood = sectors.reduce((accumulator, sector) => {
+    const nextValue = Number(simulation.sectorMood?.[sector] ?? randomBetween(-0.08, 0.18));
+    accumulator[sector] = clamp(nextValue, -1, 1);
+    return accumulator;
+  }, {} as Record<Sector, number>);
+  const marketMood = Number.isFinite(Number(simulation.marketMood))
+    ? clamp(Number(simulation.marketMood), -1, 1)
+    : STARTING_MARKET_MOOD;
+  const preliminaryWorld = normalizeWorldState(
     (simulation as SimulationState & { world?: Partial<MarketWorldState> }).world,
     sectorMood,
     marketMood,
     Date.now(),
-    stocks[0]?.priceHistory.length ?? Math.min(MAX_PRICE_HISTORY, 1_440),
+    simulation.stocks?.[0]?.priceHistory?.length ?? Math.min(MAX_PRICE_HISTORY, 720),
+  );
+  const stocks = (Array.isArray(simulation.stocks) ? simulation.stocks : createInitialStocks()).map((stock) =>
+    normalizeStockFromBlueprint(stock, simulation.tick || 0, preliminaryWorld.dayCount),
   );
   const stockIdSet = new Set(stocks.map((stock) => stock.id));
   const aiBlueprintMap = new Map(aiBlueprints.map((blueprint) => [blueprint.id, blueprint]));
-  const aiNameMap = new Map(aiBlueprints.map((blueprint) => [blueprint.id, blueprint.name]));
-  const aiTraders = simulation.aiTraders.map((aiTrader) => {
+  const aiTraders = (Array.isArray(simulation.aiTraders) ? simulation.aiTraders : createInitialAiTraders(stocks)).map((aiTrader) => {
     const blueprint = aiBlueprintMap.get(aiTrader.id);
     const behaviorSeed =
       Number.isFinite(aiTrader.behaviorSeed) ? aiTrader.behaviorSeed : randomBetween(-1, 1);
-    const watchStockIds = Array.isArray(aiTrader.watchStockIds)
-      ? aiTrader.watchStockIds.filter((stockId) => stockIdSet.has(stockId))
-      : [];
     const normalizedTrader: AiTrader = {
       ...aiTrader,
-      ...(blueprint
-        ? {
-            name: blueprint.name,
-            archetype: blueprint.archetype,
-            aggressiveness: blueprint.aggressiveness,
-            fear: blueprint.fear,
-            patience: blueprint.patience,
-            reactionSpeed: blueprint.reactionSpeed,
-            riskTolerance: blueprint.riskTolerance,
-            preferredSectors: blueprint.preferredSectors,
-            tradeFrequency: blueprint.tradeFrequency,
-            cooldown: blueprint.cooldown,
-          }
-        : {}),
-      behaviorSeed,
+      ...(blueprint ?? {}),
+      cash: Math.max(0, Number(aiTrader.cash || blueprint?.startingCash || 0)),
+      holdings: Array.isArray(aiTrader.holdings) ? aiTrader.holdings : [],
+      preferredSectors: Array.isArray(aiTrader.preferredSectors)
+        ? aiTrader.preferredSectors.filter((sector): sector is Sector =>
+            sectors.includes(sector as Sector),
+          )
+        : blueprint?.preferredSectors ?? ['AI'],
+      watchStockIds: Array.isArray(aiTrader.watchStockIds)
+        ? aiTrader.watchStockIds.filter((stockId) => stockIdSet.has(stockId))
+        : [],
       orderSizeBias:
         Number.isFinite(aiTrader.orderSizeBias) && aiTrader.orderSizeBias > 0
           ? aiTrader.orderSizeBias
           : randomBetween(0.72, 1.38),
-      watchStockIds:
-        watchStockIds.length > 0
-          ? watchStockIds
-          : createAiWatchStockIds(
-              blueprint?.preferredSectors ?? aiTrader.preferredSectors,
-              stocks,
-              blueprint?.archetype ?? aiTrader.archetype,
-            ),
-      nextDecisionTick:
-        Number.isFinite(aiTrader.nextDecisionTick)
-          ? Math.max(0, Math.floor(aiTrader.nextDecisionTick))
-          : 0,
+      behaviorSeed,
     };
 
-    return normalizedTrader.nextDecisionTick > 0
-      ? normalizedTrader
-      : {
-          ...normalizedTrader,
-          nextDecisionTick: scheduleNextAiDecisionTick(normalizedTrader, simulation.tick, false),
-        };
+    if (normalizedTrader.watchStockIds.length === 0) {
+      normalizedTrader.watchStockIds = createAiWatchStockIds(
+        normalizedTrader.preferredSectors,
+        stocks,
+        normalizedTrader.archetype,
+      );
+    }
+
+    normalizedTrader.nextDecisionTick =
+      Number.isFinite(aiTrader.nextDecisionTick) && aiTrader.nextDecisionTick > 0
+        ? Math.round(aiTrader.nextDecisionTick)
+        : scheduleNextAiDecisionTick(normalizedTrader, simulation.tick || 0, false);
+
+    return normalizedTrader;
   });
-  const competitorMap = new Map(competitorBlueprints.map((entry) => [entry.id, entry]));
+
+  const world = normalizeWorldState(
+    {
+      ...preliminaryWorld,
+      haltedCount: stocks.filter((stock) => stock.status === 'HALTED').length,
+      warningCount: stocks.filter((stock) => stock.status === 'WARNING').length,
+      delistedCount: stocks.filter((stock) => stock.status === 'DELISTED').length,
+    },
+    sectorMood,
+    marketMood,
+    Date.now(),
+    stocks[0]?.priceHistory.length ?? Math.min(MAX_PRICE_HISTORY, 720),
+  );
 
   return {
     ...simulation,
-    selectedStockId: simulation.selectedStockId || DEFAULT_SELECTED_STOCK_ID,
-    sectorMood,
+    isRunning: simulation.isRunning !== false,
+    speed: (simulation.speed as SimulationState['speed']) || 1,
+    tick: Math.max(0, Math.floor(Number(simulation.tick || 0))),
+    selectedStockId: stockIdSet.has(simulation.selectedStockId)
+      ? simulation.selectedStockId
+      : DEFAULT_SELECTED_STOCK_ID,
+    currentPlayerId: simulation.currentPlayerId || 'local-player',
     marketMood,
+    sectorMood,
     stocks,
     player: {
       ...simulation.player,
-      name: hasCorruptedText(simulation.player.name) ? '플레이어' : simulation.player.name,
+      id: simulation.player?.id || 'local-player',
+      name: String(simulation.player?.name || 'Player'),
+      cash: Math.max(0, Number(simulation.player?.cash || INITIAL_PLAYER_CASH)),
+      holdings: Array.isArray(simulation.player?.holdings) ? simulation.player.holdings : [],
+      realizedPnL: Number(simulation.player?.realizedPnL || 0),
+      tradeHistory: Array.isArray(simulation.player?.tradeHistory) ? simulation.player.tradeHistory : [],
     },
     pendingOrders: Array.isArray(simulation.pendingOrders)
-      ? simulation.pendingOrders
-          .filter((order): order is PendingOrder =>
-            Boolean(
-              order &&
-                typeof order === 'object' &&
-                typeof order.id === 'string' &&
-                typeof order.playerId === 'string' &&
-                typeof order.stockId === 'string' &&
-                (order.side === 'buy' || order.side === 'sell') &&
-                typeof order.quantity === 'number' &&
-                typeof order.targetPrice === 'number' &&
-                typeof order.createdAt === 'number',
-            ),
-          )
-          .filter((order) => stockIdSet.has(order.stockId))
+      ? simulation.pendingOrders.filter((order): order is PendingOrder =>
+          Boolean(
+            order &&
+              typeof order === 'object' &&
+              typeof order.id === 'string' &&
+              stockIdSet.has(String(order.stockId || '')),
+          ),
+        )
       : [],
     aiTraders,
-    trades: simulation.trades.map((trade) => sanitizeTrade(trade, aiNameMap)),
-    events: simulation.events.filter(sanitizeEvent),
-    aiActivity: simulation.aiActivity.filter(sanitizeActivity),
-    leaderboard: simulation.leaderboard.map((entry) => {
-      if (entry.id === 'local-player') {
-        return {
-          ...entry,
-          name: '플레이어',
-          style: '로컬 트레이더',
-          focusSectors: [],
-        };
-      }
-
-      const blueprint = competitorMap.get(entry.id);
-
-      if (!blueprint) {
-        return entry;
-      }
-
-      return {
-        ...entry,
-        name: blueprint.name,
-        style: blueprint.style,
-        focusSectors: blueprint.focusSectors,
-        volatility: blueprint.volatility,
-      };
-    }),
+    trades: Array.isArray(simulation.trades) ? simulation.trades as Trade[] : [],
+    events: Array.isArray(simulation.events) ? simulation.events as MarketEvent[] : [],
+    aiActivity: Array.isArray(simulation.aiActivity) ? simulation.aiActivity as ActivityItem[] : [],
+    leaderboard: Array.isArray(simulation.leaderboard)
+      ? simulation.leaderboard
+      : [
+          {
+            id: 'local-player',
+            name: 'Player',
+            kind: 'current-user',
+            netWorth: INITIAL_PLAYER_CASH,
+            returnRate: 0,
+            style: 'Local trader',
+            focusSectors: [],
+            volatility: 0,
+            lastDelta: 0,
+          },
+          ...competitorBlueprints.map(createLeaderboardEntry),
+        ],
     world,
+    startedAt: Number(simulation.startedAt || world.tickTimestamps[0] || Date.now()),
   };
 }
 
@@ -598,7 +727,7 @@ export function createInitialSimulationState(): SimulationState {
     sectorMood,
     STARTING_MARKET_MOOD,
     now,
-    stocks[0]?.priceHistory.length ?? Math.min(MAX_PRICE_HISTORY, 1_440),
+    stocks[0]?.priceHistory.length ?? Math.min(MAX_PRICE_HISTORY, 720),
   );
 
   return {
@@ -612,7 +741,7 @@ export function createInitialSimulationState(): SimulationState {
     stocks,
     player: {
       id: 'local-player',
-      name: '플레이어',
+      name: 'Player',
       cash: INITIAL_PLAYER_CASH,
       holdings: [],
       realizedPnL: 0,
@@ -626,11 +755,11 @@ export function createInitialSimulationState(): SimulationState {
     leaderboard: [
       {
         id: 'local-player',
-        name: '플레이어',
+        name: 'Player',
         kind: 'current-user',
         netWorth: INITIAL_PLAYER_CASH,
         returnRate: 0,
-        style: '로컬 트레이더',
+        style: 'Local trader',
         focusSectors: [],
         volatility: 0,
         lastDelta: 0,

@@ -14,7 +14,8 @@ import { TradeLogPanel } from '@/features/stock-sim/components/TradeLogPanel';
 import { useMarketWorker } from '@/features/stock-sim/hooks/useMarketWorker';
 import { useSimulationUiStore } from '@/features/stock-sim/store/simulationUiStore';
 import {
-  formatSeoulMarketClock,
+  formatMarketClock,
+  getDayPhaseLabel,
   getMarketMoodLabel,
   getMarketRegimeDescription,
   getMarketRegimeLabel,
@@ -81,9 +82,14 @@ const ConnectedTopBar = memo(function ConnectedTopBar() {
       marketMoodLabel={getMarketMoodLabel(snapshot.marketMood)}
       marketRegimeLabel={getMarketRegimeLabel(snapshot.world.regime)}
       marketRegimeDescription={getMarketRegimeDescription(snapshot.world.regime)}
-      marketClock={formatSeoulMarketClock(snapshot.world.lastTickAt)}
+      marketClock={formatMarketClock(snapshot.world.totalSimulationMinutes)}
+      dayPhaseLabel={getDayPhaseLabel(snapshot.world.dayPhase)}
       dominantSector={snapshot.world.dominantSector}
       aiFocusSector={snapshot.world.aiFocusSector}
+      activeTheme={snapshot.world.activeTheme}
+      haltedCount={snapshot.world.haltedCount}
+      warningCount={snapshot.world.warningCount}
+      delistedCount={snapshot.world.delistedCount}
       runtime={runtime}
     />
   );

@@ -2,17 +2,17 @@ import type { SPEED_OPTIONS } from '@/features/stock-sim/constants/config';
 
 export const sectors = [
   'AI',
-  '반도체',
-  '로봇',
-  '우주',
-  '바이오',
-  '배터리',
-  '게임',
-  '플랫폼',
-  '물류',
-  '에너지',
-  '엔터테인먼트',
-  '방산',
+  'Semiconductor',
+  'Robotics',
+  'Space',
+  'Bio',
+  'Battery',
+  'Game',
+  'Platform',
+  'Logistics',
+  'Energy',
+  'Entertainment',
+  'Defense',
 ] as const;
 
 export type Sector = (typeof sectors)[number];
@@ -29,6 +29,11 @@ export type StockTrait =
   | 'volume-spike'
   | 'rumor-prone';
 
+export type StockArchetype = 'bluechip' | 'growth' | 'distressed' | 'theme';
+export type StockStatus = 'NORMAL' | 'WARNING' | 'HALTED' | 'DELISTED';
+export type StockLimitState = 'normal' | 'upper-limit' | 'lower-limit';
+export type DayPhase = 'opening' | 'session' | 'closing' | 'overnight';
+
 export type StockSortMode = 'fixed' | 'gainers' | 'losers' | 'volume';
 export type LeaderboardSortMode = 'netWorth' | 'returnRate';
 export type ChartTimeframe = 'tick' | '1m' | '1h' | '3h' | '24h';
@@ -42,18 +47,44 @@ export type MarketRegime =
   | 'panic'
   | 'rebound';
 
+export type MarketEventType =
+  | 'bullish-stock'
+  | 'bearish-stock'
+  | 'sector-boom'
+  | 'sector-scare'
+  | 'market-bull'
+  | 'market-fear'
+  | 'liquidity-rush'
+  | 'rumor'
+  | 'ipo'
+  | 'theme'
+  | 'halt'
+  | 'resume'
+  | 'warning'
+  | 'delisting'
+  | 'reverse-merger'
+  | 'pump'
+  | 'crash';
+
+export type EventScope = 'stock' | 'sector' | 'market';
+
 export interface StockBlueprint {
   id: string;
   ticker: string;
   name: string;
   sector: Sector;
   description: string;
+  archetype: StockArchetype;
   basePrice: number;
   volatility: number;
   momentum: number;
   sentiment: number;
   liquidity: number;
   traits: StockTrait[];
+  sharesOutstanding: number;
+  aiAffinity: number;
+  newsSensitivity: number;
+  collapseRisk: number;
 }
 
 export interface Stock {
@@ -62,6 +93,7 @@ export interface Stock {
   name: string;
   sector: Sector;
   description: string;
+  archetype: StockArchetype;
   basePrice: number;
   currentPrice: number;
   previousPrice: number;
@@ -74,6 +106,34 @@ export interface Stock {
   tradeCountHistory: number[];
   traits: StockTrait[];
   lastVolume: number;
+  sharesOutstanding: number;
+  aiAffinity: number;
+  newsSensitivity: number;
+  collapseRisk: number;
+  referencePrice: number;
+  lastClosePrice: number;
+  dayOpenPrice: number;
+  dayHighPrice: number;
+  dayLowPrice: number;
+  dailyUpperLimit: number;
+  dailyLowerLimit: number;
+  dailyLimitState: StockLimitState;
+  sessionVolume: number;
+  averageDailyVolume: number;
+  status: StockStatus;
+  haltRemainingTicks: number;
+  haltReason: string | null;
+  warningScore: number;
+  distressScore: number;
+  listedDay: number;
+  ipoDaysRemaining: number;
+  themeTag: string | null;
+  themeIntensity: number;
+  themeUntilTick: number;
+  bubblePhase: 'idle' | 'build' | 'mania' | 'halted' | 'crash';
+  bubbleTicksRemaining: number;
+  bubbleAnchorPrice: number;
+  eventRisk: number;
 }
 
 export interface Holding {
@@ -137,18 +197,6 @@ export interface AiTrader {
   behaviorSeed: number;
 }
 
-export type MarketEventType =
-  | 'bullish-stock'
-  | 'bearish-stock'
-  | 'sector-boom'
-  | 'sector-scare'
-  | 'market-bull'
-  | 'market-fear'
-  | 'liquidity-rush'
-  | 'rumor';
-
-export type EventScope = 'stock' | 'sector' | 'market';
-
 export interface MarketEvent {
   id: string;
   type: MarketEventType;
@@ -163,6 +211,7 @@ export interface MarketEvent {
   createdAt: number;
   tick: number;
   isRumor: boolean;
+  themeTag?: string;
 }
 
 export interface Trade {
@@ -225,8 +274,11 @@ export interface MarketWorldState {
   lastTickAt: number;
   marketClockMinutes: number;
   simulationElapsedMinutes: number;
+  totalSimulationMinutes: number;
   tickTimestamps: number[];
   dayCount: number;
+  dayTick: number;
+  dayPhase: DayPhase;
   regime: MarketRegime;
   liquidityIndex: number;
   volatilityIndex: number;
@@ -234,6 +286,12 @@ export interface MarketWorldState {
   dominantSector: Sector;
   coolingSector: Sector;
   aiFocusSector: Sector;
+  marketSentiment: number;
+  sectorFlows: Record<Sector, number>;
+  activeTheme: string | null;
+  haltedCount: number;
+  warningCount: number;
+  delistedCount: number;
 }
 
 export interface SimulationState {
@@ -275,7 +333,7 @@ export interface PersistenceMeta {
   appId: string;
   checksum: number;
   engine: 'local-engine' | 'worker-engine';
-  leaderboardMode: 'preview';
+  leaderboardMode: 'preview' | 'remote';
 }
 
 export interface PersistedSimulationSnapshot {
@@ -305,6 +363,7 @@ export interface StockSummary {
   name: string;
   sector: Sector;
   description: string;
+  archetype: StockArchetype;
   basePrice: number;
   currentPrice: number;
   previousPrice: number;
@@ -315,6 +374,18 @@ export interface StockSummary {
   traits: StockTrait[];
   lastVolume: number;
   miniHistory: number[];
+  referencePrice: number;
+  dailyUpperLimit: number;
+  dailyLowerLimit: number;
+  dailyLimitState: StockLimitState;
+  sessionVolume: number;
+  averageDailyVolume: number;
+  status: StockStatus;
+  haltRemainingTicks: number;
+  haltReason: string | null;
+  themeTag: string | null;
+  themeIntensity: number;
+  ipoDaysRemaining: number;
 }
 
 export interface SelectedStockSnapshot extends StockSummary {
@@ -323,6 +394,12 @@ export interface SelectedStockSnapshot extends StockSummary {
   tradeCountHistory: number[];
   simulationElapsedMinutes: number;
   tickTimestamps: number[];
+  dayHighPrice: number;
+  dayLowPrice: number;
+  warningScore: number;
+  distressScore: number;
+  bubblePhase: Stock['bubblePhase'];
+  eventRisk: number;
 }
 
 export interface AggregatedChartPoint {
@@ -344,6 +421,7 @@ export interface VolatilityLeaderSnapshot {
   currentPrice: number;
   previousPrice: number;
   range: number;
+  status: StockStatus;
 }
 
 export interface PortfolioSummary {

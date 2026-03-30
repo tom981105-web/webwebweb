@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -100,7 +100,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(APP_DIR, 'index.html'));
 });
 
-const DEFAULT_CATEGORIES = ['카테고리 1', '카테고리 2', '카테고리 3', '카테고리 4'];
+const DEFAULT_CATEGORIES = ['移댄뀒怨좊━ 1', '移댄뀒怨좊━ 2', '移댄뀒怨좊━ 3', '移댄뀒怨좊━ 4'];
 
 
 function safeParseJson(value, fallback) {
@@ -159,7 +159,7 @@ function normalizeBoardPosts(value, categories) {
         id: Number(post.id || 0),
         title: post.title || '',
         content: normalizeBoardContent(post.content || ''),
-        author: post.author || '익명',
+        author: post.author || '?듬챸',
         date: post.date || '',
         views: Number(post.views || 0),
         likes: Number(post.likes || 0),
@@ -269,8 +269,8 @@ function normalizeMountainRecords(value) {
         return {
             ...mountain,
             id: mountain && mountain.id ? String(mountain.id) : `m_${Date.now()}`,
-            title: String((mountain && (mountain.title || mountain.name)) || '산행 기록').slice(0, 15),
-            name: String((mountain && (mountain.name || mountain.title)) || '산행 기록').slice(0, 15),
+            title: String((mountain && (mountain.title || mountain.name)) || '?고뻾 湲곕줉').slice(0, 15),
+            name: String((mountain && (mountain.name || mountain.title)) || '?고뻾 湲곕줉').slice(0, 15),
             lat: mountain && mountain.lat !== undefined ? mountain.lat : '',
             lng: mountain && mountain.lng !== undefined ? mountain.lng : '',
             alt: String(mountain && mountain.alt || ''),
@@ -296,7 +296,7 @@ function normalizeAiPromptEntries(value) {
             ...prompt,
             id,
             title: String(prompt && prompt.title || ''),
-            category: String(prompt && prompt.category || '기타'),
+            category: String(prompt && prompt.category || '湲고?'),
             description: String(prompt && prompt.description || ''),
             text: String(prompt && prompt.text || ''),
             author: String(prompt && prompt.author || 'admin').trim() || 'admin',
@@ -494,7 +494,7 @@ function canAccessStockSim(userId) {
     );
     const userEntry = matchedUserId ? state.users[matchedUserId] : null;
     return Boolean(
-        userEntry && (userEntry.isAdmin || normalizedUserId.toLowerCase() === 'tomem')
+        userEntry && (userEntry.isAdmin || String(userEntry.status || '').toLowerCase() === 'regular')
     );
 }
 
@@ -502,7 +502,7 @@ function normalizeBanners(value) {
     return value && typeof value === 'object'
         ? value
         : {
-            top: { title: '우리들의 아지트', desc: '우리들만의 소중한 공간에 오신 것을 환영합니다.', bg: '', posX: 4, posY: 50 },
+            top: { title: '우리들의 아지트', desc: '우리만의 소중한 공간에 오신 것을 환영합니다.', bg: '', posX: 4, posY: 50 },
             left: { url: '', link: '#' },
             right: { url: '', link: '#' }
         };
@@ -925,7 +925,7 @@ async function hydrateDatabaseFromRemote() {
         fs.writeFileSync(DB_FILE, JSON.stringify(remoteDb, null, 2));
         return true;
     } catch (error) {
-        console.warn('[DB] 원격 최신 상태 복구에 실패했습니다.', error.message || error);
+        console.warn('[DB] ?먭꺽 理쒖떊 ?곹깭 蹂듦뎄???ㅽ뙣?덉뒿?덈떎.', error.message || error);
         return false;
     }
 }
@@ -943,7 +943,7 @@ async function mirrorDatabaseToRemote() {
             contentType: 'application/json'
         });
     } catch (error) {
-        console.warn('[DB] 원격 최신 상태 저장에 실패했습니다.', error.message || error);
+        console.warn('[DB] ?먭꺽 理쒖떊 ?곹깭 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎.', error.message || error);
     }
 }
 
@@ -959,7 +959,7 @@ function scheduleRemoteDatabaseMirror() {
         remoteMirrorQueue = remoteMirrorQueue
             .then(() => mirrorDatabaseToRemote())
             .catch((error) => {
-                console.warn('[DB] 지연 원격 미러링에 실패했습니다.', error.message || error);
+                console.warn('[DB] 吏???먭꺽 誘몃윭留곸뿉 ?ㅽ뙣?덉뒿?덈떎.', error.message || error);
             });
     }, 350);
 }
@@ -989,7 +989,7 @@ function scheduleDeferredDbPersist() {
                 scheduleRemoteDatabaseMirror();
             })
             .catch((error) => {
-                console.warn('[DB] 지연 저장에 실패했습니다.', error.message || error);
+                console.warn('[DB] 吏????μ뿉 ?ㅽ뙣?덉뒿?덈떎.', error.message || error);
             });
     }, 450);
 }
@@ -1114,7 +1114,7 @@ async function persistDb(options = {}) {
 function persistDbInBackground(options = {}) {
     setTimeout(() => {
         persistDb(options).catch((error) => {
-            console.error('[Persist] 백그라운드 저장에 실패했습니다.', error);
+            console.error('[Persist] 諛깃렇?쇱슫????μ뿉 ?ㅽ뙣?덉뒿?덈떎.', error);
         });
     }, 0);
 }
@@ -1266,21 +1266,21 @@ app.post('/api/auth/signup', async (req, res) => {
     const inviteCode = String(req.body && req.body.code ? req.body.code : '').trim();
 
     if (!id) {
-        return res.status(400).json({ success: false, message: '아이디를 입력해 주세요.' });
+        return res.status(400).json({ success: false, message: '?꾩씠?붾? ?낅젰??二쇱꽭??' });
     }
 
     if (password.length < 4) {
-        return res.status(400).json({ success: false, message: '비밀번호는 최소 4자 이상이어야 합니다.' });
+        return res.status(400).json({ success: false, message: '鍮꾨?踰덊샇??理쒖냼 4???댁긽?댁뼱???⑸땲??' });
     }
 
     const duplicateKey = Object.keys(state.users).find((key) => key.toLowerCase() === id.toLowerCase());
     if (duplicateKey) {
-        return res.status(400).json({ success: false, message: '이미 존재하는 아이디입니다.' });
+        return res.status(400).json({ success: false, message: '?대? 議댁옱?섎뒗 ?꾩씠?붿엯?덈떎.' });
     }
 
     const codeIndex = state.inviteCodes.indexOf(inviteCode);
     if (codeIndex < 0) {
-        return res.status(400).json({ success: false, message: '초대 코드가 올바르지 않습니다.' });
+        return res.status(400).json({ success: false, message: '珥덈? 肄붾뱶媛 ?щ컮瑜댁? ?딆뒿?덈떎.' });
     }
 
     state.users[id] = {
@@ -1318,7 +1318,7 @@ app.post('/api/auth/login', async (req, res) => {
     const userKey = Object.keys(state.users).find((key) => key.toLowerCase() === id.toLowerCase());
 
     if (!userKey || state.users[userKey].password !== password) {
-        return res.status(400).json({ success: false, message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
+        return res.status(400).json({ success: false, message: '?꾩씠???먮뒗 鍮꾨?踰덊샇媛 ?щ컮瑜댁? ?딆뒿?덈떎.' });
     }
 
     state.users[userKey] = {
@@ -1358,7 +1358,7 @@ app.post('/api/login-hero', async (req, res) => {
     if (nextImages !== null) {
         const validImages = await persistLoginHeroImages(nextImages);
         if (!validImages.length) {
-            return res.status(400).json({ success: false, message: '저장할 이미지가 없습니다.' });
+            return res.status(400).json({ success: false, message: '??ν븷 ?대?吏媛 ?놁뒿?덈떎.' });
         }
         await deleteStoredImageList(state.loginHero.images);
         state.loginHero.images = validImages;
@@ -1419,7 +1419,7 @@ app.get('/api/admin/storage-status', async (req, res) => {
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: error.message || '백업 상태를 불러오지 못했습니다.'
+            message: error.message || '諛깆뾽 ?곹깭瑜?遺덈윭?ㅼ? 紐삵뻽?듬땲??'
         });
     }
 });
@@ -1431,7 +1431,7 @@ app.post('/api/admin/backup/r2', async (req, res) => {
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: error.message || 'R2 백업에 실패했습니다.'
+            message: error.message || 'R2 諛깆뾽???ㅽ뙣?덉뒿?덈떎.'
         });
     }
 });
@@ -1467,7 +1467,7 @@ app.post('/api/uploads/image', async (req, res) => {
     } catch (error) {
         res.status(400).json({
             success: false,
-            message: error.message || '이미지 업로드에 실패했습니다.'
+            message: error.message || '?대?吏 ?낅줈?쒖뿉 ?ㅽ뙣?덉뒿?덈떎.'
         });
     }
 });
@@ -1517,7 +1517,7 @@ app.get('/api/board/posts/:id', (req, res) => {
     const id = Number(req.params.id);
     const post = state.board.posts.find((item) => Number(item.id) === id);
     if (!post) {
-        return res.status(404).json({ success: false, message: '게시글을 찾을 수 없습니다.' });
+        return res.status(404).json({ success: false, message: '寃뚯떆湲??李얠쓣 ???놁뒿?덈떎.' });
     }
     res.json({ post });
 });
@@ -1530,7 +1530,7 @@ app.post('/api/board/posts', async (req, res) => {
         id: nextId,
         title: payload.title || '',
         content: payload.content || '',
-        author: payload.author || '익명',
+        author: payload.author || '?듬챸',
         date: payload.date || '',
         updatedAt: payload.updatedAt || nowIso,
         views: payload.views || 0,
@@ -1554,7 +1554,7 @@ app.put('/api/board/posts/:id', async (req, res) => {
     const id = Number(req.params.id);
     const index = state.board.posts.findIndex((item) => Number(item.id) === id);
     if (index < 0) {
-        return res.status(404).json({ success: false, message: '게시글을 찾을 수 없습니다.' });
+        return res.status(404).json({ success: false, message: '寃뚯떆湲??李얠쓣 ???놁뒿?덈떎.' });
     }
 
     state.board.posts[index] = normalizeBoardPosts([{
@@ -1588,7 +1588,7 @@ app.get('/api/board/drafts', (req, res) => {
     const userId = String(req.query.user || '').trim();
     const postId = Number(req.query.postId || 0);
     if (!userId) {
-        return res.status(400).json({ success: false, message: '사용자 정보가 필요합니다.' });
+        return res.status(400).json({ success: false, message: '?ъ슜???뺣낫媛 ?꾩슂?⑸땲??' });
     }
 
     const draft = state.board.drafts[createBoardDraftKey(userId, postId)] || null;
@@ -1601,7 +1601,7 @@ app.post('/api/board/drafts', async (req, res) => {
     const postId = Number(payload.postId || 0);
 
     if (!userId) {
-        return res.status(400).json({ success: false, message: '사용자 정보가 필요합니다.' });
+        return res.status(400).json({ success: false, message: '?ъ슜???뺣낫媛 ?꾩슂?⑸땲??' });
     }
 
     const draftKey = createBoardDraftKey(userId, postId);
@@ -1634,7 +1634,7 @@ app.delete('/api/board/drafts', async (req, res) => {
     const userId = String(req.query.user || '').trim();
     const postId = Number(req.query.postId || 0);
     if (!userId) {
-        return res.status(400).json({ success: false, message: '사용자 정보가 필요합니다.' });
+        return res.status(400).json({ success: false, message: '?ъ슜???뺣낫媛 ?꾩슂?⑸땲??' });
     }
 
     delete state.board.drafts[createBoardDraftKey(userId, postId)];
@@ -1664,7 +1664,7 @@ app.get('/api/stock-sim/session', (req, res) => {
     if (!canAccessStockSim(userId)) {
         return res.status(403).json({
             success: false,
-            message: '현재는 관리자만 접근할 수 있습니다.'
+            message: '승인된 회원만 주식장에 입장할 수 있습니다.'
         });
     }
 
@@ -1687,7 +1687,7 @@ app.put('/api/stock-sim/session', async (req, res) => {
     if (!canAccessStockSim(userId)) {
         return res.status(403).json({
             success: false,
-            message: '현재는 관리자만 접근할 수 있습니다.'
+            message: '승인된 회원만 주식장에 입장할 수 있습니다.'
         });
     }
 
@@ -1699,7 +1699,7 @@ app.put('/api/stock-sim/session', async (req, res) => {
     if (!snapshot || !snapshot.simulation || typeof snapshot.simulation !== 'object') {
         return res.status(400).json({
             success: false,
-            message: '저장할 시뮬레이션 스냅샷이 없습니다.'
+            message: '??ν븷 ?쒕??덉씠???ㅻ깄?룹씠 ?놁뒿?덈떎.'
         });
     }
 
@@ -1769,7 +1769,7 @@ app.put('/api/mountains/:id', async (req, res) => {
     const id = String(req.params.id || '').trim();
     const index = normalizeMountainRecords(state.mountains).findIndex((item) => String(item.id) === id);
     if (index < 0) {
-        return res.status(404).json({ success: false, message: '산 기록을 찾을 수 없습니다.' });
+        return res.status(404).json({ success: false, message: '??湲곕줉??李얠쓣 ???놁뒿?덈떎.' });
     }
 
     const existing = normalizeMountainRecords(state.mountains)[index];
@@ -1805,7 +1805,7 @@ app.get('/api/users/:id', (req, res) => {
     const id = String(req.params.id || '');
     const key = Object.keys(state.users).find((entry) => entry.toLowerCase() === id.toLowerCase());
     if (!key) {
-        return res.status(404).json({ success: false, message: '회원을 찾을 수 없습니다.' });
+        return res.status(404).json({ success: false, message: '?뚯썝??李얠쓣 ???놁뒿?덈떎.' });
     }
     res.json({ userId: key, user: state.users[key] });
 });
@@ -1815,7 +1815,7 @@ app.patch('/api/users/:id', async (req, res) => {
     const id = String(req.params.id || '');
     const key = Object.keys(state.users).find((entry) => entry.toLowerCase() === id.toLowerCase());
     if (!key) {
-        return res.status(404).json({ success: false, message: '회원을 찾을 수 없습니다.' });
+        return res.status(404).json({ success: false, message: '?뚯썝??李얠쓣 ???놁뒿?덈떎.' });
     }
 
     state.users[key] = {
@@ -1832,11 +1832,11 @@ app.delete('/api/users/:id', async (req, res) => {
     const id = String(req.params.id || '');
     const key = Object.keys(state.users).find((entry) => entry.toLowerCase() === id.toLowerCase());
     if (!key) {
-        return res.status(404).json({ success: false, message: '?뚯썝??李얠쓣 ???놁뒿?덈떎.' });
+        return res.status(404).json({ success: false, message: '???뜚??筌≪뼚??????곷뮸??덈뼄.' });
     }
 
     if (key.toLowerCase() === 'admin' || state.users[key].isAdmin) {
-        return res.status(400).json({ success: false, message: '관리자 계정은 삭제할 수 없습니다.' });
+        return res.status(400).json({ success: false, message: '愿由ъ옄 怨꾩젙? ??젣?????놁뒿?덈떎.' });
     }
 
     delete state.users[key];
@@ -1891,7 +1891,7 @@ async function runBackgroundBootstrap() {
         console.log(`[Boot] Background initialization complete at ${bootState.readyAt}.`);
     } catch (error) {
         bootState.error = error && error.message ? error.message : String(error);
-        console.error('[Boot] 백그라운드 초기화에 실패했습니다.', error);
+        console.error('[Boot] 諛깃렇?쇱슫??珥덇린?붿뿉 ?ㅽ뙣?덉뒿?덈떎.', error);
     }
 }
 
@@ -1899,7 +1899,7 @@ async function bootstrap() {
     try {
         loadStateFromDisk();
     } catch (error) {
-        console.warn('[Boot] 로컬 DB를 먼저 불러오지 못했습니다. 초기 상태로 시작합니다.', error.message || error);
+        console.warn('[Boot] 濡쒖뺄 DB瑜?癒쇱? 遺덈윭?ㅼ? 紐삵뻽?듬땲?? 珥덇린 ?곹깭濡??쒖옉?⑸땲??', error.message || error);
     }
 
     const PORT = process.env.PORT || 3000;
@@ -1920,6 +1920,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
-    console.error('[Boot] 서버 시작에 실패했습니다.', error);
+    console.error('[Boot] ?쒕쾭 ?쒖옉???ㅽ뙣?덉뒿?덈떎.', error);
     process.exit(1);
 });

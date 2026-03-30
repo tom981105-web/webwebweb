@@ -17,6 +17,10 @@ export function getHoldingQuantity(holdings: Holding[], stockId: string) {
 }
 
 export function calculateHoldingValue(holding: Holding, stock: PriceAwareStock) {
+  if ('status' in stock && stock.status === 'DELISTED') {
+    return 0;
+  }
+
   return holding.quantity * stock.currentPrice;
 }
 

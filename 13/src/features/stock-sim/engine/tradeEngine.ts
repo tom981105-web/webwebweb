@@ -1,5 +1,13 @@
 import { clamp, roundPrice, trimHistory, uid } from '@/features/stock-sim/engine/helpers';
-import type { AiTrader, Holding, Player, Stock, Trade, TradeSide } from '@/features/stock-sim/types';
+import type {
+  AiTrader,
+  Holding,
+  Player,
+  Stock,
+  StockLimitState,
+  Trade,
+  TradeSide,
+} from '@/features/stock-sim/types';
 
 function upsertHolding(
   holdings: Holding[],
@@ -15,6 +23,28 @@ function upsertHolding(
   return [...withoutCurrent, nextHolding];
 }
 
+function getTradeBlockReason(stock: Stock, side: TradeSide) {
+  if (stock.status === 'DELISTED') {
+    return '상장폐지 종목은 거래할 수 없습니다.';
+  }
+
+  if (stock.status === 'HALTED') {
+    return stock.haltReason
+      ? `거래정지 중입니다. (${stock.haltReason})`
+      : '거래정지 종목은 거래할 수 없습니다.';
+  }
+
+  if (stock.dailyLimitState === 'upper-limit' && side === 'buy') {
+    return '상한가 상태에서는 추가 매수가 제한됩니다.';
+  }
+
+  if (stock.dailyLimitState === 'lower-limit' && side === 'sell') {
+    return '하한가 상태에서는 추가 매도가 제한됩니다.';
+  }
+
+  return null;
+}
+
 export function executePlayerOrder(
   player: Player,
   stock: Stock,
@@ -28,6 +58,11 @@ export function executePlayerOrder(
 
   if (!Number.isFinite(normalizedQuantity) || normalizedQuantity <= 0) {
     return { error: '수량은 1주 이상이어야 합니다.' };
+  }
+
+  const blockedReason = getTradeBlockReason(stock, side);
+  if (blockedReason) {
+    return { error: blockedReason };
   }
 
   const existingHolding = player.holdings.find((holding) => holding.stockId === stock.id);
@@ -131,6 +166,10 @@ export function executeAiOrder(
     return null;
   }
 
+  if (getTradeBlockReason(stock, side)) {
+    return null;
+  }
+
   const existingHolding = aiTrader.holdings.find((holding) => holding.stockId === stock.id);
 
   if (side === 'buy') {
@@ -211,10 +250,24 @@ export function executeAiOrder(
   };
 }
 
-export function applyImmediateTradeImpact(stock: Stock, side: TradeSide, quantity: number) {
-  const orderDepth = clamp((quantity * stock.currentPrice) / (stock.liquidity * 110_000), 0, 0.015);
+export function applyImmediateTradeImpact(
+  stock: Stock,
+  side: TradeSide,
+  quantity: number,
+): Stock {
+  const orderDepth = clamp((quantity * Math.max(stock.currentPrice, 1)) / (stock.liquidity * 110_000), 0, 0.015);
   const direction = side === 'buy' ? 1 : -1;
   const nextPrice = roundPrice(stock.currentPrice * (1 + orderDepth * direction));
+  const clampedPrice = Math.min(
+    Math.max(nextPrice, stock.dailyLowerLimit),
+    stock.dailyUpperLimit,
+  );
+  const dailyLimitState: StockLimitState =
+    clampedPrice >= stock.dailyUpperLimit
+      ? 'upper-limit'
+      : clampedPrice <= stock.dailyLowerLimit
+        ? 'lower-limit'
+        : 'normal';
   const notional = quantity * stock.currentPrice;
   const replaceLast = <T,>(history: T[], nextValue: T) => {
     if (history.length === 0) {
@@ -227,11 +280,15 @@ export function applyImmediateTradeImpact(stock: Stock, side: TradeSide, quantit
   return {
     ...stock,
     previousPrice: stock.currentPrice,
-    currentPrice: nextPrice,
+    currentPrice: stock.status === 'DELISTED' ? 0 : clampedPrice,
     momentum: clamp(stock.momentum + direction * orderDepth * 3.6, -1.2, 1.2),
     sentiment: clamp(stock.sentiment + direction * orderDepth * 2.2, -1, 1),
     lastVolume: stock.lastVolume + notional,
-    priceHistory: trimHistory(replaceLast(stock.priceHistory, nextPrice)),
+    dailyLimitState,
+    dayHighPrice: Math.max(stock.dayHighPrice, clampedPrice),
+    dayLowPrice: Math.min(stock.dayLowPrice, clampedPrice),
+    sessionVolume: stock.sessionVolume + notional,
+    priceHistory: trimHistory(replaceLast(stock.priceHistory, clampedPrice)),
     volumeHistory: trimHistory(
       replaceLast(stock.volumeHistory, (stock.volumeHistory.at(-1) ?? 0) + Math.round(notional)),
     ),

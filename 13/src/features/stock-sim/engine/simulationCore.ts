@@ -73,6 +73,7 @@ function createStockSummary(stock: Stock): StockSummary {
     name: stock.name,
     sector: stock.sector,
     description: stock.description,
+    archetype: stock.archetype,
     basePrice: stock.basePrice,
     currentPrice: stock.currentPrice,
     previousPrice: stock.previousPrice,
@@ -83,6 +84,18 @@ function createStockSummary(stock: Stock): StockSummary {
     traits: stock.traits,
     lastVolume: stock.lastVolume,
     miniHistory,
+    referencePrice: stock.referencePrice,
+    dailyUpperLimit: stock.dailyUpperLimit,
+    dailyLowerLimit: stock.dailyLowerLimit,
+    dailyLimitState: stock.dailyLimitState,
+    sessionVolume: stock.sessionVolume,
+    averageDailyVolume: stock.averageDailyVolume,
+    status: stock.status,
+    haltRemainingTicks: stock.haltRemainingTicks,
+    haltReason: stock.haltReason,
+    themeTag: stock.themeTag,
+    themeIntensity: stock.themeIntensity,
+    ipoDaysRemaining: stock.ipoDaysRemaining,
   };
 }
 
@@ -98,6 +111,12 @@ function createSelectedStockSnapshot(stock: Stock | undefined): SelectedStockSna
     tradeCountHistory: stock.tradeCountHistory,
     simulationElapsedMinutes: 0,
     tickTimestamps: [],
+    dayHighPrice: stock.dayHighPrice,
+    dayLowPrice: stock.dayLowPrice,
+    warningScore: stock.warningScore,
+    distressScore: stock.distressScore,
+    bubblePhase: stock.bubblePhase,
+    eventRisk: stock.eventRisk,
   };
 }
 
@@ -127,6 +146,7 @@ function createHotStocks(stocks: Stock[]) {
 
 function createVolatilityLeaders(stocks: Stock[]): VolatilityLeaderSnapshot[] {
   return [...stocks]
+    .filter((stock) => stock.status !== 'DELISTED')
     .map((stock) => ({
       stockId: stock.id,
       ticker: stock.ticker,
@@ -135,6 +155,7 @@ function createVolatilityLeaders(stocks: Stock[]): VolatilityLeaderSnapshot[] {
       currentPrice: stock.currentPrice,
       previousPrice: stock.previousPrice,
       range: Math.max(...stock.priceHistory) - Math.min(...stock.priceHistory),
+      status: stock.status,
     }))
     .sort((left, right) => right.range - left.range)
     .slice(0, 3);

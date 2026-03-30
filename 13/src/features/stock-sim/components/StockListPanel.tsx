@@ -21,6 +21,9 @@ import {
   formatCompactNumber,
   formatPercent,
   formatPrice,
+  getLimitStateLabel,
+  getStockArchetypeLabel,
+  getStockStatusLabel,
 } from '@/features/stock-sim/utils/formatters';
 import { getFilteredStocks } from '@/features/stock-sim/utils/selectors';
 
@@ -47,7 +50,7 @@ type StockCardProps = {
 function getSortLabel(sortMode: StockSortMode) {
   switch (sortMode) {
     case 'fixed':
-      return '고정';
+      return '기본';
     case 'gainers':
       return '상승률';
     case 'losers':
@@ -55,7 +58,7 @@ function getSortLabel(sortMode: StockSortMode) {
     case 'volume':
       return '거래량';
     default:
-      return '고정';
+      return '기본';
   }
 }
 
@@ -64,7 +67,7 @@ const sortOptions: Array<{
   value: StockSortMode;
   icon: ReactNode;
 }> = [
-  { label: '고정', value: 'fixed', icon: <Sparkles className="ss-h-3.5 ss-w-3.5" /> },
+  { label: '기본', value: 'fixed', icon: <Sparkles className="ss-h-3.5 ss-w-3.5" /> },
   { label: '상승', value: 'gainers', icon: <ArrowUp className="ss-h-3.5 ss-w-3.5" /> },
   { label: '하락', value: 'losers', icon: <ArrowDown className="ss-h-3.5 ss-w-3.5" /> },
   { label: '거래량', value: 'volume', icon: <BarChart3 className="ss-h-3.5 ss-w-3.5" /> },
@@ -78,25 +81,21 @@ function buildSparkline(history: number[], width = 132, height = 42, padding = 5
   const min = Math.min(...history);
   const max = Math.max(...history);
   const range = Math.max(1, max - min);
-
   const points = history.map((value, index) => {
     const x =
       history.length === 1
         ? width / 2
         : padding + (index / (history.length - 1)) * (width - padding * 2);
     const y = height - padding - ((value - min) / range) * (height - padding * 2);
-
     return { x, y };
   });
 
   const linePath = points
     .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
     .join(' ');
-
   const areaPath = `${linePath} L ${points.at(-1)?.x ?? width - padding} ${height - padding} L ${
     points[0]?.x ?? padding
   } ${height - padding} Z`;
-
   const lastPoint = points.at(-1) ?? { x: width - padding, y: height / 2 };
 
   return {
@@ -107,12 +106,31 @@ function buildSparkline(history: number[], width = 132, height = 42, padding = 5
   };
 }
 
+function Chip({
+  label,
+  tone = 'neutral',
+}: {
+  label: string;
+  tone?: 'neutral' | 'positive' | 'negative' | 'warning';
+}) {
+  const className =
+    tone === 'positive'
+      ? 'ss-ui-chip ss-ui-chip-positive'
+      : tone === 'negative'
+        ? 'ss-ui-chip ss-ui-chip-negative'
+        : tone === 'warning'
+          ? 'ss-ui-chip ss-border-amber-300/18 ss-bg-amber-300/10 ss-text-amber-50'
+          : 'ss-ui-chip';
+
+  return <span className={className}>{label}</span>;
+}
+
 const StockCard = memo(function StockCard({
   stock,
   isSelected,
   onSelectStock,
 }: StockCardProps) {
-  const changeRate = ((stock.currentPrice - stock.previousPrice) / stock.previousPrice) * 100;
+  const changeRate = ((stock.currentPrice - stock.previousPrice) / Math.max(stock.previousPrice, 1)) * 100;
   const positive = changeRate >= 0;
   const { linePath, areaPath, lastX, lastY } = useMemo(
     () => buildSparkline(stock.miniHistory),
@@ -146,20 +164,41 @@ const StockCard = memo(function StockCard({
         </span>
       </div>
 
+      <div className="ss-mt-2 ss-flex ss-flex-wrap ss-gap-1.5">
+        <Chip
+          label={getStockStatusLabel(stock.status)}
+          tone={
+            stock.status === 'WARNING'
+              ? 'warning'
+              : stock.status === 'HALTED' || stock.status === 'DELISTED'
+                ? 'negative'
+                : 'neutral'
+          }
+        />
+        <Chip label={getStockArchetypeLabel(stock.archetype)} />
+        {stock.dailyLimitState !== 'normal' ? (
+          <Chip
+            label={getLimitStateLabel(stock.dailyLimitState)}
+            tone={stock.dailyLimitState === 'upper-limit' ? 'positive' : 'negative'}
+          />
+        ) : null}
+        {stock.ipoDaysRemaining > 0 ? <Chip label="신규 상장" tone="warning" /> : null}
+      </div>
+
       <div className="ss-mt-3 ss-flex ss-items-end ss-justify-between ss-gap-3">
         <div>
           <p className="ss-text-[15px] ss-font-semibold ss-text-white">
             {formatPrice(stock.currentPrice)}
           </p>
           <p className="ss-mt-1 ss-text-[11px] ss-text-slate-300/82">
-            기준가 {formatPrice(stock.basePrice)}
+            기준가 {formatPrice(stock.referencePrice)}
           </p>
         </div>
         <div className="ss-text-right">
           <p className="ss-text-[12px] ss-font-medium ss-text-slate-100">
-            {formatCompactNumber(stock.lastVolume)}
+            {formatCompactNumber(stock.sessionVolume || stock.lastVolume)}
           </p>
-          <p className="ss-mt-1 ss-text-[10px] ss-text-slate-300/72">체결량</p>
+          <p className="ss-mt-1 ss-text-[10px] ss-text-slate-300/72">거래대금</p>
         </div>
       </div>
 
@@ -212,7 +251,7 @@ export function StockListPanel({
   return (
     <Panel
       title="종목 보드"
-      subtitle="카드 위치는 기본적으로 고정하고, 필요할 때만 정렬 기준을 바꿔 흐름을 비교하기 쉽게 정리했습니다."
+      subtitle="하루 기준가, 상하한, 거래정지, 신규 상장 상태를 카드 단위로 빠르게 비교할 수 있습니다."
       icon={<ArrowDownUp className="ss-h-5 ss-w-5" />}
       action={
         <button
