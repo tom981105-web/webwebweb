@@ -983,13 +983,15 @@ function buildSectorFlows(
     }, 0);
     const themeBias = sectorStocks.some((stock) => stock.themeTag) ? 0.08 : 0;
     const haltPenalty = sectorStocks.filter((stock) => stock.status === 'HALTED').length * 0.05;
+    const washoutSupport = clamp(-averageDeviation, 0, 0.34) * 0.28;
     next[sector] = clamp(
       (previousFlows[sector] || 0) * 0.8 +
-        sectorMood[sector] * 0.34 +
-        averageDeviation * 0.55 +
-        averageMomentum * 0.15 +
+        sectorMood[sector] * 0.22 +
+        averageDeviation * 0.18 +
+        averageMomentum * 0.12 +
         eventBias +
         themeBias +
+        washoutSupport +
         marketMood * 0.12 -
         haltPenalty +
         randomBetween(-0.025, 0.025),
@@ -1022,12 +1024,14 @@ function buildSectorMood(
       if (event.affectedSectors.includes(sector)) return sum + event.impact * 0.3;
       return sum;
     }, 0);
+    const reboundBias = clamp(-performance, 0, 0.32) * 0.18;
 
     next[sector] = clamp(
-      previousMood[sector] * 0.74 +
-        sectorFlows[sector] * 0.5 +
-        performance * 0.42 +
+      previousMood[sector] * 0.64 +
+        sectorFlows[sector] * 0.34 +
+        performance * 0.14 +
         eventBias +
+        reboundBias +
         marketMood * 0.08 +
         randomBetween(-0.03, 0.03),
       -1,
@@ -1173,13 +1177,27 @@ function applyAmbientMove(
   const eventImpulse = getStockEventImpulse(stock, events);
   const sectorFlow = world.sectorFlows[stock.sector] || 0;
   const themeBoost = stock.themeIntensity * (stock.archetype === 'theme' ? 0.035 : 0.024);
+  const priceDrawdown = clamp((stock.referencePrice - stock.currentPrice) / Math.max(stock.referencePrice, 1), 0, 0.36);
+  const valueSupport =
+    priceDrawdown *
+    (stock.archetype === 'bluechip'
+      ? 0.42
+      : stock.archetype === 'growth'
+        ? 0.3
+        : stock.archetype === 'distressed'
+          ? 0.12
+          : 0.22);
+  const lowerLimitBounce =
+    stock.dailyLimitState === 'lower-limit' || stock.currentPrice <= stock.dailyLowerLimit * 1.012
+      ? 0.18 + priceDrawdown * 0.42
+      : 0;
   const bubbleBoost =
     stock.bubblePhase === 'build'
       ? 0.012
       : stock.bubblePhase === 'mania'
         ? 0.032
         : stock.bubblePhase === 'crash'
-          ? -0.046
+          ? -0.028
           : 0;
   const ipoBoost = stock.ipoDaysRemaining > 0 ? randomBetween(-0.018, 0.024) : 0;
   const imbalance =
@@ -1189,6 +1207,8 @@ function applyAmbientMove(
     stock.momentum * 0.18 +
     meanReversion +
     themeBoost +
+    valueSupport +
+    lowerLimitBounce +
     bubbleBoost +
     ipoBoost +
     imbalanceRatio * 0.24 +
@@ -1660,8 +1680,18 @@ function stepOneTick(simulation: SimulationState, timestamp: number) {
   }, 0);
   const averageSectorMood =
     Object.values(sectorMood).reduce((sum, value) => sum + value, 0) / Math.max(1, sectors.length);
+  const broadWashoutSupport =
+    clamp(
+      nextStocks.filter((stock) => stock.dailyLimitState === 'lower-limit').length / Math.max(1, nextStocks.length),
+      0,
+      0.5,
+    ) * 0.16;
   const marketMood = clamp(
-    simulation.marketMood * 0.82 + averageSectorMood * 0.42 + marketEventBias + randomBetween(-0.025, 0.025),
+    simulation.marketMood * 0.66 +
+      averageSectorMood * 0.24 +
+      marketEventBias +
+      broadWashoutSupport +
+      randomBetween(-0.025, 0.025),
     -1,
     1,
   );
