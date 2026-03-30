@@ -3,6 +3,7 @@ import {
   Activity,
   Clock3,
   Gauge,
+  House,
   RadioTower,
   Save,
   ShieldCheck,
@@ -116,6 +117,10 @@ export function TopBar({
 }: TopBarProps) {
   const pnlPositive = unrealizedPnL >= 0;
   const returnPositive = returnRate >= 0;
+  const homeUrl =
+    typeof window !== 'undefined'
+      ? new URL('/index.html', window.location.origin).href
+      : '/index.html';
 
   return (
     <div className="ss-ui-panel-surface ss-rounded-[28px] ss-p-4 lg:ss-p-5">
@@ -124,11 +129,11 @@ export function TopBar({
           <div className="ss-flex ss-flex-wrap ss-items-center ss-gap-2">
             <span className="ss-ui-chip ss-ui-chip-info">
               <RadioTower className="ss-h-3.5 ss-w-3.5" />
-              실시간 영구 시장
+              실시간 시장
             </span>
             <span className="ss-ui-chip">
               <ShieldCheck className="ss-h-3.5 ss-w-3.5" />
-              워커 기반 엔진
+              관리자 전용
             </span>
             <span className={`ss-ui-chip ${getPersistenceTone(runtime)}`}>
               <Save className="ss-h-3.5 ss-w-3.5" />
@@ -151,17 +156,26 @@ export function TopBar({
               </p>
             </div>
 
-            <div className="ss-ui-soft-card ss-inline-flex ss-items-center ss-gap-3 ss-self-start ss-rounded-full ss-px-4 ss-py-2.5">
-              <Activity className="ss-h-4 ss-w-4 ss-text-cyan-100" />
-              <span className="ss-text-sm ss-font-medium ss-text-white">
-                엔진 상태 {speed}배속 · 틱 {tick.toLocaleString('ko-KR')}
-              </span>
+            <div className="ss-flex ss-flex-col ss-items-start ss-gap-2">
+              <a
+                href={homeUrl}
+                className="ss-inline-flex ss-items-center ss-gap-2 ss-self-start ss-rounded-full ss-border ss-border-white/12 ss-bg-white/6 ss-px-4 ss-py-2 ss-text-sm ss-font-medium ss-text-white ss-no-underline ss-transition hover:ss-bg-white/10"
+              >
+                <House className="ss-h-4 ss-w-4 ss-text-cyan-100" />
+                홈으로
+              </a>
+              <div className="ss-ui-soft-card ss-inline-flex ss-items-center ss-gap-3 ss-self-start ss-rounded-full ss-px-4 ss-py-2.5">
+                <Activity className="ss-h-4 ss-w-4 ss-text-cyan-100" />
+                <span className="ss-text-sm ss-font-medium ss-text-white">
+                  엔진 상태 {speed}배속 · 틱 {tick.toLocaleString('ko-KR')}
+                </span>
+              </div>
             </div>
           </div>
 
           <div className="ss-grid ss-gap-3 sm:ss-grid-cols-2 xl:ss-grid-cols-4">
             <MiniStat label="시장 시계" value={marketClock} />
-            <MiniStat label="시장 심리" value={marketMoodLabel} />
+            <MiniStat label="시장 분위기" value={marketMoodLabel} />
             <MiniStat label="주도 섹터" value={dominantSector} />
             <MiniStat label="AI 집중 섹터" value={aiFocusSector} />
           </div>
@@ -221,7 +235,7 @@ export function TopBar({
             hint={
               runtime.hydratedFrom === 'backup'
                 ? '백업 데이터에서 복구됨'
-                : '로컬 상태가 이어지고 있음'
+                : '현재 상태가 이어지고 있음'
             }
             accent="slate"
             icon={<Clock3 className="ss-h-4.5 ss-w-4.5" />}
