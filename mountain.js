@@ -2,6 +2,7 @@
 let map;
 let markers = [];
 let mountainsCache = [];
+let mountainBoardBootstrapped = false;
 
 function getApiBase() {
     if (window.location.protocol === 'file:') {
@@ -77,6 +78,14 @@ function getMountains() {
     return mountainsCache;
 }
 
+function getNormalizedMountainsCache() {
+    if (!Array.isArray(mountainsCache)) {
+        mountainsCache = [];
+    }
+    mountainsCache = mountainsCache.map(normalizeMountainRecord);
+    return mountainsCache;
+}
+
 async function fetchMountainsFromServer() {
     const response = await fetch(getApiUrl('/api/mountains'), { cache: 'no-store' });
     const result = await response.json().catch(() => ({}));
@@ -122,16 +131,23 @@ async function deleteMountainOnServer(id) {
     }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    if (typeof window.waitForInitialSync === 'function') {
-        await window.waitForInitialSync();
+async function refreshMountainsFromServer(options = {}) {
+    const attempts = Number.isFinite(Number(options.attempts)) ? Number(options.attempts) : 2;
+    const delayMs = Number.isFinite(Number(options.delayMs)) ? Number(options.delayMs) : 150;
+    const nextMountains = (await retryAsync(() => fetchMountainsFromServer(), attempts, delayMs)).map(normalizeMountainRecord);
+    const previousSerialized = JSON.stringify(getNormalizedMountainsCache());
+    const nextSerialized = JSON.stringify(nextMountains);
+    mountainsCache = nextMountains;
+    saveMountains(nextMountains);
+    if (mountainBoardBootstrapped && previousSerialized !== nextSerialized) {
+        renderMarkers();
+        renderMountainBoard();
     }
+    return nextMountains;
+}
 
-    try {
-        mountainsCache = (await retryAsync(() => fetchMountainsFromServer())).map(normalizeMountainRecord);
-    } catch (error) {
-        mountainsCache = getMountains().map(normalizeMountainRecord);
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    mountainsCache = getMountains().map(normalizeMountainRecord);
 
     // ?쒕컲???꾩껜媛 蹂댁씪 ???덈룄濡?以묒븰 醫뚰몴瑜??쎄컙 遺곸そ?쇰줈 ?곹뼢
     const koreaCenter = [38.0, 127.5];
@@ -189,6 +205,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     renderMarkers();
     renderMountainBoard();
+    mountainBoardBootstrapped = true;
+
+    void refreshMountainsFromServer().catch(() => {});
 });
 
 function renderMarkers() {
@@ -196,7 +215,7 @@ function renderMarkers() {
     markers.forEach(m => map.removeLayer(m));
     markers = [];
 
-    const mountains = getMountains();
+    const mountains = getNormalizedMountainsCache();
 
     mountains.forEach(mtn => {
         // Red Map Marker for Leaflet
@@ -539,7 +558,7 @@ function saveMountains(nextMountains) {
 }
 
 function getMountainById(id) {
-    return getMountains().map(normalizeMountainRecord).find((mountain) => mountain.id === id) || null;
+    return getNormalizedMountainsCache().find((mountain) => mountain.id === id) || null;
 }
 
 function canManageMountain(mountain) {
@@ -684,8 +703,7 @@ window.deleteMountain = async function(id) {
         return;
     }
 
-    const updated = getMountains()
-        .map(normalizeMountainRecord)
+    const updated = getNormalizedMountainsCache()
         .filter((item) => item.id !== id);
 
     saveMountains(updated);
@@ -698,7 +716,7 @@ window.deleteMountain = async function(id) {
 document.getElementById('mountainForm').onsubmit = async (e) => {
     e.preventDefault();
 
-    const mountains = getMountains().map(normalizeMountainRecord);
+    const mountains = getNormalizedMountainsCache();
     const editId = document.getElementById('mEditId').value;
     const currentUser = localStorage.getItem('current_user') || 'admin';
     const titleValue = document.getElementById('mName').value.trim().slice(0, 15);
@@ -750,8 +768,7 @@ function renderMountainBoard() {
     const grid = document.getElementById('mountainBoardGrid');
     if (!grid) return;
 
-      const mountains = getMountains()
-          .map(normalizeMountainRecord)
+      const mountains = getNormalizedMountainsCache()
           .sort((a, b) => new Date(b.updatedAt || b.createdAt || b.date) - new Date(a.updatedAt || a.createdAt || a.date));
 
     if (!mountains.length) {
