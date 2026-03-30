@@ -53,11 +53,12 @@ app.use('/stock-sim-app', express.static(STOCK_SIM_DIST_DIR, {
             res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
             return;
         }
-        res.setHeader('Cache-Control', 'public, max-age=600');
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
     }
 }));
 
 app.get(['/stock-sim-app', '/stock-sim-app/'], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.sendFile(path.join(STOCK_SIM_DIST_DIR, 'index.html'));
 });
 
