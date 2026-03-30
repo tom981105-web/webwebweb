@@ -1432,7 +1432,7 @@ app.delete('/api/mountains/:id', async (req, res) => {
 
 app.get('/api/users', (req, res) => {
     reloadDb();
-    res.json({ users: state.users });
+    res.json({ success: true, users: state.users });
 });
 
 app.get('/api/users/:id', (req, res) => {
@@ -1475,8 +1475,16 @@ app.delete('/api/users/:id', async (req, res) => {
     }
 
     delete state.users[key];
+    Object.keys(state.notifications || {}).forEach((notificationUserId) => {
+        if (notificationUserId.toLowerCase() === key.toLowerCase()) {
+            delete state.notifications[notificationUserId];
+        }
+    });
+    if (String(state.currentUser || '').toLowerCase() === key.toLowerCase()) {
+        state.currentUser = null;
+    }
     await persistDb();
-    res.json({ success: true });
+    res.json({ success: true, userId: key, users: state.users });
 });
 
 app.get('/api/admin/state', (req, res) => {

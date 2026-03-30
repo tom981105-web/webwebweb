@@ -892,6 +892,16 @@
                 if (!response.ok || result.success === false) {
                     throw new Error(result.message || '회원 삭제에 실패했습니다.');
                 }
+                const usersDb = result.users && typeof result.users === 'object'
+                    ? result.users
+                    : getUsersDbSafe();
+                Object.keys(usersDb).forEach((key) => {
+                    if (key.toLowerCase() === String(id || '').toLowerCase()) {
+                        delete usersDb[key];
+                    }
+                });
+                localStorage.setItem('users_db', JSON.stringify(usersDb));
+                renderUsersList(usersDb);
                 await renderUsers();
             } catch (error) {
                 alert(error.message || '회원 삭제에 실패했습니다.');
