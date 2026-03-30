@@ -598,6 +598,82 @@ body {
     object-fit: contain;
 }
 
+.mountain-photo-preview-card {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(109, 64, 38, 0.12);
+    padding: 12px;
+}
+
+.mountain-photo-preview-frame {
+    position: relative;
+    min-height: 132px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(247, 239, 229, 0.86);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.mountain-photo-preview-image {
+    width: 100%;
+    max-height: 180px;
+    object-fit: contain;
+    display: block;
+}
+
+.mountain-photo-remove-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(47, 31, 24, 0.72);
+    color: #fff;
+    cursor: pointer;
+}
+
+.mountain-photo-size-controls {
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.mountain-photo-size-btn {
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(109, 64, 38, 0.16);
+    border-radius: 999px;
+    background: rgba(255, 248, 239, 0.95);
+    color: #8d4f31;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.mountain-photo-size-label {
+    min-width: 64px;
+    text-align: center;
+    color: rgba(47, 31, 24, 0.68);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.mountain-detail-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+    justify-items: center;
+}
+
 .mountain-detail-meta {
     display: flex;
     flex-wrap: wrap;

@@ -225,9 +225,27 @@ function remapBoardCategoriesInState(nextCategories) {
 function normalizeMountainRecords(value) {
     const mountains = Array.isArray(value) ? value : [];
     return mountains.map((mountain) => {
+        const normalizePhotoEntry = (entry) => {
+            if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+                const url = String(entry.url || entry.src || '').trim();
+                if (!url) return null;
+                const numericWidth = Number(entry.width);
+                return {
+                    url,
+                    width: Number.isFinite(numericWidth)
+                        ? Math.min(520, Math.max(180, Math.round(numericWidth)))
+                        : 280
+                };
+            }
+
+            const url = String(entry || '').trim();
+            if (!url) return null;
+            return { url, width: 280 };
+        };
+
         const photos = Array.isArray(mountain && mountain.photos)
-            ? mountain.photos.filter(Boolean).slice(0, 4)
-            : (mountain && mountain.photo ? [mountain.photo] : []);
+            ? mountain.photos.map(normalizePhotoEntry).filter(Boolean).slice(0, 4)
+            : (mountain && mountain.photo ? [normalizePhotoEntry(mountain.photo)].filter(Boolean) : []);
         return {
             ...mountain,
             id: mountain && mountain.id ? String(mountain.id) : `m_${Date.now()}`,
@@ -240,7 +258,7 @@ function normalizeMountainRecords(value) {
             members: String(mountain && mountain.members || ''),
             desc: String(mountain && mountain.desc || ''),
             photos,
-            photo: photos[0] || '',
+            photo: photos[0] ? photos[0].url : '',
             author: String(mountain && mountain.author || 'admin').trim() || 'admin',
             createdAt: mountain && mountain.createdAt ? mountain.createdAt : new Date().toISOString(),
             updatedAt: mountain && mountain.updatedAt ? mountain.updatedAt : new Date().toISOString()
