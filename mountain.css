@@ -642,20 +642,8 @@ body {
     margin-top: 10px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     gap: 10px;
-}
-
-.mountain-photo-size-btn {
-    width: 34px;
-    height: 34px;
-    border: 1px solid rgba(109, 64, 38, 0.16);
-    border-radius: 999px;
-    background: rgba(255, 248, 239, 0.95);
-    color: #8d4f31;
-    font: inherit;
-    font-weight: 800;
-    cursor: pointer;
 }
 
 .mountain-photo-size-label {
@@ -664,6 +652,12 @@ body {
     color: rgba(47, 31, 24, 0.68);
     font-size: 0.9rem;
     font-weight: 700;
+}
+
+.mountain-photo-size-slider {
+    flex: 1;
+    accent-color: #b96c3f;
+    cursor: ew-resize;
 }
 
 .mountain-detail-gallery {

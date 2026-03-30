@@ -664,9 +664,17 @@ function renderMountainPhotoPreviews() {
                 <button type="button" onclick="removeMountainPhoto(${index})" class="mountain-photo-remove-btn">×</button>
             </div>
             <div class="mountain-photo-size-controls">
-                <button type="button" class="mountain-photo-size-btn" onclick="resizeMountainPhoto(${index}, -40)">-</button>
                 <span class="mountain-photo-size-label">${getMountainPhotoWidth(photo)}px</span>
-                <button type="button" class="mountain-photo-size-btn" onclick="resizeMountainPhoto(${index}, 40)">+</button>
+                <input
+                    type="range"
+                    class="mountain-photo-size-slider"
+                    min="180"
+                    max="520"
+                    step="10"
+                    value="${getMountainPhotoWidth(photo)}"
+                    oninput="setMountainPhotoWidth(${index}, this.value)"
+                    aria-label="산행 사진 ${index + 1} 크기 조절"
+                >
             </div>
         </div>
     `).join('');
@@ -688,12 +696,12 @@ window.removeMountainPhoto = function(index) {
     renderMountainPhotoPreviews();
 };
 
-window.resizeMountainPhoto = function(index, delta) {
+window.setMountainPhotoWidth = function(index, nextWidth) {
     const current = normalizeMountainPhotoEntry(pendingMountainPhotos[index]);
     if (!current) return;
     pendingMountainPhotos[index] = {
         ...current,
-        width: clampMountainPhotoWidth(current.width + Number(delta || 0))
+        width: clampMountainPhotoWidth(nextWidth)
     };
     renderMountainPhotoPreviews();
 };
