@@ -225,20 +225,58 @@ const ConnectedNews = memo(function ConnectedNews({
 });
 
 const ConnectedLeaderboard = memo(function ConnectedLeaderboard() {
+  const snapshot = useSimulationUiStore((state) => state.snapshot);
   const remoteEntries = useSimulationUiStore((state) => state.remoteLeaderboard);
   const remoteLeaderboardReady = useSimulationUiStore(
     (state) => state.runtime.remoteLeaderboardReady,
   );
   const sortMode = useSimulationUiStore((state) => state.ui.leaderboardSort);
   const onSortChange = useSimulationUiStore((state) => state.actions.setLeaderboardSort);
+  const optimisticCurrentEntry = useMemo(() => {
+    if (!snapshot) {
+      return null;
+    }
+
+    const currentUser =
+      typeof window !== 'undefined'
+        ? String(window.localStorage.getItem('current_user') || '').trim()
+        : '';
+    const normalizedUser = currentUser.toLowerCase();
+    const style =
+      normalizedUser === 'admin'
+        ? '실시간 관리자'
+        : normalizedUser === 'tomem'
+          ? '실시간 참가자'
+          : '실시간 플레이어';
+    const focusSectors = [snapshot.world.dominantSector, snapshot.world.aiFocusSector].filter(
+      (sector, index, list) => sector && list.indexOf(sector) === index,
+    );
+
+    return {
+      id: `stock-sim-${currentUser || snapshot.currentPlayerId || 'current-user'}`,
+      name: currentUser || snapshot.player.name || '플레이어',
+      kind: 'current-user' as const,
+      netWorth: snapshot.portfolioSummary.totalAssets,
+      returnRate: snapshot.portfolioSummary.returnRate,
+      style,
+      focusSectors,
+      volatility: 0,
+      lastDelta: 0,
+    };
+  }, [snapshot]);
+  const entries = remoteEntries.length > 0
+    ? remoteEntries
+    : optimisticCurrentEntry
+      ? [optimisticCurrentEntry]
+      : [];
 
   return (
     <LeaderboardPanel
-      entries={remoteEntries}
+      entries={entries}
       sortMode={sortMode}
       onSortChange={onSortChange}
       isRemote
-      isLoading={!remoteLeaderboardReady}
+      isLoading={!remoteLeaderboardReady && !optimisticCurrentEntry}
     />
   );
 });
