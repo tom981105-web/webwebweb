@@ -229,6 +229,14 @@ async function refreshServiceAccessSettings() {
         }
     } catch (error) {
     }
+    try {
+        const response = await fetch(getAuthApiUrl(`/api/admin/state?t=${Date.now()}`), { cache: 'no-store' });
+        const result = await response.json().catch(() => ({}));
+        if (response.ok && result && result.accessSettings) {
+            return saveServiceAccessSettings(result.accessSettings);
+        }
+    } catch (error) {
+    }
     return getServiceAccessSettings();
 }
 

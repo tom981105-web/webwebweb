@@ -184,7 +184,31 @@
             const localhostUploadMatch = value.match(/^https?:\/\/localhost:\d+(\/uploads\/.+)$/i);
             if (localhostUploadMatch) return localhostUploadMatch[1];
             if (/^\/uploads\//i.test(value)) return value;
-            return value;
+            return /^https?:\/\//i.test(value) ? value : '';
+        }
+
+        function getDefaultBannerBackground() {
+            return "linear-gradient(135deg, rgba(120, 87, 54, 0.25), rgba(47, 29, 15, 0.1)), url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1600&auto=format&fit=crop')";
+        }
+
+        function applyBannerBackground(imageUrl) {
+            const bannerEl = document.getElementById('mainBanner');
+            if (!bannerEl) return;
+
+            const fallback = getDefaultBannerBackground();
+            if (!imageUrl) {
+                bannerEl.style.backgroundImage = fallback;
+                return;
+            }
+
+            const testImage = new Image();
+            testImage.onload = () => {
+                bannerEl.style.backgroundImage = `url('${imageUrl}')`;
+            };
+            testImage.onerror = () => {
+                bannerEl.style.backgroundImage = fallback;
+            };
+            testImage.src = imageUrl;
         }
 
         function getDisplayName(authorId) {
@@ -256,27 +280,26 @@
 
         async function renderRecentPosts() {
             const postsList = document.getElementById('recentPostsList');
-            let boardPosts = [];
-            let mountainPosts = [];
-            let aiPrompts = [];
+            const loadLocalArray = (key) => {
+                const value = safeParse(localStorage.getItem(key) || '[]', []);
+                return Array.isArray(value) ? value : [];
+            };
 
-            try {
-                const result = await retryFetchJson('/api/board/posts');
-                if (Array.isArray(result.posts)) boardPosts = result.posts;
-            } catch (error) {
-            }
+            const [boardResult, mountainResult, aiResult] = await Promise.allSettled([
+                retryFetchJson('/api/board/posts'),
+                retryFetchJson('/api/mountains'),
+                retryFetchJson('/api/ai/prompts')
+            ]);
 
-            try {
-                const result = await retryFetchJson('/api/mountains');
-                if (Array.isArray(result.mountains)) mountainPosts = result.mountains;
-            } catch (error) {
-            }
-
-            try {
-                const result = await retryFetchJson('/api/ai/prompts');
-                if (Array.isArray(result.prompts)) aiPrompts = result.prompts;
-            } catch (error) {
-            }
+            const boardPosts = boardResult.status === 'fulfilled' && Array.isArray(boardResult.value.posts)
+                ? boardResult.value.posts
+                : loadLocalArray('board_posts');
+            const mountainPosts = mountainResult.status === 'fulfilled' && Array.isArray(mountainResult.value.mountains)
+                ? mountainResult.value.mountains
+                : loadLocalArray('mountains_db');
+            const aiPrompts = aiResult.status === 'fulfilled' && Array.isArray(aiResult.value.prompts)
+                ? aiResult.value.prompts
+                : loadLocalArray('my_prompt_directory');
 
             const feedItems = [];
 
@@ -369,11 +392,7 @@
             document.getElementById('bannerDesc').innerText = banners.top.desc || '우리끼리 모여 자유롭게 이야기하는 공간';
 
             const bannerEl = document.getElementById('mainBanner');
-            if (banners.top.bg) {
-                bannerEl.style.backgroundImage = `url('${banners.top.bg}')`;
-            } else {
-                bannerEl.style.backgroundImage = "linear-gradient(135deg, rgba(120, 87, 54, 0.25), rgba(47, 29, 15, 0.1)), url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1600&auto=format&fit=crop')";
-            }
+            applyBannerBackground(banners.top.bg);
 
             const contentEl = bannerEl.querySelector('.banner-content');
             if (contentEl && banners.top.posX !== undefined && banners.top.posY !== undefined) {

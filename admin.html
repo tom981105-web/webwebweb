@@ -787,7 +787,7 @@
         async function loadServiceAccessControls() {
             let settings = getServiceAccessSettingsSafe();
             try {
-                const response = await fetch(getApiUrl('/api/access-settings?t=' + Date.now()), { cache: 'no-store' });
+                const response = await fetch(getApiUrl('/api/admin/state?t=' + Date.now()), { cache: 'no-store' });
                 const result = await response.json().catch(() => ({}));
                 if (response.ok && result && result.accessSettings) {
                     settings = result.accessSettings;
@@ -807,14 +807,27 @@
             };
 
             try {
-                const response = await fetch(getApiUrl('/api/admin/access-settings'), {
+                let response = await fetch(getApiUrl('/api/admin/access-settings'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(nextSettings)
                 });
-                const result = await response.json().catch(() => ({}));
+                let result = await response.json().catch(() => ({}));
+
                 if (!response.ok || result.success === false || !result.accessSettings) {
-                    throw new Error(result.message || '서비스 출입 상태 저장에 실패했습니다.');
+                    response = await fetch(getApiUrl('/api/sync'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            key: 'service_access_settings',
+                            value: nextSettings
+                        })
+                    });
+                    result = await response.json().catch(() => ({}));
+                    if (!response.ok || result.success === false) {
+                        throw new Error(result.message || '서비스 출입 상태 저장에 실패했습니다.');
+                    }
+                    result = { success: true, accessSettings: nextSettings };
                 }
                 renderServiceAccessControls(result.accessSettings);
                 alert(`${SERVICE_ACCESS_META[serviceKey].label} 상태를 ${getServiceModeLabel(normalizedMode)}으로 변경했습니다.`);
