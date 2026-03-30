@@ -97,6 +97,14 @@
         .status-pill.pending { background: rgba(215, 167, 63, 0.14); color: #946500; }
         .status-pill.offline { background: rgba(189, 73, 56, 0.1); color: #9f3f32; }
         .status-note { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.7; }
+        .service-access-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 16px 18px; border-radius: 20px; background: rgba(255, 252, 248, 0.76); border: 1px solid rgba(88, 60, 28, 0.1); }
+        .service-access-copy strong { display: block; color: var(--text-primary); margin-bottom: 4px; }
+        .service-access-copy p { color: var(--text-secondary); font-size: 0.92rem; line-height: 1.65; }
+        .service-access-buttons { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+        .service-access-buttons button { min-width: 92px; }
+        .service-access-buttons button.is-active { background: linear-gradient(135deg, #9f4f2e, #c17349); color: #fff8f0; border-color: transparent; }
+        .service-access-buttons button.is-active.btn-green { background: linear-gradient(135deg, #5f7d42, #7d9b5b); }
+        .service-access-buttons button.is-active.btn-muted { background: rgba(88, 60, 28, 0.86); color: #fff8f0; }
         .admin-profile-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 18px; align-items: start; }
         .admin-profile-preview { width: 110px; height: 110px; border-radius: 26px; object-fit: cover; background: rgba(230, 219, 205, 0.7); border: 1px solid rgba(88, 60, 28, 0.12); display: block; }
         .admin-profile-placeholder { width: 110px; height: 110px; border-radius: 26px; display: flex; align-items: center; justify-content: center; background: rgba(88, 60, 28, 0.08); border: 1px dashed rgba(88, 60, 28, 0.18); color: var(--text-secondary); font-size: 0.9rem; font-weight: 700; }
@@ -116,6 +124,8 @@
             .point-control { justify-content: flex-start; }
             .status-item { align-items: flex-start; flex-direction: column; }
             .status-item span { text-align: left; }
+            .service-access-item { flex-direction: column; }
+            .service-access-buttons { justify-content: flex-start; }
             .admin-profile-row { grid-template-columns: 1fr; }
             .admin-profile-focus { width: 100%; }
         }
@@ -227,6 +237,12 @@
                 <div class="row wrap" style="margin-top: 16px;">
                     <button class="btn-primary" id="saveBoardCategoriesButton" type="button">카테고리 저장</button>
                 </div>
+            </section>
+
+            <section class="card">
+                <h2>서비스 출입 관리</h2>
+                <p class="meta">자유게시판, 등산, AI, 주식장의 운영 상태를 서비스별로 조절합니다.</p>
+                <div class="list" id="serviceAccessList"></div>
             </section>
 
             <section class="card">
@@ -677,6 +693,134 @@
                     saveButton.disabled = false;
                     saveButton.textContent = '카테고리 저장';
                 }
+            }
+        }
+
+        const SERVICE_ACCESS_META = {
+            board: {
+                label: '자유게시판',
+                description: '커뮤니티 메인 게시판의 입장 상태를 조절합니다.'
+            },
+            mountain: {
+                label: '등산',
+                description: '지도와 산행기 기록 페이지의 출입 상태를 조절합니다.'
+            },
+            ai: {
+                label: 'AI',
+                description: 'AI 도구와 프롬프트 보관함의 접근 상태를 조절합니다.'
+            },
+            stockSim: {
+                label: '주식장',
+                description: '주식 시뮬레이션 프로토타입의 접근 상태를 조절합니다.'
+            }
+        };
+
+        function normalizeServiceAccessMode(value) {
+            const mode = String(value || '').trim().toLowerCase();
+            if (mode === 'admin' || mode === 'maintenance') return mode;
+            return 'open';
+        }
+
+        function getServiceAccessSettingsSafe() {
+            try {
+                const stored = JSON.parse(localStorage.getItem('service_access_settings') || '{}');
+                return {
+                    board: normalizeServiceAccessMode(stored.board),
+                    mountain: normalizeServiceAccessMode(stored.mountain),
+                    ai: normalizeServiceAccessMode(stored.ai),
+                    stockSim: normalizeServiceAccessMode(stored.stockSim)
+                };
+            } catch (error) {
+                return {
+                    board: 'open',
+                    mountain: 'open',
+                    ai: 'open',
+                    stockSim: 'open'
+                };
+            }
+        }
+
+        function saveServiceAccessSettingsLocal(settings) {
+            const normalized = {
+                board: normalizeServiceAccessMode(settings && settings.board),
+                mountain: normalizeServiceAccessMode(settings && settings.mountain),
+                ai: normalizeServiceAccessMode(settings && settings.ai),
+                stockSim: normalizeServiceAccessMode(settings && settings.stockSim)
+            };
+            localStorage.setItem('service_access_settings', JSON.stringify(normalized));
+            window.dispatchEvent(new CustomEvent('service-access:updated', { detail: normalized }));
+            return normalized;
+        }
+
+        function getServiceModeLabel(mode) {
+            if (mode === 'admin') return '관리자 전용';
+            if (mode === 'maintenance') return '점검중';
+            return '정상 운영';
+        }
+
+        function renderServiceAccessControls(settings) {
+            const normalized = saveServiceAccessSettingsLocal(settings || getServiceAccessSettingsSafe());
+            const list = document.getElementById('serviceAccessList');
+            if (!list) return;
+
+            list.innerHTML = '';
+
+            Object.entries(SERVICE_ACCESS_META).forEach(([serviceKey, serviceMeta]) => {
+                const mode = normalized[serviceKey] || 'open';
+                const item = document.createElement('div');
+                item.className = 'service-access-item';
+                item.innerHTML = `
+                    <div class="service-access-copy">
+                        <strong>${serviceMeta.label}</strong>
+                        <p>${serviceMeta.description}<br>현재 상태: <b>${getServiceModeLabel(mode)}</b></p>
+                    </div>
+                    <div class="service-access-buttons">
+                        <button type="button" class="btn-green ${mode === 'open' ? 'is-active' : ''}" data-service-access="${serviceKey}" data-service-mode="open">정상 운영</button>
+                        <button type="button" class="btn-primary ${mode === 'admin' ? 'is-active' : ''}" data-service-access="${serviceKey}" data-service-mode="admin">관리자만</button>
+                        <button type="button" class="btn-muted ${mode === 'maintenance' ? 'is-active' : ''}" data-service-access="${serviceKey}" data-service-mode="maintenance">점검중</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        async function loadServiceAccessControls() {
+            let settings = getServiceAccessSettingsSafe();
+            try {
+                const response = await fetch(getApiUrl('/api/access-settings?t=' + Date.now()), { cache: 'no-store' });
+                const result = await response.json().catch(() => ({}));
+                if (response.ok && result && result.accessSettings) {
+                    settings = result.accessSettings;
+                }
+            } catch (error) {
+            }
+            renderServiceAccessControls(settings);
+        }
+
+        async function updateServiceAccess(serviceKey, mode) {
+            const normalizedMode = normalizeServiceAccessMode(mode);
+            if (!SERVICE_ACCESS_META[serviceKey]) return;
+
+            const nextSettings = {
+                ...getServiceAccessSettingsSafe(),
+                [serviceKey]: normalizedMode
+            };
+
+            try {
+                const response = await fetch(getApiUrl('/api/admin/access-settings'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(nextSettings)
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.success === false || !result.accessSettings) {
+                    throw new Error(result.message || '서비스 출입 상태 저장에 실패했습니다.');
+                }
+                renderServiceAccessControls(result.accessSettings);
+                alert(`${SERVICE_ACCESS_META[serviceKey].label} 상태를 ${getServiceModeLabel(normalizedMode)}으로 변경했습니다.`);
+            } catch (error) {
+                alert(error.message || '서비스 출입 상태 저장에 실패했습니다.');
+                renderServiceAccessControls(getServiceAccessSettingsSafe());
             }
         }
 
@@ -1386,6 +1530,8 @@
             const grantPointsId = event.target.getAttribute('data-grant-points');
             const deductPointsId = event.target.getAttribute('data-deduct-points');
             const clearSide = event.target.getAttribute('data-clear-side');
+            const serviceAccessKey = event.target.getAttribute('data-service-access');
+            const serviceAccessMode = event.target.getAttribute('data-service-mode');
 
             if (deleteCodeIndex !== null) deleteCode(Number(deleteCodeIndex));
             if (approveId) updateUserStatus(approveId, 'regular');
@@ -1394,6 +1540,7 @@
             if (grantPointsId) adjustUserPoints(grantPointsId, 'grant');
             if (deductPointsId) adjustUserPoints(deductPointsId, 'deduct');
             if (clearSide) clearSideBanner(clearSide);
+            if (serviceAccessKey && serviceAccessMode) updateServiceAccess(serviceAccessKey, serviceAccessMode);
         });
 
         document.getElementById('createCodeButton').addEventListener('click', createCode);
@@ -1436,6 +1583,8 @@
         renderAdminProfileCard();
         window.addEventListener('sync:initial-complete', renderAdminProfileCard);
         renderBoardCategoryFields();
+        window.addEventListener('sync:initial-complete', loadServiceAccessControls);
+        loadServiceAccessControls();
         loadBanners();
         refreshCloudStatus();
         fetchLoginHeroState()

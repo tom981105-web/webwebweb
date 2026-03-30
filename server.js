@@ -22,6 +22,12 @@ const BOARD_POST_STATE_PREFIX = 'system/board-posts/';
 const BOARD_DRAFT_STATE_PREFIX = 'system/board-drafts/';
 const STOCK_SIM_PARTICIPANT_LIMIT = 12;
 const STOCK_SIM_STALE_MS = 1000 * 60 * 60 * 24 * 14;
+const DEFAULT_SERVICE_ACCESS_SETTINGS = Object.freeze({
+    board: 'open',
+    mountain: 'open',
+    ai: 'open',
+    stockSim: 'open'
+});
 
 const app = express();
 app.use(cors());
@@ -101,6 +107,22 @@ app.get('/', (req, res) => {
 });
 
 const DEFAULT_CATEGORIES = ['移댄뀒怨좊━ 1', '移댄뀒怨좊━ 2', '移댄뀒怨좊━ 3', '移댄뀒怨좊━ 4'];
+
+function normalizeServiceAccessMode(value) {
+    const mode = String(value || '').trim().toLowerCase();
+    if (mode === 'admin' || mode === 'maintenance') return mode;
+    return 'open';
+}
+
+function normalizeServiceAccessSettings(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+        board: normalizeServiceAccessMode(source.board),
+        mountain: normalizeServiceAccessMode(source.mountain),
+        ai: normalizeServiceAccessMode(source.ai),
+        stockSim: normalizeServiceAccessMode(source.stockSim)
+    };
+}
 
 
 function safeParseJson(value, fallback) {
@@ -839,7 +861,8 @@ function normalizeRawDb(raw) {
         stockSim: normalizeStockSimState(safeParseJson(raw.stock_sim_state, raw.stock_sim_state || {}), users),
         currentUser: raw.current_user || null,
         notifications: safeParseJson(raw.user_notifications, raw.user_notifications || {}),
-        reuseInviteCode: raw.settings_reuse_code === true || raw.settings_reuse_code === 'true' || raw.settings_reuse_code === 1 || raw.settings_reuse_code === '1'
+        reuseInviteCode: raw.settings_reuse_code === true || raw.settings_reuse_code === 'true' || raw.settings_reuse_code === 1 || raw.settings_reuse_code === '1',
+        accessSettings: normalizeServiceAccessSettings(safeParseJson(raw.service_access_settings, raw.service_access_settings || DEFAULT_SERVICE_ACCESS_SETTINGS))
     };
 
     return normalized;
@@ -864,6 +887,7 @@ function createLegacyPayloadFromState(state) {
         stock_sim_state: state.stockSim,
         user_notifications: state.notifications,
         settings_reuse_code: state.reuseInviteCode,
+        service_access_settings: state.accessSettings,
         __meta: {
             updatedAt: new Date().toISOString()
         }
@@ -1195,6 +1219,9 @@ function applyLegacySyncWrite(key, value) {
         break;
     case 'settings_reuse_code':
         state.reuseInviteCode = value === true || value === 'true' || value === 1 || value === '1';
+        break;
+    case 'service_access_settings':
+        state.accessSettings = normalizeServiceAccessSettings(safeParseJson(value, DEFAULT_SERVICE_ACCESS_SETTINGS));
         break;
     case 'my_ai_directory':
         state.ai.directory = safeParseJson(value, []);
@@ -1858,7 +1885,16 @@ app.get('/api/admin/state', (req, res) => {
         inviteCodes: state.inviteCodes,
         boardCategories: state.board.categories,
         banners: state.banners,
-        loginHero: state.loginHero
+        loginHero: state.loginHero,
+        accessSettings: state.accessSettings
+    });
+});
+
+app.get('/api/access-settings', (req, res) => {
+    reloadDb();
+    res.json({
+        success: true,
+        accessSettings: state.accessSettings
     });
 });
 
@@ -1870,6 +1906,21 @@ app.post('/api/admin/board-categories', async (req, res) => {
     res.json({
         success: true,
         categories: state.board.categories
+    });
+});
+
+app.post('/api/admin/access-settings', async (req, res) => {
+    reloadDb();
+    const currentSettings = normalizeServiceAccessSettings(state.accessSettings);
+    const nextSettings = normalizeServiceAccessSettings({
+        ...currentSettings,
+        ...(req.body && typeof req.body === 'object' ? req.body : {})
+    });
+    state.accessSettings = nextSettings;
+    await persistDb({ deferRemote: true });
+    res.json({
+        success: true,
+        accessSettings: state.accessSettings
     });
 });
 

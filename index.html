@@ -64,25 +64,25 @@
                     </div>
                 </div>
                 <div class="menu-grid">
-                    <a href="mountain.html" class="menu-card">
+                    <a href="mountain.html" class="menu-card" id="mountainMenuCard" data-service-key="mountain">
                         <div class="card-icon">산</div>
                         <div class="menu-copy">
                             <h3>등산</h3>
-                            <p>코스와 사진, 기록을 차분하게 모아보는 공간</p>
+                            <p id="mountainMenuCardDesc">코스와 사진, 기록을 차분하게 모아보는 공간</p>
                         </div>
                     </a>
-                    <a href="ai.html" class="menu-card">
+                    <a href="ai.html" class="menu-card" id="aiMenuCard" data-service-key="ai">
                         <div class="card-icon">AI</div>
                         <div class="menu-copy">
                             <h3>AI</h3>
-                            <p>자주 쓰는 도구와 프롬프트를 가볍게 둘러볼 수 있는 공간</p>
+                            <p id="aiMenuCardDesc">자주 쓰는 도구와 프롬프트를 가볍게 둘러볼 수 있는 공간</p>
                         </div>
                     </a>
-                    <a href="board.html" class="menu-card">
+                    <a href="board.html" class="menu-card" id="boardMenuCard" data-service-key="board">
                         <div class="card-icon">글</div>
                         <div class="menu-copy">
                             <h3>자유게시판</h3>
-                            <p>일상 이야기부터 짧은 잡담까지 편하게 머무는 메인 라운지</p>
+                            <p id="boardMenuCardDesc">일상 이야기부터 짧은 잡담까지 편하게 머무는 메인 라운지</p>
                         </div>
                     </a>
                     <a href="#" class="menu-card disabled" id="stockSimCard" aria-disabled="true" onclick="openStockSimPage(event)">
@@ -415,50 +415,138 @@
             return apiBase ? `${apiBase}/stock-sim-app/` : 'stock-sim-app/';
         }
 
-        function canAccessStockSim() {
+        const DEFAULT_SERVICE_ACCESS_SETTINGS = {
+            board: 'open',
+            mountain: 'open',
+            ai: 'open',
+            stockSim: 'open'
+        };
+        const SERVICE_CARD_META = {
+            board: {
+                cardId: 'boardMenuCard',
+                descId: 'boardMenuCardDesc',
+                defaultDesc: '일상 이야기부터 짧은 잡담까지 편하게 머무는 메인 라운지'
+            },
+            mountain: {
+                cardId: 'mountainMenuCard',
+                descId: 'mountainMenuCardDesc',
+                defaultDesc: '코스와 사진, 기록을 차분하게 모아보는 공간'
+            },
+            ai: {
+                cardId: 'aiMenuCard',
+                descId: 'aiMenuCardDesc',
+                defaultDesc: '자주 쓰는 도구와 프롬프트를 가볍게 둘러볼 수 있는 공간'
+            },
+            stockSim: {
+                cardId: 'stockSimCard',
+                descId: 'stockSimCardDesc',
+                defaultDesc: '03월 30일~03월 31일까지 진행하는 프로토타입입니다.'
+            }
+        };
+
+        function normalizeServiceAccessMode(value) {
+            const mode = String(value || '').trim().toLowerCase();
+            if (mode === 'admin' || mode === 'maintenance') return mode;
+            return 'open';
+        }
+
+        function getServiceAccessSettingsLocal() {
+            if (typeof window.getServiceAccessSettings === 'function') {
+                return window.getServiceAccessSettings();
+            }
+
+            const stored = safeParse(localStorage.getItem('service_access_settings') || '{}', {});
+            return {
+                board: normalizeServiceAccessMode(stored.board),
+                mountain: normalizeServiceAccessMode(stored.mountain),
+                ai: normalizeServiceAccessMode(stored.ai),
+                stockSim: normalizeServiceAccessMode(stored.stockSim)
+            };
+        }
+
+        function getCurrentUserRecordLocal() {
             const currentUser = String(localStorage.getItem('current_user') || '').trim();
-            if (!currentUser) return false;
+            if (!currentUser) return { currentUser: '', user: null, isAdmin: false, isRegular: false };
 
             const users = safeParse(localStorage.getItem('users_db') || '{}', {});
             const matchedUserId = Object.keys(users).find((entry) => entry.toLowerCase() === currentUser.toLowerCase());
             const user = matchedUserId ? users[matchedUserId] : null;
-            return Boolean(user && (user.isAdmin || String(user.status || '').toLowerCase() === 'regular'));
+            return {
+                currentUser,
+                user,
+                isAdmin: Boolean(user && user.isAdmin),
+                isRegular: Boolean(user && (user.isAdmin || String(user.status || '').toLowerCase() === 'regular'))
+            };
         }
 
-        function updateStockSimCardState() {
-            const card = document.getElementById('stockSimCard');
-            const desc = document.getElementById('stockSimCardDesc');
+        function getServiceBlockedMessage(serviceKey) {
+            const accessSettings = getServiceAccessSettingsLocal();
+            const mode = accessSettings[serviceKey] || 'open';
+            if (mode === 'admin') return '현재 관리자만 접근할 수 있습니다.';
+            if (mode === 'maintenance') return '현재 점검중입니다. 잠시 후 다시 확인해 주세요.';
+            return '';
+        }
+
+        function canOpenServiceCard(serviceKey) {
+            const accessSettings = getServiceAccessSettingsLocal();
+            const { isAdmin } = getCurrentUserRecordLocal();
+            const mode = accessSettings[serviceKey] || 'open';
+            return isAdmin || mode === 'open';
+        }
+
+        function updateServiceCardState(serviceKey) {
+            const meta = SERVICE_CARD_META[serviceKey];
+            if (!meta) return;
+
+            const card = document.getElementById(meta.cardId);
+            const desc = document.getElementById(meta.descId);
             if (!card || !desc) return;
 
-            const icon = card.querySelector('.card-icon');
-            const title = card.querySelector('h3');
-            const isAllowed = canAccessStockSim();
+            const accessSettings = getServiceAccessSettingsLocal();
+            const { isAdmin } = getCurrentUserRecordLocal();
+            const mode = accessSettings[serviceKey] || 'open';
+            const isAllowed = isAdmin || mode === 'open';
+            let description = meta.defaultDesc;
 
-            if (icon) icon.textContent = '주식';
-            if (title) title.textContent = '주식장';
+            if (mode === 'admin') {
+                description = `${meta.defaultDesc} 현재 관리자 전용으로 운영 중입니다.`;
+            } else if (mode === 'maintenance') {
+                description = `${meta.defaultDesc} 현재 점검중입니다.`;
+            }
 
             card.classList.toggle('disabled', !isAllowed);
             card.setAttribute('aria-disabled', isAllowed ? 'false' : 'true');
-            desc.textContent = isAllowed
-                ? '03월 30일~03월 31일까지 진행하는 프로토타입입니다.'
-                : '03월 30일~03월 31일까지 진행하는 프로토타입입니다. 승인된 회원만 입장할 수 있습니다.';
+            desc.textContent = description;
         }
 
         function openStockSimPage(event) {
             if (event) event.preventDefault();
-            const currentUser = String(localStorage.getItem('current_user') || '').trim();
+            const { currentUser, isRegular } = getCurrentUserRecordLocal();
 
             if (!currentUser) {
                 window.location.href = 'login.html';
                 return;
             }
 
-            if (!canAccessStockSim()) {
+            if (!canOpenServiceCard('stockSim')) {
+                alert(getServiceBlockedMessage('stockSim'));
+                return;
+            }
+
+            if (!isRegular) {
                 alert('승인된 회원만 주식장에 입장할 수 있습니다. 관리자 승인 후 다시 시도해 주세요.');
                 return;
             }
 
             window.location.href = getStockSimUrl();
+        }
+
+        function handleServiceCardClick(event) {
+            const card = event.currentTarget;
+            const serviceKey = card && card.dataset ? card.dataset.serviceKey : '';
+            if (!serviceKey || canOpenServiceCard(serviceKey)) return;
+            event.preventDefault();
+            alert(getServiceBlockedMessage(serviceKey));
         }
 
         window.openStockSimPage = openStockSimPage;
@@ -467,15 +555,29 @@
             renderRecentPosts();
             applyBanners();
             applyMenuIcons();
-            updateStockSimCardState();
+            Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
+            document.querySelectorAll('[data-service-key]').forEach((card) => {
+                if (card.id === 'stockSimCard') return;
+                card.addEventListener('click', handleServiceCardClick);
+            });
+            if (typeof window.refreshServiceAccessSettings === 'function') {
+                window.refreshServiceAccessSettings().then(() => {
+                    Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
+                });
+            }
         });
 
         window.addEventListener('sync:initial-complete', () => {
             renderRecentPosts();
-            updateStockSimCardState();
+            Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
         });
 
-        window.addEventListener('auth:login-success', updateStockSimCardState);
+        window.addEventListener('auth:login-success', () => {
+            Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
+        });
+        window.addEventListener('service-access:updated', () => {
+            Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
+        });
     </script>
 </body>
 </html>

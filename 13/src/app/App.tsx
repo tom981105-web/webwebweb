@@ -1,4 +1,38 @@
+import { useEffect, useState } from 'react';
+
 import { StockSimulationFeature } from '@/features/stock-sim';
+
+type ServiceAccessMode = 'open' | 'admin' | 'maintenance';
+
+type ServiceAccessSettings = {
+  board: ServiceAccessMode;
+  mountain: ServiceAccessMode;
+  ai: ServiceAccessMode;
+  stockSim: ServiceAccessMode;
+};
+
+const DEFAULT_SERVICE_ACCESS_SETTINGS: ServiceAccessSettings = {
+  board: 'open',
+  mountain: 'open',
+  ai: 'open',
+  stockSim: 'open',
+};
+
+function normalizeServiceAccessMode(value: unknown): ServiceAccessMode {
+  const mode = String(value || '').trim().toLowerCase();
+  if (mode === 'admin' || mode === 'maintenance') return mode;
+  return 'open';
+}
+
+function normalizeServiceAccessSettings(value: unknown): ServiceAccessSettings {
+  const source = value && typeof value === 'object' ? (value as Partial<ServiceAccessSettings>) : {};
+  return {
+    board: normalizeServiceAccessMode(source.board),
+    mountain: normalizeServiceAccessMode(source.mountain),
+    ai: normalizeServiceAccessMode(source.ai),
+    stockSim: normalizeServiceAccessMode(source.stockSim),
+  };
+}
 
 function getCurrentSiteUser() {
   if (typeof window === 'undefined') {
@@ -30,9 +64,25 @@ function getCurrentUserRecord(currentUser: string) {
   }
 }
 
-function canAccessStockSim(currentUser: string) {
+function getStoredAccessSettings() {
+  if (typeof window === 'undefined') {
+    return DEFAULT_SERVICE_ACCESS_SETTINGS;
+  }
+
+  try {
+    return normalizeServiceAccessSettings(
+      JSON.parse(window.localStorage.getItem('service_access_settings') || '{}'),
+    );
+  } catch {
+    return DEFAULT_SERVICE_ACCESS_SETTINGS;
+  }
+}
+
+function canAccessStockSim(currentUser: string, accessSettings: ServiceAccessSettings) {
   const userRecord = getCurrentUserRecord(currentUser);
-  return Boolean(userRecord && (userRecord.isAdmin || userRecord.status === 'regular'));
+  if (!userRecord) return false;
+  if (userRecord.isAdmin) return true;
+  return accessSettings.stockSim === 'open' && userRecord.status === 'regular';
 }
 
 function getRootUrl(path: string) {
@@ -43,15 +93,39 @@ function getRootUrl(path: string) {
   return new URL(path, window.location.origin).href;
 }
 
-function AccessBlocked() {
+function getBlockedMessage(
+  currentUser: string,
+  userRecord: { status?: string; isAdmin?: boolean } | null,
+  accessSettings: ServiceAccessSettings,
+) {
+  if (!currentUser) {
+    return '로그인 후 이용 가능한 서비스입니다.';
+  }
+
+  if (userRecord?.isAdmin) {
+    return '';
+  }
+
+  if (accessSettings.stockSim === 'maintenance') {
+    return '주식장은 현재 점검중입니다. 잠시 후 다시 확인해 주세요.';
+  }
+
+  if (accessSettings.stockSim === 'admin') {
+    return '주식장은 현재 관리자만 이용할 수 있습니다.';
+  }
+
+  if (userRecord?.status === 'pending') {
+    return '승인된 회원만 주식장에 입장할 수 있습니다. 관리자 승인 후 다시 시도해 주세요.';
+  }
+
+  return '현재 계정은 주식장 이용 권한이 없습니다.';
+}
+
+function AccessBlocked({ accessSettings }: { accessSettings: ServiceAccessSettings }) {
   const currentUser = getCurrentSiteUser();
   const isLoggedIn = Boolean(currentUser);
   const userRecord = getCurrentUserRecord(currentUser);
-  const message = isLoggedIn
-    ? userRecord?.status === 'pending'
-      ? '승인된 회원만 주식장에 입장할 수 있습니다. 관리자 승인 후 다시 시도해 주세요.'
-      : '현재 계정은 주식장 이용 권한이 없습니다.'
-    : '로그인 후 승인된 회원 계정으로 접속해 주세요.';
+  const message = getBlockedMessage(currentUser, userRecord, accessSettings);
 
   return (
     <div className="stock-sim-shell ss-relative ss-flex ss-min-h-dvh ss-items-center ss-justify-center ss-overflow-hidden">
@@ -80,9 +154,34 @@ function AccessBlocked() {
 
 export function App() {
   const currentUser = getCurrentSiteUser();
+  const [accessSettings, setAccessSettings] = useState<ServiceAccessSettings>(() => getStoredAccessSettings());
 
-  if (!canAccessStockSim(currentUser)) {
-    return <AccessBlocked />;
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAccessSettings() {
+      try {
+        const response = await fetch(new URL('/api/access-settings', window.location.origin), {
+          cache: 'no-store',
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok && result.accessSettings) {
+          const nextSettings = normalizeServiceAccessSettings(result.accessSettings);
+          window.localStorage.setItem('service_access_settings', JSON.stringify(nextSettings));
+          setAccessSettings(nextSettings);
+        }
+      } catch {
+      }
+    }
+
+    loadAccessSettings();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!canAccessStockSim(currentUser, accessSettings)) {
+    return <AccessBlocked accessSettings={accessSettings} />;
   }
 
   return <StockSimulationFeature shellMode="standalone" showAdminPanel />;

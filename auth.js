@@ -21,6 +21,13 @@ const RPG_SHOP_ITEMS = [
 ];
 const NOTIFICATION_STORAGE_KEY = 'user_notifications';
 const NOTIFICATION_SEEN_PREFIX = 'seen_notifications_';
+const SERVICE_ACCESS_STORAGE_KEY = 'service_access_settings';
+const DEFAULT_SERVICE_ACCESS_SETTINGS = {
+    board: 'open',
+    mountain: 'open',
+    ai: 'open',
+    stockSim: 'open'
+};
 
 function createDefaultRpgState() {
     return {
@@ -180,6 +187,65 @@ function getAuthApiBase() {
 
 function getAuthApiUrl(path) {
     return `${getAuthApiBase()}${path}`;
+}
+
+function normalizeServiceAccessMode(value) {
+    const mode = String(value || '').trim().toLowerCase();
+    if (mode === 'admin' || mode === 'maintenance') return mode;
+    return 'open';
+}
+
+function normalizeServiceAccessSettings(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    return {
+        board: normalizeServiceAccessMode(source.board),
+        mountain: normalizeServiceAccessMode(source.mountain),
+        ai: normalizeServiceAccessMode(source.ai),
+        stockSim: normalizeServiceAccessMode(source.stockSim)
+    };
+}
+
+function getServiceAccessSettings() {
+    try {
+        return normalizeServiceAccessSettings(JSON.parse(localStorage.getItem(SERVICE_ACCESS_STORAGE_KEY) || '{}'));
+    } catch (error) {
+        return { ...DEFAULT_SERVICE_ACCESS_SETTINGS };
+    }
+}
+
+function saveServiceAccessSettings(settings) {
+    const normalized = normalizeServiceAccessSettings(settings);
+    localStorage.setItem(SERVICE_ACCESS_STORAGE_KEY, JSON.stringify(normalized));
+    window.dispatchEvent(new CustomEvent('service-access:updated', { detail: normalized }));
+    return normalized;
+}
+
+async function refreshServiceAccessSettings() {
+    try {
+        const response = await fetch(getAuthApiUrl(`/api/access-settings?t=${Date.now()}`), { cache: 'no-store' });
+        const result = await response.json().catch(() => ({}));
+        if (response.ok && result && result.accessSettings) {
+            return saveServiceAccessSettings(result.accessSettings);
+        }
+    } catch (error) {
+    }
+    return getServiceAccessSettings();
+}
+
+function getServiceGateForPath(pathname) {
+    const normalizedPath = String(pathname || '').toLowerCase();
+    if (normalizedPath.includes('board.html')) return { key: 'board', label: '자유게시판' };
+    if (normalizedPath.includes('mountain.html')) return { key: 'mountain', label: '등산' };
+    if (normalizedPath.includes('ai.html')) return { key: 'ai', label: 'AI' };
+    if (normalizedPath.includes('/stock-sim-app')) return { key: 'stockSim', label: '주식장' };
+    return null;
+}
+
+function getServiceBlockedMessage(label, mode) {
+    if (mode === 'admin') {
+        return `${label}은 현재 관리자만 이용할 수 있습니다.`;
+    }
+    return `${label}은 현재 점검중입니다. 잠시 후 다시 확인해 주세요.`;
 }
 
 function resolveProfileImageUrl(value) {
@@ -1030,6 +1096,18 @@ function checkAuth() {
             if (currentUser.toLowerCase() !== 'admin' && user && user.status !== 'regular' && !isAdmin && requiresApproval) {
                 alert('승인된 회원만 이용 가능합니다. 관리자 승인 후 다시 시도해 주세요.');
                 window.location.href = 'index.html';
+                return;
+            }
+
+            const gate = getServiceGateForPath(pathname);
+            if (gate && !isAdmin) {
+                const accessSettings = getServiceAccessSettings();
+                const mode = accessSettings[gate.key] || 'open';
+                if (mode !== 'open') {
+                    alert(getServiceBlockedMessage(gate.label, mode));
+                    window.location.href = 'index.html';
+                    return;
+                }
             }
         } catch (error) {
             console.error('[Auth] 권한 체크 오류:', error);
@@ -1365,11 +1443,21 @@ window.renderNotificationPanel = renderNotificationPanel;
 window.openNotificationItem = openNotificationItem;
 window.handleSignupRequest = handleSignupRequest;
 window.handleLoginRequest = handleLoginRequest;
+window.getServiceAccessSettings = getServiceAccessSettings;
+window.refreshServiceAccessSettings = refreshServiceAccessSettings;
 
 if (!window.location.pathname.endsWith('login.html')) {
     document.addEventListener('DOMContentLoaded', () => {
         injectLogoutButton();
         surfaceUnreadNotifications();
+        refreshServiceAccessSettings().then(() => {
+            checkAuth();
+            if (window.location.pathname.toLowerCase().endsWith('index.html') || window.location.pathname === '/' || window.location.pathname.endsWith('/')) {
+                window.dispatchEvent(new CustomEvent('service-access:updated', {
+                    detail: getServiceAccessSettings()
+                }));
+            }
+        });
     });
     window.addEventListener('notifications:updated', (event) => {
         injectLogoutButton();
@@ -1379,4 +1467,5 @@ if (!window.location.pathname.endsWith('login.html')) {
             showNotificationToast(detail.latestNotification, detail.userId);
         }
     });
+    window.addEventListener('service-access:updated', checkAuth);
 }
