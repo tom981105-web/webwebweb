@@ -302,8 +302,9 @@
             sorted.forEach((entry) => {
                 const item = document.createElement('div');
                 item.className = 'post-item';
+                const tagClass = `post-tag post-tag-${String(entry.type || '').toLowerCase()}`;
                 item.innerHTML = `
-                    <span class="post-tag">${escapeRecentHtml(entry.type)}</span>
+                    <span class="${tagClass}">${escapeRecentHtml(entry.type)}</span>
                     <a href="${entry.href}" class="post-title">${escapeRecentHtml(entry.title)}${entry.extraHtml}</a>
                     <span class="post-date"><span style="color:#8f755d; margin-right:8px;">${escapeRecentHtml(entry.author)}</span>${escapeRecentHtml(entry.dateLabel)}</span>
                 `;
