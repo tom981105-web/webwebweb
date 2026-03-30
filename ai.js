@@ -44,6 +44,11 @@ let promptFilter = '전체';
 let promptSort = 'latest';
 let promptSearchTerm = '';
 let editingPromptId = null;
+const SAFE_ALL_LABEL = '\uC804\uCCB4';
+const SAFE_ALL_PROMPT_CATEGORY_LABEL = '\uC804\uCCB4 \uCE74\uD14C\uACE0\uB9AC';
+
+currentFilter = SAFE_ALL_LABEL;
+promptFilter = SAFE_ALL_LABEL;
 
 function normalizeRecommendedAi(value) {
     if (Array.isArray(value)) {
@@ -104,6 +109,16 @@ function normalizeAiEntry(ai) {
 
 function getSelectedCheckboxValues(name) {
     return Array.from(document.querySelectorAll(`input[name="${name}"]:checked`)).map((input) => input.value);
+}
+
+function canUseTextLogoValue() {
+    return String(getCurrentAiUser() || '').toLowerCase() === 'admin';
+}
+
+function isAllowedLogoValue(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return false;
+    return isImageLogoValue(raw) || canUseTextLogoValue();
 }
 
 function renderCategoryCheckboxGroup(containerId, inputName, options, selectedValues = []) {
@@ -208,7 +223,7 @@ function isImageLogoValue(value) {
 function getCategories() {
     // Unique categories from data
     const categories = new Set(aiData.flatMap(ai => normalizeCategoryList(ai.categories || ai.category, AI_CATEGORY_OPTIONS)));
-    return ['전체', ...Array.from(categories)];
+    return [SAFE_ALL_LABEL, ...Array.from(categories)];
 }
 
 function renderFilters() {
@@ -231,7 +246,7 @@ function renderFilters() {
 function renderCards() {
     aiGrid.innerHTML = '';
     
-    const filteredData = currentFilter === '전체' 
+    const filteredData = currentFilter === SAFE_ALL_LABEL 
         ? aiData 
         : aiData.filter(ai => normalizeCategoryList(ai.categories || ai.category, AI_CATEGORY_OPTIONS).includes(currentFilter));
         
@@ -309,10 +324,8 @@ function setupEventListeners() {
             closeModal(viewModal);
             const remainingInCategory = aiData.filter(a => normalizeCategoryList(a.categories || a.category, AI_CATEGORY_OPTIONS).includes(currentFilter));
             
-            // 만약 현재 필터에 해당하는 항목이 하나도 안남게 되면 '전체'로 돌아가기
-            const RemainingInCategory = aiData.filter(a => a.category === currentFilter);
-            if(currentFilter !== '전체' && remainingInCategory.length === 0) {
-                currentFilter = '전체';
+            if(currentFilter !== SAFE_ALL_LABEL && remainingInCategory.length === 0) {
+                currentFilter = SAFE_ALL_LABEL;
             }
             
             renderFilters();
@@ -325,8 +338,10 @@ function setupEventListeners() {
         e.preventDefault();
         const logoValue = document.getElementById('aiLogo').value.trim();
         const selectedCategories = getSelectedCheckboxValues('aiCategoryChoice');
-        if (!isImageLogoValue(logoValue)) {
-            alert('AI 로고는 이미지 주소나 이미지 파일만 사용할 수 있습니다.');
+        if (!isAllowedLogoValue(logoValue)) {
+            alert(canUseTextLogoValue()
+                ? 'AI 로고는 이미지 주소, 이미지 파일, 또는 짧은 텍스트를 사용할 수 있습니다.'
+                : 'AI 로고는 이미지 주소나 이미지 파일만 사용할 수 있습니다.');
             return;
         }
         if (!selectedCategories.length) {
@@ -419,7 +434,8 @@ function setupDropZone() {
     const logoPreview = document.getElementById('logoPreview');
 
     function updateLogoPreview(val) {
-        logoPreview.innerHTML = isImageLogoValue(val) ? renderLogo(val) : '';
+        const raw = String(val || '').trim();
+        logoPreview.innerHTML = isAllowedLogoValue(raw) ? renderLogo(raw) : '';
     }
 
     ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -464,12 +480,13 @@ function renderPromptFilters() {
     const categories = Array.from(new Set(promptData.flatMap(p => normalizeCategoryList(p.categories || p.category, PROMPT_CATEGORY_OPTIONS))));
     const filterSelect = document.getElementById('promptFilter');
     
-    filterSelect.innerHTML = '<option value="?꾩껜">?꾩껜 移댄뀒怨좊━</option>';
+    filterSelect.innerHTML = '';
+    filterSelect.add(new Option(SAFE_ALL_PROMPT_CATEGORY_LABEL, SAFE_ALL_LABEL));
     categories.forEach((cat) => {
         filterSelect.add(new Option(cat, cat));
     });
-    if (!['?꾩껜', ...categories].includes(promptFilter)) {
-        promptFilter = '?꾩껜';
+    if (![SAFE_ALL_LABEL, ...categories].includes(promptFilter)) {
+        promptFilter = SAFE_ALL_LABEL;
     }
     filterSelect.value = promptFilter;
 }
@@ -491,7 +508,7 @@ function renderPromptCards() {
     }
     
     // Filter
-    if (promptFilter !== '전체') {
+    if (promptFilter !== SAFE_ALL_LABEL) {
         filtered = filtered.filter(p => normalizeCategoryList(p.categories || p.category, PROMPT_CATEGORY_OPTIONS).includes(promptFilter));
     }
     
