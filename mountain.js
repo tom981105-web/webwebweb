@@ -1,6 +1,41 @@
 ﻿// mountain.js
 let map;
 let markers = [];
+let mountainsCache = [];
+
+function getApiBase() {
+    if (window.location.protocol === 'file:') {
+        return 'http://localhost:3000';
+    }
+    return '';
+}
+
+function getApiUrl(path) {
+    return getApiBase() + path;
+}
+
+function safeParse(value, fallback) {
+    try {
+        return JSON.parse(value);
+    } catch (error) {
+        return fallback;
+    }
+}
+
+async function retryAsync(task, attempts = 4, delayMs = 300) {
+    let lastError = null;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+            return await task();
+        } catch (error) {
+            lastError = error;
+            if (attempt < attempts - 1) {
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+            }
+        }
+    }
+    throw lastError || new Error('요청에 실패했습니다.');
+}
 
 const initialMountains = [
     {
@@ -28,15 +63,76 @@ const initialMountains = [
 ];
 
 function getMountains() {
-    let mtns = localStorage.getItem('mountains_db');
-    if (!mtns) {
-        localStorage.setItem('mountains_db', JSON.stringify(initialMountains));
-        return initialMountains;
+    if (Array.isArray(mountainsCache) && mountainsCache.length) {
+        return mountainsCache;
     }
-    return JSON.parse(mtns);
+    const mtns = safeParse(localStorage.getItem('mountains_db') || '[]', []);
+    if (Array.isArray(mtns) && mtns.length) {
+        mountainsCache = mtns.map(normalizeMountainRecord);
+        return mountainsCache;
+    }
+    mountainsCache = window.location.protocol === 'file:'
+        ? initialMountains.map(normalizeMountainRecord)
+        : [];
+    return mountainsCache;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+async function fetchMountainsFromServer() {
+    const response = await fetch(getApiUrl('/api/mountains'), { cache: 'no-store' });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success === false || !Array.isArray(result.mountains)) {
+        throw new Error(result.message || '산 기록을 불러오지 못했습니다.');
+    }
+    return result.mountains;
+}
+
+async function createMountainOnServer(payload) {
+    const response = await fetch(getApiUrl('/api/mountains'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success === false || !result.mountain) {
+        throw new Error(result.message || '산 기록 저장에 실패했습니다.');
+    }
+    return normalizeMountainRecord(result.mountain);
+}
+
+async function updateMountainOnServer(id, payload) {
+    const response = await fetch(getApiUrl(`/api/mountains/${encodeURIComponent(id)}`), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success === false || !result.mountain) {
+        throw new Error(result.message || '산 기록 수정에 실패했습니다.');
+    }
+    return normalizeMountainRecord(result.mountain);
+}
+
+async function deleteMountainOnServer(id) {
+    const response = await fetch(getApiUrl(`/api/mountains/${encodeURIComponent(id)}`), {
+        method: 'DELETE'
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success === false) {
+        throw new Error(result.message || '산 기록 삭제에 실패했습니다.');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    if (typeof window.waitForInitialSync === 'function') {
+        await window.waitForInitialSync();
+    }
+
+    try {
+        mountainsCache = (await retryAsync(() => fetchMountainsFromServer())).map(normalizeMountainRecord);
+    } catch (error) {
+        mountainsCache = getMountains().map(normalizeMountainRecord);
+    }
+
     // ?쒕컲???꾩껜媛 蹂댁씪 ???덈룄濡?以묒븰 醫뚰몴瑜??쎄컙 遺곸そ?쇰줈 ?곹뼢
     const koreaCenter = [38.0, 127.5];
     
@@ -92,6 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updatePopupScale(); // 珥덇린 ?쒕뜑留?異뺤쿃
 
     renderMarkers();
+    renderMountainBoard();
 });
 
 function renderMarkers() {
@@ -233,7 +330,31 @@ const mountainPhotoFileInput = document.getElementById('mountainPhotoFile');
 const preview = document.getElementById('photoPreview');
 const dropText = document.getElementById('dropText');
 
-function handleMountainPhotoFiles(fileList) {
+async function uploadMountainPhoto(file) {
+    const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('사진 파일을 읽지 못했습니다.'));
+        reader.readAsDataURL(file);
+    });
+
+    const response = await fetch(getApiUrl('/api/uploads/image'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            folder: 'board-inline',
+            fileName: file.name || 'mountain-photo',
+            dataUrl
+        })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success === false || !result.url) {
+        throw new Error(result.message || '산행 사진 업로드에 실패했습니다.');
+    }
+    return result.url;
+}
+
+async function handleMountainPhotoFiles(fileList) {
     const imageFiles = Array.from(fileList || []).filter((file) => file && String(file.type || '').startsWith('image/'));
     if (!imageFiles.length) return;
 
@@ -243,13 +364,13 @@ function handleMountainPhotoFiles(fileList) {
         return;
     }
 
-    imageFiles.slice(0, remainingSlots).forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-            addMountainPhoto(evt.target.result);
-        };
-        reader.readAsDataURL(file);
-    });
+    for (const file of imageFiles.slice(0, remainingSlots)) {
+        try {
+            addMountainPhoto(await uploadMountainPhoto(file));
+        } catch (error) {
+            alert(error.message || '산행 사진 업로드에 실패했습니다.');
+        }
+    }
 
     if (imageFiles.length > remainingSlots) {
         alert('산행 사진은 최대 4장까지 추가할 수 있습니다.');
@@ -270,8 +391,8 @@ photoInput.addEventListener('input', (e) => {
 });
 
 if (mountainPhotoFileInput) {
-    mountainPhotoFileInput.addEventListener('change', (e) => {
-        handleMountainPhotoFiles(e.target.files);
+    mountainPhotoFileInput.addEventListener('change', async (e) => {
+        await handleMountainPhotoFiles(e.target.files);
         e.target.value = '';
     });
 }
@@ -289,10 +410,10 @@ dropZone.addEventListener('dragover', (e) => {
 dropZone.addEventListener('dragleave', () => {
     dropZone.classList.remove('dragover');
 });
-dropZone.addEventListener('drop', (e) => {
+dropZone.addEventListener('drop', async (e) => {
     e.preventDefault();
     dropZone.classList.remove('dragover');
-    handleMountainPhotoFiles(e.dataTransfer.files || []);
+    await handleMountainPhotoFiles(e.dataTransfer.files || []);
 });
 
 // -- Region Masking Logic --
@@ -413,7 +534,8 @@ function normalizeMountainRecord(mountain) {
 }
 
 function saveMountains(nextMountains) {
-    localStorage.setItem('mountains_db', JSON.stringify(nextMountains.map(normalizeMountainRecord)));
+    mountainsCache = nextMountains.map(normalizeMountainRecord);
+    localStorage.setItem('mountains_db', JSON.stringify(mountainsCache));
 }
 
 function getMountainById(id) {
@@ -550,10 +672,17 @@ if (mountainNameInput) mountainNameInput.maxLength = 15;
 const mountainStoryTitleInput = document.getElementById('mtTitle');
 if (mountainStoryTitleInput) mountainStoryTitleInput.maxLength = 15;
 
-window.deleteMountain = function(id) {
+window.deleteMountain = async function(id) {
     const mountain = getMountainById(id);
     if (!mountain || !canManageMountain(mountain)) return;
     if (!confirm('이 산 기록을 삭제하시겠습니까? 삭제하면 되돌릴 수 없습니다.')) return;
+
+    try {
+        await deleteMountainOnServer(id);
+    } catch (error) {
+        alert(error.message || '산 기록 삭제에 실패했습니다.');
+        return;
+    }
 
     const updated = getMountains()
         .map(normalizeMountainRecord)
@@ -566,7 +695,7 @@ window.deleteMountain = function(id) {
     closeMtDetailModal();
 };
 
-document.getElementById('mountainForm').onsubmit = (e) => {
+document.getElementById('mountainForm').onsubmit = async (e) => {
     e.preventDefault();
 
     const mountains = getMountains().map(normalizeMountainRecord);
@@ -592,16 +721,26 @@ document.getElementById('mountainForm').onsubmit = (e) => {
         updatedAt: new Date().toISOString()
     });
 
+    let savedRecord;
+    try {
+        savedRecord = editId
+            ? await updateMountainOnServer(editId, nextRecord)
+            : await createMountainOnServer(nextRecord);
+    } catch (error) {
+        alert(error.message || '산 기록 저장에 실패했습니다.');
+        return;
+    }
+
     const nextMountains = editId
-        ? mountains.map((mountain) => mountain.id === editId ? nextRecord : mountain)
-        : [nextRecord, ...mountains];
+        ? mountains.map((mountain) => mountain.id === editId ? savedRecord : mountain)
+        : [savedRecord, ...mountains];
 
     saveMountains(nextMountains);
     renderMarkers();
     renderMountainBoard();
     closeAddModal();
 
-    map.flyTo([parseFloat(nextRecord.lat), parseFloat(nextRecord.lng)], 11, {
+    map.flyTo([parseFloat(savedRecord.lat), parseFloat(savedRecord.lng)], 11, {
         animate: true,
         duration: 1.5
     });
@@ -680,6 +819,10 @@ window.closeMtDetailModal = function() {
     document.getElementById('mtDetailModal').style.display = 'none';
 };
 
-window.addEventListener('load', renderMountainBoard);
+window.addEventListener('load', () => {
+    if (Array.isArray(mountainsCache) && mountainsCache.length) {
+        renderMountainBoard();
+    }
+});
 
 

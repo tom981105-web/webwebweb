@@ -182,6 +182,32 @@ function normalizeBoardDrafts(value, categories) {
     return normalized;
 }
 
+function normalizeMountainRecords(value) {
+    const mountains = Array.isArray(value) ? value : [];
+    return mountains.map((mountain) => {
+        const photos = Array.isArray(mountain && mountain.photos)
+            ? mountain.photos.filter(Boolean).slice(0, 4)
+            : (mountain && mountain.photo ? [mountain.photo] : []);
+        return {
+            ...mountain,
+            id: mountain && mountain.id ? String(mountain.id) : `m_${Date.now()}`,
+            title: String((mountain && (mountain.title || mountain.name)) || '산행 기록').slice(0, 15),
+            name: String((mountain && (mountain.name || mountain.title)) || '산행 기록').slice(0, 15),
+            lat: mountain && mountain.lat !== undefined ? mountain.lat : '',
+            lng: mountain && mountain.lng !== undefined ? mountain.lng : '',
+            alt: String(mountain && mountain.alt || ''),
+            date: String(mountain && mountain.date || ''),
+            members: String(mountain && mountain.members || ''),
+            desc: String(mountain && mountain.desc || ''),
+            photos,
+            photo: photos[0] || '',
+            author: String(mountain && mountain.author || 'admin').trim() || 'admin',
+            createdAt: mountain && mountain.createdAt ? mountain.createdAt : new Date().toISOString(),
+            updatedAt: mountain && mountain.updatedAt ? mountain.updatedAt : new Date().toISOString()
+        };
+    });
+}
+
 function normalizeBanners(value) {
     return value && typeof value === 'object'
         ? value
@@ -512,7 +538,7 @@ function normalizeRawDb(raw) {
             directory: safeParseJson(raw.my_ai_directory, raw.my_ai_directory || []),
             prompts: safeParseJson(raw.my_prompt_directory, raw.my_prompt_directory || [])
         },
-        mountains: safeParseJson(raw.mountains_db, raw.mountains_db || []),
+        mountains: normalizeMountainRecords(safeParseJson(raw.mountains_db, raw.mountains_db || [])),
         banners: normalizeBannerState(safeParseJson(raw.site_banners, raw.site_banners || {})),
         loginHero: {
             images: normalizeLoginHeroImages(Array.isArray(raw.login_hero_images) ? raw.login_hero_images : []),
@@ -874,7 +900,7 @@ function applyLegacySyncWrite(key, value) {
         state.ai.prompts = safeParseJson(value, []);
         break;
     case 'mountains_db':
-        state.mountains = safeParseJson(value, []);
+        state.mountains = normalizeMountainRecords(safeParseJson(value, []));
         break;
     case 'board_categories':
         state.board.categories = normalizeCategories(safeParseJson(value, []));
@@ -1310,6 +1336,58 @@ app.delete('/api/board/drafts', async (req, res) => {
     delete state.board.drafts[createBoardDraftKey(userId, postId)];
     scheduleDeferredDbPersist();
     await deleteBoardDraftSnapshot(userId, postId).catch(() => {});
+    res.json({ success: true });
+});
+
+app.get('/api/mountains', (req, res) => {
+    res.json({
+        success: true,
+        mountains: normalizeMountainRecords(state.mountains)
+    });
+});
+
+app.post('/api/mountains', async (req, res) => {
+    const payload = req.body || {};
+    const nowIso = new Date().toISOString();
+    const [record] = normalizeMountainRecords([{
+        ...payload,
+        id: payload.id || `m_${Date.now()}`,
+        createdAt: payload.createdAt || nowIso,
+        updatedAt: nowIso
+    }]);
+
+    state.mountains = [record, ...normalizeMountainRecords(state.mountains)];
+    await persistDb({ deferRemote: true });
+    res.json({ success: true, mountain: record });
+});
+
+app.put('/api/mountains/:id', async (req, res) => {
+    const id = String(req.params.id || '').trim();
+    const index = normalizeMountainRecords(state.mountains).findIndex((item) => String(item.id) === id);
+    if (index < 0) {
+        return res.status(404).json({ success: false, message: '산 기록을 찾을 수 없습니다.' });
+    }
+
+    const existing = normalizeMountainRecords(state.mountains)[index];
+    const [record] = normalizeMountainRecords([{
+        ...existing,
+        ...req.body,
+        id,
+        createdAt: existing.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    }]);
+
+    const nextMountains = normalizeMountainRecords(state.mountains);
+    nextMountains[index] = record;
+    state.mountains = nextMountains;
+    await persistDb({ deferRemote: true });
+    res.json({ success: true, mountain: record });
+});
+
+app.delete('/api/mountains/:id', async (req, res) => {
+    const id = String(req.params.id || '').trim();
+    state.mountains = normalizeMountainRecords(state.mountains).filter((item) => String(item.id) !== id);
+    await persistDb({ deferRemote: true });
     res.json({ success: true });
 });
 

@@ -786,6 +786,36 @@ function setupCommentStickerPicker() {
         return result.posts.map(normalizePost);
     }
 
+    async function fetchBoardMetaFromServer() {
+        const response = await fetch(getApiUrl('/api/board/meta'), { cache: 'no-store' });
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || !Array.isArray(result.categories)) {
+            throw new Error(result.message || '게시판 메타 정보를 불러오지 못했습니다.');
+        }
+
+        return result;
+    }
+
+    async function retryAsync(task, attempts = 3, delayMs = 250) {
+        let lastError = null;
+        for (let attempt = 0; attempt < attempts; attempt += 1) {
+            try {
+                return await task();
+            } catch (error) {
+                lastError = error;
+                if (attempt < attempts - 1) {
+                    await new Promise((resolve) => setTimeout(resolve, delayMs));
+                }
+            }
+        }
+        throw lastError || new Error('요청에 실패했습니다.');
+    }
+
     async function persistExistingPost(post) {
         if (!post || !post.id) throw new Error('저장할 게시글이 없습니다.');
         const response = await fetch(getApiUrl(`/api/board/posts/${post.id}`), {
@@ -1975,21 +2005,28 @@ document.getElementById('richEditor').addEventListener('click', (event) => {
     });
 
     async function initializeBoard() {
-        if (typeof window.waitForInitialSync === 'function') {
-            await window.waitForInitialSync();
+        loadBoardCategories();
+        try {
+            const meta = await retryAsync(() => fetchBoardMetaFromServer(), 4, 300);
+            if (Array.isArray(meta.categories) && meta.categories.length === 4) {
+                boardCategories = meta.categories.map((item, index) => String(item || '').trim() || defaultBoardCategories[index]);
+                if (!boardCategories.includes(activeCategory)) {
+                    activeCategory = boardCategories[0];
+                }
+            }
+        } catch (error) {
         }
 
-        loadBoardCategories();
         let loadedFromServer = false;
         try {
-            boardPosts = await fetchBoardPostsFromServer();
+            boardPosts = await retryAsync(() => fetchBoardPostsFromServer(), 4, 300);
             loadedFromServer = true;
         } catch (error) {
             boardPosts = safeParse(localStorage.getItem('board_posts') || '[]', []).map(normalizePost);
         }
         if (!boardPosts.length) {
-            ensureSeedPosts();
-            if (!loadedFromServer) {
+            if (window.location.protocol === 'file:') {
+                ensureSeedPosts();
                 savePosts();
             }
         }

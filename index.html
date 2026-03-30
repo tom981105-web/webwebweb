@@ -106,6 +106,35 @@
             }
         }
 
+        function getApiBase() {
+            if (window.location.protocol === 'file:') {
+                return 'http://localhost:3000';
+            }
+            return '';
+        }
+
+        function getApiUrl(path) {
+            return getApiBase() + path;
+        }
+
+        async function retryFetchJson(path, attempts = 4, delayMs = 300) {
+            let lastError = null;
+            for (let attempt = 0; attempt < attempts; attempt += 1) {
+                try {
+                    const response = await fetch(getApiUrl(path), { cache: 'no-store' });
+                    const result = await response.json().catch(() => ({}));
+                    if (response.ok) return result;
+                    lastError = new Error(result.message || '요청에 실패했습니다.');
+                } catch (error) {
+                    lastError = error;
+                }
+                if (attempt < attempts - 1) {
+                    await new Promise((resolve) => setTimeout(resolve, delayMs));
+                }
+            }
+            throw lastError || new Error('요청에 실패했습니다.');
+        }
+
         function getUsersDbLocal() {
             return safeParse(localStorage.getItem('users_db') || '{}', {});
         }
@@ -139,9 +168,17 @@
             return users[author] && users[author].nickname ? users[author].nickname : author || '익명';
         }
 
-        function renderRecentPosts() {
+        async function renderRecentPosts() {
             const postsList = document.getElementById('recentPostsList');
-            const posts = safeParse(localStorage.getItem('board_posts') || '[]', []);
+            let posts = [];
+
+            try {
+                const result = await retryFetchJson('/api/board/posts');
+                if (Array.isArray(result.posts)) {
+                    posts = result.posts;
+                }
+            } catch (error) {
+            }
 
             if (!Array.isArray(posts) || posts.length === 0) {
                 postsList.innerHTML = '<div style="padding:20px 0; color:#6f5a47; text-align:center;">최근 등록된 게시글이 없습니다. 첫 글을 남겨보세요.</div>';
@@ -249,6 +286,10 @@
             renderRecentPosts();
             applyBanners();
             applyMenuIcons();
+        });
+
+        window.addEventListener('sync:initial-complete', () => {
+            renderRecentPosts();
         });
     </script>
 </body>
