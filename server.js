@@ -1265,6 +1265,11 @@ app.get('/api/sync', (req, res) => {
     }
 });
 
+app.get('/api/sync', (req, res) => {
+    reloadDb();
+    res.json(createLegacyPayloadFromState(state));
+});
+
 app.post('/api/sync', async (req, res) => {
     const { key, value } = req.body || {};
 
