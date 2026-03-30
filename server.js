@@ -1922,11 +1922,11 @@ app.post('/api/admin/access-settings', async (req, res) => {
         ...(req.body && typeof req.body === 'object' ? req.body : {})
     });
     state.accessSettings = nextSettings;
-    await persistDb({ deferRemote: true });
     res.json({
         success: true,
         accessSettings: state.accessSettings
     });
+    persistDbInBackground({ deferRemote: true, skipBoardRepair: true });
 });
 
 async function runBackgroundBootstrap() {

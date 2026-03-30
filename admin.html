@@ -714,6 +714,8 @@
                 description: '주식 시뮬레이션 프로토타입의 접근 상태를 조절합니다.'
             }
         };
+        const serviceAccessPendingModes = {};
+        const serviceAccessRequestTokens = {};
 
         function normalizeServiceAccessMode(value) {
             const mode = String(value || '').trim().toLowerCase();
@@ -767,17 +769,19 @@
 
             Object.entries(SERVICE_ACCESS_META).forEach(([serviceKey, serviceMeta]) => {
                 const mode = normalized[serviceKey] || 'open';
+                const pendingMode = serviceAccessPendingModes[serviceKey] || '';
+                const pendingLabel = pendingMode ? ` <span style="color: var(--accent); font-weight: 600;">저장 중...</span>` : '';
                 const item = document.createElement('div');
                 item.className = 'service-access-item';
                 item.innerHTML = `
                     <div class="service-access-copy">
                         <strong>${serviceMeta.label}</strong>
-                        <p>${serviceMeta.description}<br>현재 상태: <b>${getServiceModeLabel(mode)}</b></p>
+                        <p>${serviceMeta.description}<br>현재 상태: <b>${getServiceModeLabel(mode)}</b>${pendingLabel}</p>
                     </div>
                     <div class="service-access-buttons">
-                        <button type="button" class="btn-green ${mode === 'open' ? 'is-active' : ''}" data-service-access="${serviceKey}" data-service-mode="open">정상 운영</button>
-                        <button type="button" class="btn-primary ${mode === 'admin' ? 'is-active' : ''}" data-service-access="${serviceKey}" data-service-mode="admin">관리자만</button>
-                        <button type="button" class="btn-muted ${mode === 'maintenance' ? 'is-active' : ''}" data-service-access="${serviceKey}" data-service-mode="maintenance">점검중</button>
+                        <button type="button" class="btn-green ${mode === 'open' ? 'is-active' : ''}" data-service-access="${serviceKey}" data-service-mode="open" ${pendingMode ? 'disabled' : ''}>정상 운영</button>
+                        <button type="button" class="btn-primary ${mode === 'admin' ? 'is-active' : ''}" data-service-access="${serviceKey}" data-service-mode="admin" ${pendingMode ? 'disabled' : ''}>관리자만</button>
+                        <button type="button" class="btn-muted ${mode === 'maintenance' ? 'is-active' : ''}" data-service-access="${serviceKey}" data-service-mode="maintenance" ${pendingMode ? 'disabled' : ''}>점검중</button>
                     </div>
                 `;
                 list.appendChild(item);
@@ -801,10 +805,16 @@
             const normalizedMode = normalizeServiceAccessMode(mode);
             if (!SERVICE_ACCESS_META[serviceKey]) return;
 
+            const previousSettings = getServiceAccessSettingsSafe();
             const nextSettings = {
-                ...getServiceAccessSettingsSafe(),
+                ...previousSettings,
                 [serviceKey]: normalizedMode
             };
+            const requestToken = `${serviceKey}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+            serviceAccessRequestTokens[serviceKey] = requestToken;
+            serviceAccessPendingModes[serviceKey] = normalizedMode;
+            renderServiceAccessControls(nextSettings);
 
             try {
                 let response = await fetch(getApiUrl('/api/admin/access-settings'), {
@@ -829,11 +839,14 @@
                     }
                     result = { success: true, accessSettings: nextSettings };
                 }
+                if (serviceAccessRequestTokens[serviceKey] !== requestToken) return;
+                delete serviceAccessPendingModes[serviceKey];
                 renderServiceAccessControls(result.accessSettings);
-                alert(`${SERVICE_ACCESS_META[serviceKey].label} 상태를 ${getServiceModeLabel(normalizedMode)}으로 변경했습니다.`);
             } catch (error) {
+                if (serviceAccessRequestTokens[serviceKey] !== requestToken) return;
+                delete serviceAccessPendingModes[serviceKey];
                 alert(error.message || '서비스 출입 상태 저장에 실패했습니다.');
-                renderServiceAccessControls(getServiceAccessSettingsSafe());
+                renderServiceAccessControls(previousSettings);
             }
         }
 
