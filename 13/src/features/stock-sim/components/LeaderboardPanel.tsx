@@ -16,9 +16,15 @@ export function LeaderboardPanel({
   onSortChange,
   isRemote = false,
 }: LeaderboardPanelProps) {
-  const sortedEntries = [...entries].sort((left, right) =>
+  const hiddenPreviewIds = new Set(['friend-hana', 'friend-jin']);
+  const sortedEntries = entries
+    .filter((entry) => {
+      const normalizedId = String(entry.id || '').replace(/^stock-sim-/, '');
+      return !hiddenPreviewIds.has(normalizedId);
+    })
+    .sort((left, right) =>
     sortMode === 'returnRate' ? right.returnRate - left.returnRate : right.netWorth - left.netWorth,
-  );
+    );
 
   return (
     <Panel
