@@ -47,3 +47,197 @@ a {
 .rg-scrollbar::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.04);
 }
+
+.rg-scratch-shell {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 26px 60px rgba(4, 9, 18, 0.42);
+}
+
+.rg-scratch-shell::after {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 24%);
+  pointer-events: none;
+}
+
+.rg-scratch-shell--revealed {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 24px 62px rgba(4, 9, 18, 0.44),
+    0 0 48px var(--relic-glow, rgba(113, 217, 255, 0.22));
+}
+
+.rg-scratch-shell--rare {
+  animation: rg-rare-panel-pulse 1.5s ease-out both;
+}
+
+.rg-symbol-slot--revealed {
+  animation: rg-symbol-rise 0.5s ease-out both;
+}
+
+.rg-reveal-veil {
+  background:
+    linear-gradient(180deg, transparent 0%, rgba(6, 9, 16, 0.18) 18%, rgba(4, 7, 13, 0.88) 100%);
+  animation: rg-reveal-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.rg-result-value {
+  text-shadow: 0 10px 26px rgba(0, 0, 0, 0.42);
+  animation: rg-result-pop 0.75s cubic-bezier(0.17, 0.84, 0.44, 1) both;
+}
+
+.rg-rare-burst,
+.rg-rare-burst--jackpot {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.rg-rare-burst::before,
+.rg-rare-burst--jackpot::before {
+  content: '';
+  position: absolute;
+  inset: 12%;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(169, 140, 255, 0.28), transparent 72%);
+  animation: rg-burst-cloud 1.25s ease-out both;
+}
+
+.rg-rare-burst--jackpot::before {
+  inset: 6%;
+  background: radial-gradient(circle, rgba(242, 205, 114, 0.34), transparent 72%);
+}
+
+.rg-rare-spark {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 1) 0 22%, rgba(242, 205, 114, 0.96) 22% 58%, rgba(242, 205, 114, 0) 76%);
+  filter: blur(0.2px);
+  animation: rg-spark-float 1.4s ease-out both;
+}
+
+.rg-rare-burst--jackpot .rg-rare-spark {
+  width: 12px;
+  height: 12px;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 1) 0 18%, rgba(242, 205, 114, 0.98) 18% 56%, rgba(255, 122, 162, 0.7) 56% 74%, rgba(242, 205, 114, 0) 82%);
+}
+
+.rg-upgrade-card {
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.rg-upgrade-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 40px rgba(4, 9, 18, 0.24);
+}
+
+.rg-feedback-toast {
+  min-width: min(320px, calc(100vw - 2.75rem));
+  backdrop-filter: blur(12px);
+  animation: rg-toast-in 0.42s cubic-bezier(0.16, 0.84, 0.44, 1) both;
+}
+
+.rg-feedback-toast--rare {
+  box-shadow:
+    0 18px 40px rgba(67, 36, 109, 0.28),
+    0 0 0 1px rgba(169, 140, 255, 0.18);
+}
+
+@keyframes rg-reveal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rg-result-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72) translateY(18px);
+  }
+  68% {
+    opacity: 1;
+    transform: scale(1.06) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rg-rare-panel-pulse {
+  0% {
+    transform: scale(0.985);
+  }
+  45% {
+    transform: scale(1.01);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes rg-symbol-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes rg-burst-cloud {
+  from {
+    opacity: 0.9;
+    transform: scale(0.65);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.28);
+  }
+}
+
+@keyframes rg-spark-float {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) translate3d(0, 12px, 0);
+  }
+  28% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.2) translate3d(0, -34px, 0);
+  }
+}
+
+@keyframes rg-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

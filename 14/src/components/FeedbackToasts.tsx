@@ -7,17 +7,27 @@ const toneClass: Record<ScratchFeedback['tone'], string> = {
   system: 'rg-border-cyan-300/24 rg-bg-cyan-300/10 rg-text-cyan-100',
 };
 
+const toneLabel: Record<ScratchFeedback['tone'], string> = {
+  reward: '획득',
+  rare: '희귀 해제',
+  warning: '주의',
+  system: '안내',
+};
+
 export function FeedbackToasts({ entries }: { entries: ScratchFeedback[] }) {
   if (!entries.length) return null;
 
   return (
-    <div className="rg-pointer-events-none rg-fixed rg-bottom-5 rg-right-5 rg-z-40 rg-flex rg-flex-col rg-items-end rg-gap-3">
+    <div className="rg-pointer-events-none rg-fixed rg-bottom-5 rg-right-5 rg-z-40 rg-flex rg-max-w-[calc(100vw-2rem)] rg-flex-col rg-items-end rg-gap-3">
       {entries.map((entry) => (
         <div
           key={entry.id}
-          className={`rg-animate-rewardPop rg-rounded-2xl rg-border rg-px-4 rg-py-3 rg-text-sm rg-font-semibold rg-shadow-soft ${toneClass[entry.tone]}`}
+          className={`rg-feedback-toast rg-rounded-2xl rg-border rg-px-4 rg-py-3 rg-shadow-soft ${toneClass[entry.tone]} ${
+            entry.tone === 'rare' ? 'rg-feedback-toast--rare' : ''
+          }`}
         >
-          {entry.label}
+          <div className="rg-text-[11px] rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-opacity-80">{toneLabel[entry.tone]}</div>
+          <div className="rg-mt-1 rg-text-sm rg-font-semibold">{entry.label}</div>
         </div>
       ))}
     </div>

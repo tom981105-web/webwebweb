@@ -226,7 +226,14 @@ export const useGameStore = create<StoreState>((set, get) => {
         specialLabel: revealedPanel.specialEffect.label,
         createdAt: Date.now(),
       };
-      const tone = revealedPanel.rarity === 'legendary' || revealedPanel.rarity === 'mythic' ? 'rare' : 'reward';
+      const tone =
+        revealedPanel.rarity === 'rare' ||
+        revealedPanel.rarity === 'epic' ||
+        revealedPanel.rarity === 'legendary' ||
+        revealedPanel.rarity === 'mythic' ||
+        revealedPanel.specialEffect.id === 'jackpot'
+          ? 'rare'
+          : 'reward';
 
       set({
         coins: nextCoins,

@@ -328,6 +328,9 @@ export function App() {
             metaUpgrades={metaUpgradeCards}
             coins={coins}
             dust={resonanceDust}
+            totalCoinsEarned={stats.totalCoinsEarned}
+            totalPanelsScratched={stats.totalPanelsScratched}
+            prestigeCount={stats.prestigeCount}
             compactNumbers={settings.compactNumbers}
             onBuyUpgrade={buyUpgrade}
             onBuyMetaUpgrade={buyMetaUpgrade}
