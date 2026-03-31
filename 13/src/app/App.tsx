@@ -11,11 +11,18 @@ type ServiceAccessSettings = {
   stockSim: ServiceAccessMode;
 };
 
+type PrototypeSlotState = {
+  activeKey: string;
+};
+
 const DEFAULT_SERVICE_ACCESS_SETTINGS: ServiceAccessSettings = {
   board: 'open',
   mountain: 'open',
   ai: 'open',
   stockSim: 'open',
+};
+const DEFAULT_PROTOTYPE_SLOT_STATE: PrototypeSlotState = {
+  activeKey: 'stockSim',
 };
 
 function normalizeServiceAccessMode(value: unknown): ServiceAccessMode {
@@ -31,6 +38,14 @@ function normalizeServiceAccessSettings(value: unknown): ServiceAccessSettings {
     mountain: normalizeServiceAccessMode(source.mountain),
     ai: normalizeServiceAccessMode(source.ai),
     stockSim: normalizeServiceAccessMode(source.stockSim),
+  };
+}
+
+function normalizePrototypeSlotState(value: unknown): PrototypeSlotState {
+  const source = value && typeof value === 'object' ? (value as Partial<PrototypeSlotState>) : {};
+  const activeKey = String(source.activeKey || DEFAULT_PROTOTYPE_SLOT_STATE.activeKey).trim();
+  return {
+    activeKey: activeKey === 'stockSim' ? activeKey : '',
   };
 }
 
@@ -78,9 +93,28 @@ function getStoredAccessSettings() {
   }
 }
 
-function canAccessStockSim(currentUser: string, accessSettings: ServiceAccessSettings) {
+function getStoredPrototypeSlotState() {
+  if (typeof window === 'undefined') {
+    return DEFAULT_PROTOTYPE_SLOT_STATE;
+  }
+
+  try {
+    return normalizePrototypeSlotState(
+      JSON.parse(window.localStorage.getItem('prototype_slot_state') || '{}'),
+    );
+  } catch {
+    return DEFAULT_PROTOTYPE_SLOT_STATE;
+  }
+}
+
+function canAccessStockSim(
+  currentUser: string,
+  accessSettings: ServiceAccessSettings,
+  prototypeSlot: PrototypeSlotState,
+) {
   const userRecord = getCurrentUserRecord(currentUser);
   if (!userRecord) return false;
+  if (prototypeSlot.activeKey !== 'stockSim') return false;
   if (userRecord.isAdmin) return true;
   return accessSettings.stockSim === 'open' && userRecord.status === 'regular';
 }
@@ -97,13 +131,21 @@ function getBlockedMessage(
   currentUser: string,
   userRecord: { status?: string; isAdmin?: boolean } | null,
   accessSettings: ServiceAccessSettings,
+  prototypeSlot: PrototypeSlotState,
 ) {
   if (!currentUser) {
     return '로그인 후 이용 가능한 서비스입니다.';
   }
 
   if (userRecord?.isAdmin) {
+    if (prototypeSlot.activeKey !== 'stockSim') {
+      return '주식장은 현재 메인 프로토타입 슬롯에 적용되어 있지 않습니다.';
+    }
     return '';
+  }
+
+  if (prototypeSlot.activeKey !== 'stockSim') {
+    return '주식장은 현재 메인 프로토타입 슬롯에 적용되어 있지 않습니다.';
   }
 
   if (accessSettings.stockSim === 'maintenance') {
@@ -121,11 +163,17 @@ function getBlockedMessage(
   return '현재 계정은 주식장 이용 권한이 없습니다.';
 }
 
-function AccessBlocked({ accessSettings }: { accessSettings: ServiceAccessSettings }) {
+function AccessBlocked({
+  accessSettings,
+  prototypeSlot,
+}: {
+  accessSettings: ServiceAccessSettings;
+  prototypeSlot: PrototypeSlotState;
+}) {
   const currentUser = getCurrentSiteUser();
   const isLoggedIn = Boolean(currentUser);
   const userRecord = getCurrentUserRecord(currentUser);
-  const message = getBlockedMessage(currentUser, userRecord, accessSettings);
+  const message = getBlockedMessage(currentUser, userRecord, accessSettings, prototypeSlot);
 
   return (
     <div className="stock-sim-shell ss-relative ss-flex ss-min-h-dvh ss-items-center ss-justify-center ss-overflow-hidden">
@@ -155,6 +203,7 @@ function AccessBlocked({ accessSettings }: { accessSettings: ServiceAccessSettin
 export function App() {
   const currentUser = getCurrentSiteUser();
   const [accessSettings, setAccessSettings] = useState<ServiceAccessSettings>(() => getStoredAccessSettings());
+  const [prototypeSlot, setPrototypeSlot] = useState<PrototypeSlotState>(() => getStoredPrototypeSlotState());
 
   useEffect(() => {
     let cancelled = false;
@@ -174,14 +223,30 @@ export function App() {
       }
     }
 
+    async function loadPrototypeSlot() {
+      try {
+        const response = await fetch(new URL('/api/prototype-slot', window.location.origin), {
+          cache: 'no-store',
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok && result.prototypeSlot) {
+          const nextState = normalizePrototypeSlotState(result.prototypeSlot);
+          window.localStorage.setItem('prototype_slot_state', JSON.stringify(nextState));
+          setPrototypeSlot(nextState);
+        }
+      } catch {
+      }
+    }
+
     loadAccessSettings();
+    loadPrototypeSlot();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!canAccessStockSim(currentUser, accessSettings)) {
-    return <AccessBlocked accessSettings={accessSettings} />;
+  if (!canAccessStockSim(currentUser, accessSettings, prototypeSlot)) {
+    return <AccessBlocked accessSettings={accessSettings} prototypeSlot={prototypeSlot} />;
   }
 
   return <StockSimulationFeature shellMode="standalone" showAdminPanel />;

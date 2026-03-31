@@ -85,11 +85,11 @@
                             <p id="boardMenuCardDesc">일상 이야기부터 짧은 잡담까지 편하게 머무는 메인 라운지</p>
                         </div>
                     </a>
-                    <a href="#" class="menu-card disabled" id="stockSimCard" aria-disabled="true" onclick="openStockSimPage(event)">
-                        <div class="card-icon">주식</div>
+                    <a href="#" class="menu-card disabled" id="prototypeSlotCard" aria-disabled="true" onclick="openPrototypeSlotPage(event)">
+                        <div class="card-icon" id="prototypeSlotIcon">공사</div>
                         <div class="menu-copy">
-                            <h3>주식장</h3>
-                            <p id="stockSimCardDesc">03월 30일~03월 31일까지 진행하는 프로토타입입니다.</p>
+                            <h3 id="prototypeSlotTitle">공사중</h3>
+                            <p id="prototypeSlotCardDesc">현재 준비 중인 프로토타입이 없습니다.</p>
                         </div>
                     </a>
                 </div>
@@ -440,6 +440,18 @@
             ai: 'open',
             stockSim: 'open'
         };
+        const PROTOTYPE_SLOT_STORAGE_KEY = 'prototype_slot_state';
+        const DEFAULT_PROTOTYPE_SLOT_STATE = {
+            activeKey: 'stockSim'
+        };
+        const PROTOTYPE_SLOT_META = {
+            stockSim: {
+                title: '주식장',
+                icon: '주식',
+                href: () => getStockSimUrl(),
+                desc: '03월 30일~03월 31일까지 진행하는 프로토타입입니다.'
+            }
+        };
         const SERVICE_CARD_META = {
             board: {
                 cardId: 'boardMenuCard',
@@ -455,11 +467,6 @@
                 cardId: 'aiMenuCard',
                 descId: 'aiMenuCardDesc',
                 defaultDesc: '자주 쓰는 도구와 프롬프트를 가볍게 둘러볼 수 있는 공간'
-            },
-            stockSim: {
-                cardId: 'stockSimCard',
-                descId: 'stockSimCardDesc',
-                defaultDesc: '03월 30일~03월 31일까지 진행하는 프로토타입입니다.'
             }
         };
 
@@ -496,6 +503,26 @@
                 isAdmin: Boolean(user && user.isAdmin),
                 isRegular: Boolean(user && (user.isAdmin || String(user.status || '').toLowerCase() === 'regular'))
             };
+        }
+
+        function normalizePrototypeSlotState(value) {
+            const source = value && typeof value === 'object' ? value : {};
+            const activeKey = String(source.activeKey || DEFAULT_PROTOTYPE_SLOT_STATE.activeKey).trim();
+            if (activeKey && PROTOTYPE_SLOT_META[activeKey]) {
+                return { activeKey };
+            }
+            return { activeKey: '' };
+        }
+
+        function getPrototypeSlotStateLocal() {
+            const stored = safeParse(localStorage.getItem(PROTOTYPE_SLOT_STORAGE_KEY) || '{}', {});
+            return normalizePrototypeSlotState(stored);
+        }
+
+        function savePrototypeSlotStateLocal(state) {
+            const normalized = normalizePrototypeSlotState(state);
+            localStorage.setItem(PROTOTYPE_SLOT_STORAGE_KEY, JSON.stringify(normalized));
+            return normalized;
         }
 
         function getServiceBlockedMessage(serviceKey) {
@@ -538,12 +565,65 @@
             desc.textContent = description;
         }
 
-        function openStockSimPage(event) {
+        function updatePrototypeSlotCard() {
+            const card = document.getElementById('prototypeSlotCard');
+            const icon = document.getElementById('prototypeSlotIcon');
+            const title = document.getElementById('prototypeSlotTitle');
+            const desc = document.getElementById('prototypeSlotCardDesc');
+            if (!card || !icon || !title || !desc) return;
+
+            const slotState = getPrototypeSlotStateLocal();
+            const activeMeta = slotState.activeKey ? PROTOTYPE_SLOT_META[slotState.activeKey] : null;
+
+            if (!activeMeta) {
+                card.classList.add('disabled');
+                card.setAttribute('aria-disabled', 'true');
+                icon.textContent = '공사';
+                title.textContent = '공사중';
+                desc.textContent = '현재 준비 중인 프로토타입이 없습니다.';
+                return;
+            }
+
+            card.classList.toggle('disabled', !canOpenServiceCard('stockSim'));
+            card.setAttribute('aria-disabled', canOpenServiceCard('stockSim') ? 'false' : 'true');
+            icon.textContent = activeMeta.icon;
+            title.textContent = activeMeta.title;
+            desc.textContent = activeMeta.desc;
+        }
+
+        async function refreshPrototypeSlotState() {
+            try {
+                const response = await fetch(getApiUrl('/api/prototype-slot?t=' + Date.now()), { cache: 'no-store' });
+                const result = await response.json().catch(() => ({}));
+                if (response.ok && result && result.prototypeSlot) {
+                    return savePrototypeSlotStateLocal(result.prototypeSlot);
+                }
+            } catch (error) {
+            }
+            try {
+                const response = await fetch(getApiUrl('/api/admin/state?t=' + Date.now()), { cache: 'no-store' });
+                const result = await response.json().catch(() => ({}));
+                if (response.ok && result && result.prototypeSlot) {
+                    return savePrototypeSlotStateLocal(result.prototypeSlot);
+                }
+            } catch (error) {
+            }
+            return getPrototypeSlotStateLocal();
+        }
+
+        function openPrototypeSlotPage(event) {
             if (event) event.preventDefault();
             const { currentUser, isRegular } = getCurrentUserRecordLocal();
+            const slotState = getPrototypeSlotStateLocal();
+            const activeKey = slotState.activeKey;
 
             if (!currentUser) {
                 window.location.href = 'login.html';
+                return;
+            }
+
+            if (!activeKey || !PROTOTYPE_SLOT_META[activeKey]) {
+                alert('현재 적용된 프로토타입이 없습니다.');
                 return;
             }
 
@@ -557,7 +637,7 @@
                 return;
             }
 
-            window.location.href = getStockSimUrl();
+            window.location.href = PROTOTYPE_SLOT_META[activeKey].href();
         }
 
         function handleServiceCardClick(event) {
@@ -568,35 +648,41 @@
             alert(getServiceBlockedMessage(serviceKey));
         }
 
-        window.openStockSimPage = openStockSimPage;
+        window.openPrototypeSlotPage = openPrototypeSlotPage;
 
         document.addEventListener('DOMContentLoaded', () => {
             renderRecentPosts();
             applyBanners();
             applyMenuIcons();
             Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
+            updatePrototypeSlotCard();
             document.querySelectorAll('[data-service-key]').forEach((card) => {
-                if (card.id === 'stockSimCard') return;
                 card.addEventListener('click', handleServiceCardClick);
             });
             if (typeof window.refreshServiceAccessSettings === 'function') {
                 window.refreshServiceAccessSettings().then(() => {
                     Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
+                    updatePrototypeSlotCard();
                 });
             }
+            refreshPrototypeSlotState().then(updatePrototypeSlotCard);
         });
 
         window.addEventListener('sync:initial-complete', () => {
             renderRecentPosts();
             Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
+            refreshPrototypeSlotState().then(updatePrototypeSlotCard);
         });
 
         window.addEventListener('auth:login-success', () => {
             Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
+            updatePrototypeSlotCard();
         });
         window.addEventListener('service-access:updated', () => {
             Object.keys(SERVICE_CARD_META).forEach(updateServiceCardState);
+            updatePrototypeSlotCard();
         });
+        window.addEventListener('prototype-slot:updated', updatePrototypeSlotCard);
     </script>
 </body>
 </html>

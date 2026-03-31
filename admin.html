@@ -246,6 +246,12 @@
             </section>
 
             <section class="card">
+                <h2>프로토타입 슬롯</h2>
+                <p class="meta">메인 화면 마지막 카드에 어떤 실험 기능을 올릴지 정합니다. 모두 미적용이면 공사중으로 표시됩니다.</p>
+                <div class="list" id="prototypeSlotList"></div>
+            </section>
+
+            <section class="card">
                 <h2>클라우드 상태</h2>
                 <p class="meta">Railway 배포 전에 저장소와 백업 연결 준비 상태를 이곳에서 바로 확인합니다.</p>
                 <div class="status-list" id="cloudStatusList">
@@ -714,8 +720,17 @@
                 description: '주식 시뮬레이션 프로토타입의 접근 상태를 조절합니다.'
             }
         };
+        const PROTOTYPE_SLOT_STORAGE_KEY = 'prototype_slot_state';
+        const PROTOTYPE_SLOT_META = {
+            stockSim: {
+                label: '주식장',
+                description: '가상 주식시장 프로토타입을 메인 슬롯에 올립니다.'
+            }
+        };
         const serviceAccessPendingModes = {};
         const serviceAccessRequestTokens = {};
+        const prototypeSlotPendingKeys = {};
+        const prototypeSlotRequestTokens = {};
 
         function normalizeServiceAccessMode(value) {
             const mode = String(value || '').trim().toLowerCase();
@@ -758,6 +773,118 @@
             if (mode === 'admin') return '관리자 전용';
             if (mode === 'maintenance') return '점검중';
             return '정상 운영';
+        }
+
+        function normalizePrototypeSlotState(value) {
+            const source = value && typeof value === 'object' ? value : {};
+            const activeKey = String(source.activeKey || 'stockSim').trim();
+            if (activeKey === 'stockSim') {
+                return { activeKey };
+            }
+            return { activeKey: '' };
+        }
+
+        function getPrototypeSlotStateSafe() {
+            try {
+                return normalizePrototypeSlotState(JSON.parse(localStorage.getItem(PROTOTYPE_SLOT_STORAGE_KEY) || '{}'));
+            } catch (error) {
+                return { activeKey: 'stockSim' };
+            }
+        }
+
+        function savePrototypeSlotStateLocal(state) {
+            const normalized = normalizePrototypeSlotState(state);
+            localStorage.setItem(PROTOTYPE_SLOT_STORAGE_KEY, JSON.stringify(normalized));
+            window.dispatchEvent(new CustomEvent('prototype-slot:updated', { detail: normalized }));
+            return normalized;
+        }
+
+        function renderPrototypeSlotControls(slotState) {
+            const normalized = savePrototypeSlotStateLocal(slotState || getPrototypeSlotStateSafe());
+            const list = document.getElementById('prototypeSlotList');
+            if (!list) return;
+
+            list.innerHTML = '';
+
+            Object.entries(PROTOTYPE_SLOT_META).forEach(([prototypeKey, prototypeMeta]) => {
+                const isActive = normalized.activeKey === prototypeKey;
+                const isPending = Boolean(prototypeSlotPendingKeys[prototypeKey]);
+                const pendingLabel = isPending ? ' <span style="color: var(--accent); font-weight: 600;">저장 중...</span>' : '';
+                const item = document.createElement('div');
+                item.className = 'service-access-item';
+                item.innerHTML = `
+                    <div class="service-access-copy">
+                        <strong>${prototypeMeta.label}</strong>
+                        <p>${prototypeMeta.description}<br>현재 상태: <b>${isActive ? '적용됨' : '미적용'}</b>${pendingLabel}</p>
+                    </div>
+                    <div class="service-access-buttons">
+                        <button type="button" class="btn-primary ${isActive ? 'is-active' : ''}" data-prototype-slot="${prototypeKey}" data-prototype-mode="apply" ${isPending ? 'disabled' : ''}>적용</button>
+                        <button type="button" class="btn-muted ${!isActive ? 'is-active' : ''}" data-prototype-slot="${prototypeKey}" data-prototype-mode="clear" ${isPending ? 'disabled' : ''}>미적용</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        async function loadPrototypeSlotControls() {
+            let slotState = getPrototypeSlotStateSafe();
+            try {
+                const response = await fetch(getApiUrl('/api/admin/state?t=' + Date.now()), { cache: 'no-store' });
+                const result = await response.json().catch(() => ({}));
+                if (response.ok && result && result.prototypeSlot) {
+                    slotState = result.prototypeSlot;
+                }
+            } catch (error) {
+            }
+            renderPrototypeSlotControls(slotState);
+        }
+
+        async function updatePrototypeSlot(prototypeKey, mode) {
+            if (!PROTOTYPE_SLOT_META[prototypeKey]) return;
+
+            const previousState = getPrototypeSlotStateSafe();
+            const nextState = {
+                activeKey: mode === 'apply' ? prototypeKey : ''
+            };
+            const requestToken = `${prototypeKey}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+            prototypeSlotRequestTokens[prototypeKey] = requestToken;
+            prototypeSlotPendingKeys[prototypeKey] = true;
+            renderPrototypeSlotControls(nextState);
+
+            try {
+                let response = await fetch(getApiUrl('/api/admin/prototype-slot'), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(nextState)
+                });
+                let result = await response.json().catch(() => ({}));
+
+                if (!response.ok || result.success === false || !result.prototypeSlot) {
+                    response = await fetch(getApiUrl('/api/sync'), {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            key: PROTOTYPE_SLOT_STORAGE_KEY,
+                            value: nextState
+                        })
+                    });
+                    result = await response.json().catch(() => ({}));
+                    if (!response.ok || result.success === false) {
+                        throw new Error(result.message || '프로토타입 슬롯 저장에 실패했습니다.');
+                    }
+                    result = { success: true, prototypeSlot: nextState };
+                }
+
+                if (prototypeSlotRequestTokens[prototypeKey] !== requestToken) return;
+                delete prototypeSlotPendingKeys[prototypeKey];
+                renderPrototypeSlotControls(result.prototypeSlot);
+            } catch (error) {
+                if (prototypeSlotRequestTokens[prototypeKey] !== requestToken) return;
+                delete prototypeSlotPendingKeys[prototypeKey];
+                alert(error.message || '프로토타입 슬롯 저장에 실패했습니다.');
+                renderPrototypeSlotControls(previousState);
+            }
         }
 
         function renderServiceAccessControls(settings) {
@@ -1558,6 +1685,8 @@
             const clearSide = event.target.getAttribute('data-clear-side');
             const serviceAccessKey = event.target.getAttribute('data-service-access');
             const serviceAccessMode = event.target.getAttribute('data-service-mode');
+            const prototypeSlotKey = event.target.getAttribute('data-prototype-slot');
+            const prototypeSlotMode = event.target.getAttribute('data-prototype-mode');
 
             if (deleteCodeIndex !== null) deleteCode(Number(deleteCodeIndex));
             if (approveId) updateUserStatus(approveId, 'regular');
@@ -1567,6 +1696,7 @@
             if (deductPointsId) adjustUserPoints(deductPointsId, 'deduct');
             if (clearSide) clearSideBanner(clearSide);
             if (serviceAccessKey && serviceAccessMode) updateServiceAccess(serviceAccessKey, serviceAccessMode);
+            if (prototypeSlotKey && prototypeSlotMode) updatePrototypeSlot(prototypeSlotKey, prototypeSlotMode);
         });
 
         document.getElementById('createCodeButton').addEventListener('click', createCode);
@@ -1610,7 +1740,9 @@
         window.addEventListener('sync:initial-complete', renderAdminProfileCard);
         renderBoardCategoryFields();
         window.addEventListener('sync:initial-complete', loadServiceAccessControls);
+        window.addEventListener('sync:initial-complete', loadPrototypeSlotControls);
         loadServiceAccessControls();
+        loadPrototypeSlotControls();
         loadBanners();
         refreshCloudStatus();
         fetchLoginHeroState()

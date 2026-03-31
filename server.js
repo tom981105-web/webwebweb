@@ -28,6 +28,9 @@ const DEFAULT_SERVICE_ACCESS_SETTINGS = Object.freeze({
     ai: 'open',
     stockSim: 'open'
 });
+const DEFAULT_PROTOTYPE_SLOT_STATE = Object.freeze({
+    activeKey: 'stockSim'
+});
 
 const app = express();
 app.use(cors());
@@ -122,6 +125,15 @@ function normalizeServiceAccessSettings(value) {
         ai: normalizeServiceAccessMode(source.ai),
         stockSim: normalizeServiceAccessMode(source.stockSim)
     };
+}
+
+function normalizePrototypeSlotState(value) {
+    const source = value && typeof value === 'object' ? value : {};
+    const activeKey = String(source.activeKey || DEFAULT_PROTOTYPE_SLOT_STATE.activeKey).trim();
+    if (activeKey === 'stockSim') {
+        return { activeKey };
+    }
+    return { activeKey: '' };
 }
 
 
@@ -509,6 +521,7 @@ function createStockSimLeaderboardEntries(currentUserId) {
 }
 
 function canAccessStockSim(userId) {
+    if (!state.prototypeSlot || state.prototypeSlot.activeKey !== 'stockSim') return false;
     const normalizedUserId = String(userId || '').trim();
     if (!normalizedUserId) return false;
     const matchedUserId = Object.keys(state.users || {}).find(
@@ -862,7 +875,8 @@ function normalizeRawDb(raw) {
         currentUser: raw.current_user || null,
         notifications: safeParseJson(raw.user_notifications, raw.user_notifications || {}),
         reuseInviteCode: raw.settings_reuse_code === true || raw.settings_reuse_code === 'true' || raw.settings_reuse_code === 1 || raw.settings_reuse_code === '1',
-        accessSettings: normalizeServiceAccessSettings(safeParseJson(raw.service_access_settings, raw.service_access_settings || DEFAULT_SERVICE_ACCESS_SETTINGS))
+        accessSettings: normalizeServiceAccessSettings(safeParseJson(raw.service_access_settings, raw.service_access_settings || DEFAULT_SERVICE_ACCESS_SETTINGS)),
+        prototypeSlot: normalizePrototypeSlotState(safeParseJson(raw.prototype_slot_state, raw.prototype_slot_state || DEFAULT_PROTOTYPE_SLOT_STATE))
     };
 
     return normalized;
@@ -888,6 +902,7 @@ function createLegacyPayloadFromState(state) {
         user_notifications: state.notifications,
         settings_reuse_code: state.reuseInviteCode,
         service_access_settings: state.accessSettings,
+        prototype_slot_state: state.prototypeSlot,
         __meta: {
             updatedAt: new Date().toISOString()
         }
@@ -1222,6 +1237,9 @@ function applyLegacySyncWrite(key, value) {
         break;
     case 'service_access_settings':
         state.accessSettings = normalizeServiceAccessSettings(safeParseJson(value, DEFAULT_SERVICE_ACCESS_SETTINGS));
+        break;
+    case 'prototype_slot_state':
+        state.prototypeSlot = normalizePrototypeSlotState(safeParseJson(value, DEFAULT_PROTOTYPE_SLOT_STATE));
         break;
     case 'my_ai_directory':
         state.ai.directory = safeParseJson(value, []);
@@ -1891,7 +1909,8 @@ app.get('/api/admin/state', (req, res) => {
         boardCategories: state.board.categories,
         banners: state.banners,
         loginHero: state.loginHero,
-        accessSettings: state.accessSettings
+        accessSettings: state.accessSettings,
+        prototypeSlot: state.prototypeSlot
     });
 });
 
@@ -1900,6 +1919,14 @@ app.get('/api/access-settings', (req, res) => {
     res.json({
         success: true,
         accessSettings: state.accessSettings
+    });
+});
+
+app.get('/api/prototype-slot', (req, res) => {
+    reloadDb();
+    res.json({
+        success: true,
+        prototypeSlot: state.prototypeSlot
     });
 });
 
@@ -1925,6 +1952,16 @@ app.post('/api/admin/access-settings', async (req, res) => {
     res.json({
         success: true,
         accessSettings: state.accessSettings
+    });
+    persistDbInBackground({ deferRemote: true, skipBoardRepair: true });
+});
+
+app.post('/api/admin/prototype-slot', async (req, res) => {
+    reloadDb();
+    state.prototypeSlot = normalizePrototypeSlotState(req.body || {});
+    res.json({
+        success: true,
+        prototypeSlot: state.prototypeSlot
     });
     persistDbInBackground({ deferRemote: true, skipBoardRepair: true });
 });
