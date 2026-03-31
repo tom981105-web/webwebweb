@@ -10,9 +10,11 @@ import { TierSelector } from '@/components/TierSelector';
 import { TopBar } from '@/components/TopBar';
 import { TutorialCard } from '@/components/TutorialCard';
 import { UpgradePanel } from '@/components/UpgradePanel';
+import { buildMetaUpgradeCards, buildUpgradeCards } from '@/game/economy';
+import { getPrestigePreview } from '@/game/offline';
 import { useAutosave } from '@/hooks/useAutosave';
 import { useGameLoop } from '@/hooks/useGameLoop';
-import { useGameStore, useMetaUpgradeCards, usePrestigePreview, useUpgradeCards } from '@/store/gameStore';
+import { useGameStore } from '@/store/gameStore';
 
 type ServiceAccessMode = 'open' | 'admin' | 'maintenance';
 type ServiceAccessSettings = {
@@ -169,12 +171,18 @@ export function App() {
   const selectedTier = useGameStore((state) => state.selectedTier);
   const coins = useGameStore((state) => state.coins);
   const resonanceDust = useGameStore((state) => state.resonanceDust);
+  const upgrades = useGameStore((state) => state.upgrades);
+  const metaUpgradesState = useGameStore((state) => state.metaUpgrades);
   const settings = useGameStore((state) => state.settings);
   const tutorial = useGameStore((state) => state.tutorial);
   const feedbacks = useGameStore((state) => state.feedbacks);
   const offlineSummary = useGameStore((state) => state.offlineSummary);
   const recentResults = useGameStore((state) => state.recentResults);
   const stats = useGameStore((state) => state.stats);
+  const version = useGameStore((state) => state.version);
+  const sessionId = useGameStore((state) => state.sessionId);
+  const lastSavedAt = useGameStore((state) => state.lastSavedAt);
+  const lastOpenedAt = useGameStore((state) => state.lastOpenedAt);
   const moodIndex = useGameStore((state) => state.moodIndex);
   const computed = useGameStore((state) => state.computed);
   const setSelectedTier = useGameStore((state) => state.setSelectedTier);
@@ -190,9 +198,50 @@ export function App() {
   const importSaveString = useGameStore((state) => state.importSaveString);
   const resetProgress = useGameStore((state) => state.resetProgress);
 
-  const upgradeCards = useUpgradeCards();
-  const metaUpgradeCards = useMetaUpgradeCards();
-  const prestigePreview = usePrestigePreview();
+  const upgradeCards = useMemo(
+    () =>
+      buildUpgradeCards({
+        version,
+        coins,
+        resonanceDust,
+        selectedTier,
+        currentPanel,
+        upgrades,
+        metaUpgrades: metaUpgradesState,
+        stats,
+        recentResults,
+        settings,
+        tutorial,
+        sessionId,
+        lastSavedAt,
+        lastOpenedAt,
+      }),
+    [coins, resonanceDust, selectedTier, currentPanel, upgrades, metaUpgradesState, stats, recentResults, settings, tutorial, version, sessionId, lastSavedAt, lastOpenedAt],
+  );
+  const metaUpgradeCards = useMemo(
+    () =>
+      buildMetaUpgradeCards({
+        version,
+        coins,
+        resonanceDust,
+        selectedTier,
+        currentPanel,
+        upgrades,
+        metaUpgrades: metaUpgradesState,
+        stats,
+        recentResults,
+        settings,
+        tutorial,
+        sessionId,
+        lastSavedAt,
+        lastOpenedAt,
+      }),
+    [coins, resonanceDust, selectedTier, currentPanel, upgrades, metaUpgradesState, stats, recentResults, settings, tutorial, version, sessionId, lastSavedAt, lastOpenedAt],
+  );
+  const prestigePreview = useMemo(
+    () => getPrestigePreview(stats.totalCoinsEarned, stats.prestigeCount),
+    [stats.totalCoinsEarned, stats.prestigeCount],
+  );
 
   const [statsOpen, setStatsOpen] = useState(false);
   const [prestigeOpen, setPrestigeOpen] = useState(false);

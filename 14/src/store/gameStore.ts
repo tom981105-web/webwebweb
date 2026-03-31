@@ -6,8 +6,6 @@ import {
   appendLog,
   appendToast,
   applyRewardToStats,
-  buildMetaUpgradeCards,
-  buildUpgradeCards,
   createEmptySave,
   createStarterPanel,
   createTierPanel,
@@ -369,15 +367,3 @@ export const useGameStore = create<StoreState>((set, get) => {
     },
   };
 });
-
-export function useUpgradeCards() {
-  return useGameStore((state) => buildUpgradeCards(state));
-}
-
-export function useMetaUpgradeCards() {
-  return useGameStore((state) => buildMetaUpgradeCards(state));
-}
-
-export function usePrestigePreview() {
-  return useGameStore((state) => getPrestigePreview(state.stats.totalCoinsEarned, state.stats.prestigeCount));
-}
