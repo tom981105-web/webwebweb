@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+  background: #060a14;
+}
+
+body {
+  color: #f8f2e7;
+  font-family: 'Pretendard Variable', 'IBM Plex Sans KR', 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.rg-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(242, 205, 114, 0.36) rgba(255, 255, 255, 0.04);
+}
+
+.rg-scrollbar::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.rg-scrollbar::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(242, 205, 114, 0.3);
+}
+
+.rg-scrollbar::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+}

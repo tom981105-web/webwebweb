@@ -434,6 +434,11 @@
             return apiBase ? `${apiBase}/stock-sim-app/` : 'stock-sim-app/';
         }
 
+        function getRelicSealUrl() {
+            const apiBase = getApiBase();
+            return apiBase ? `${apiBase}/relic-seal-app/` : 'relic-seal-app/';
+        }
+
         const INDEX_SERVICE_ACCESS_DEFAULTS = {
             board: 'open',
             mountain: 'open',
@@ -450,6 +455,12 @@
                 icon: '주식',
                 href: () => getStockSimUrl(),
                 desc: '가상 시장 흐름을 체험하고 종목 변화를 살펴보는 실험형 주식 프로토타입입니다.'
+            },
+            relicSeal: {
+                title: '행운의 서고',
+                icon: '유물',
+                href: () => getRelicSealUrl(),
+                desc: '직접 긁는 손맛과 자동화 성장 루프를 함께 즐기는 스크래치 인크리멘탈 프로토타입입니다.'
             }
         };
         const SERVICE_CARD_META = {

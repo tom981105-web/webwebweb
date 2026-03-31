@@ -54,6 +54,7 @@ app.use((req, res, next) => {
 ensureDataLayout();
 
 const STOCK_SIM_DIST_DIR = path.resolve(APP_DIR, '13', 'dist');
+const RELIC_SEAL_DIST_DIR = path.resolve(APP_DIR, '14', 'dist');
 
 app.use('/stock-sim-app', express.static(STOCK_SIM_DIST_DIR, {
     index: false,
@@ -69,6 +70,22 @@ app.use('/stock-sim-app', express.static(STOCK_SIM_DIST_DIR, {
 app.get(['/stock-sim-app', '/stock-sim-app/'], (req, res) => {
     res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.sendFile(path.join(STOCK_SIM_DIST_DIR, 'index.html'));
+});
+
+app.use('/relic-seal-app', express.static(RELIC_SEAL_DIST_DIR, {
+    index: false,
+    setHeaders(res, filePath) {
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            return;
+        }
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    }
+}));
+
+app.get(['/relic-seal-app', '/relic-seal-app/'], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    res.sendFile(path.join(RELIC_SEAL_DIST_DIR, 'index.html'));
 });
 
 app.use('/uploads', express.static(UPLOADS_DIR));
@@ -131,7 +148,7 @@ function normalizePrototypeSlotState(value) {
     const source = value && typeof value === 'object' ? value : {};
     const hasActiveKey = Object.prototype.hasOwnProperty.call(source, 'activeKey');
     const activeKey = String(hasActiveKey ? source.activeKey : DEFAULT_PROTOTYPE_SLOT_STATE.activeKey).trim();
-    if (activeKey === 'stockSim') {
+    if (activeKey === 'stockSim' || activeKey === 'relicSeal') {
         return { activeKey };
     }
     return { activeKey: '' };

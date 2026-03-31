@@ -725,6 +725,10 @@
             stockSim: {
                 label: '주식장',
                 description: '가상 주식시장 프로토타입을 메인 슬롯에 올립니다.'
+            },
+            relicSeal: {
+                label: '행운의 서고',
+                description: '스크래치 + 자동화 성장형 프로토타입을 메인 슬롯에 올립니다.'
             }
         };
         const serviceAccessPendingModes = {};
@@ -776,14 +780,14 @@
         }
 
         function isPrototypeApplied() {
-            return getPrototypeSlotStateSafe().activeKey === 'stockSim';
+            return Boolean(getPrototypeSlotStateSafe().activeKey);
         }
 
         function normalizePrototypeSlotState(value) {
             const source = value && typeof value === 'object' ? value : {};
             const hasActiveKey = Object.prototype.hasOwnProperty.call(source, 'activeKey');
             const activeKey = String(hasActiveKey ? source.activeKey : 'stockSim').trim();
-            if (activeKey === 'stockSim') {
+            if (activeKey && PROTOTYPE_SLOT_META[activeKey]) {
                 return { activeKey };
             }
             return { activeKey: '' };
@@ -793,7 +797,7 @@
             try {
                 return normalizePrototypeSlotState(JSON.parse(localStorage.getItem(PROTOTYPE_SLOT_STORAGE_KEY) || '{}'));
             } catch (error) {
-                return { activeKey: 'stockSim' };
+                return { activeKey: '' };
             }
         }
 
