@@ -27,7 +27,7 @@ import { clamp } from '@/utils/random';
 export function createEmptySave(): GameSaveState {
   return {
     version: 1,
-    coins: 24,
+    coins: 36,
     resonanceDust: 0,
     selectedTier: 'basic',
     currentPanel: null,
@@ -95,23 +95,23 @@ export function deriveComputedState(state: GameSaveState): GameComputed {
   const autoRevealEnabled = getUpgradeLevel(state, 'autoReveal') > 0;
   const autoLoopEnabled = getUpgradeLevel(state, 'autoLoop') > 0;
   const autoScratchPerSecond =
-    (autoScratchEnabled ? 7.4 : 0) +
-    getUpgradeLevel(state, 'droneRig') * 3.5 +
-    getMetaUpgradeLevel(state, 'awakenedServo') * 1.8;
+    (autoScratchEnabled ? 10.5 : 0) +
+    getUpgradeLevel(state, 'droneRig') * 4.6 +
+    getMetaUpgradeLevel(state, 'awakenedServo') * 2.2;
   const autoBuyIntervalMs = clamp(
-    4200 - getUpgradeLevel(state, 'droneRig') * 220 - getMetaUpgradeLevel(state, 'awakenedServo') * 180,
-    850,
-    4200,
+    3600 - getUpgradeLevel(state, 'droneRig') * 240 - getMetaUpgradeLevel(state, 'awakenedServo') * 220,
+    700,
+    3600,
   );
   const offlineEfficiency = clamp(
-    0.22 + getUpgradeLevel(state, 'offlineLedger') * 0.11 + getMetaUpgradeLevel(state, 'legacyMint') * 0.02,
-    0.22,
+    0.28 + getUpgradeLevel(state, 'offlineLedger') * 0.11 + getMetaUpgradeLevel(state, 'legacyMint') * 0.025,
+    0.28,
     0.94,
   );
   const currentTier = PANEL_TIERS[state.selectedTier];
   const averageReward = currentTier.cost * currentTier.expectedValue * payoutMultiplier;
   const currentCpsEstimate =
-    autoBuyEnabled && autoScratchEnabled ? (1000 / autoBuyIntervalMs) * averageReward * 0.38 : 0;
+    autoBuyEnabled && autoScratchEnabled ? (1000 / autoBuyIntervalMs) * averageReward * 0.48 : 0;
 
   return {
     brushRadius,

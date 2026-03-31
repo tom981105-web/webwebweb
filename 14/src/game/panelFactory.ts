@@ -69,23 +69,23 @@ export function createPanel(tier: PanelTierId, computed: GameComputed, manualDis
     { coin: 0, star: 0, moon: 0, gem: 0, skull: 0, clover: 0, crown: 0, relic: 0 },
   );
 
-  let reward = tierConfig.baseReward * rarityMultiplier * special.modifier * randomBetween(0.92, 1.18);
+  let reward = tierConfig.baseReward * rarityMultiplier * special.modifier * randomBetween(0.96, 1.22);
   const highestMatch = Math.max(...Object.values(counts));
   if (highestMatch >= 4) reward *= 2.85;
   else if (highestMatch === 3) reward *= 1.82;
 
   if (counts.relic >= 1 && counts.crown >= 1) reward *= 1.44;
-  if (counts.clover >= 2) reward *= 1.22;
-  if (counts.gem >= 2) reward *= 1.18;
-  if (counts.moon >= 1 && counts.star >= 1) reward *= 1.12;
-  if (counts.skull >= 1) reward *= Math.max(0.45, 1 - counts.skull * 0.16);
+  if (counts.clover >= 2) reward *= 1.24;
+  if (counts.gem >= 2) reward *= 1.2;
+  if (counts.moon >= 1 && counts.star >= 1) reward *= 1.14;
+  if (counts.skull >= 1) reward *= Math.max(0.58, 1 - counts.skull * 0.12);
 
   reward *= computed.payoutMultiplier;
   const critTriggered = Math.random() < computed.critChance;
   if (critTriggered) reward *= computed.critMultiplier;
   if (highestMatch >= 3 && specialEffectId === 'jackpot') reward *= computed.jackpotMultiplier;
 
-  const finalReward = Math.max(2, Math.floor(reward));
+  const finalReward = Math.max(Math.ceil(tierConfig.cost * 0.52), Math.floor(reward));
   const costPaid = Math.max(0, Math.floor(tierConfig.cost - manualDiscount));
   const comboLabel = buildComboLabel(symbols);
 

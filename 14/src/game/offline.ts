@@ -11,7 +11,7 @@ export function estimateOfflineGain(state: GameSaveState, computed: GameComputed
   const tier = PANEL_TIERS[state.selectedTier];
   const cyclesPerSecond = 1000 / computed.autoBuyIntervalMs;
   const averageReward = Math.max(tier.cost * tier.expectedValue, tier.baseReward);
-  const cps = cyclesPerSecond * averageReward * 0.42 * computed.offlineEfficiency;
+  const cps = cyclesPerSecond * averageReward * 0.5 * computed.offlineEfficiency;
   return { gain: Math.floor(cps * (capped / 1000)), durationMs: capped };
 }
 
