@@ -43,7 +43,8 @@ function normalizeServiceAccessSettings(value: unknown): ServiceAccessSettings {
 
 function normalizePrototypeSlotState(value: unknown): PrototypeSlotState {
   const source = value && typeof value === 'object' ? (value as Partial<PrototypeSlotState>) : {};
-  const activeKey = String(source.activeKey || DEFAULT_PROTOTYPE_SLOT_STATE.activeKey).trim();
+  const hasActiveKey = Object.prototype.hasOwnProperty.call(source, 'activeKey');
+  const activeKey = String(hasActiveKey ? source.activeKey : DEFAULT_PROTOTYPE_SLOT_STATE.activeKey).trim();
   return {
     activeKey: activeKey === 'stockSim' ? activeKey : '',
   };

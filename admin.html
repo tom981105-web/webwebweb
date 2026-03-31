@@ -777,7 +777,8 @@
 
         function normalizePrototypeSlotState(value) {
             const source = value && typeof value === 'object' ? value : {};
-            const activeKey = String(source.activeKey || 'stockSim').trim();
+            const hasActiveKey = Object.prototype.hasOwnProperty.call(source, 'activeKey');
+            const activeKey = String(hasActiveKey ? source.activeKey : 'stockSim').trim();
             if (activeKey === 'stockSim') {
                 return { activeKey };
             }
