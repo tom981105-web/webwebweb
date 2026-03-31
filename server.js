@@ -187,6 +187,27 @@ function normalizeUsers(value) {
     return normalized;
 }
 
+function createBoardCommentId() {
+    return `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeBoardComments(value) {
+    const comments = Array.isArray(value) ? value : [];
+    return comments.map((comment) => {
+        const source = comment && typeof comment === 'object' ? comment : {};
+        const legacyReplies = source.reply && typeof source.reply === 'object' ? [source.reply] : [];
+        const repliesSource = Array.isArray(source.replies) ? source.replies : legacyReplies;
+        return {
+            id: String(source.id || createBoardCommentId()),
+            author: String(source.author || '익명').trim() || '익명',
+            text: String(source.text || ''),
+            date: String(source.date || source.createdAt || ''),
+            editedAt: source.editedAt ? String(source.editedAt) : '',
+            replies: normalizeBoardComments(repliesSource)
+        };
+    });
+}
+
 function normalizeBoardPosts(value, categories) {
     const posts = Array.isArray(value) ? value : [];
     return posts.map((post) => ({
@@ -201,7 +222,7 @@ function normalizeBoardPosts(value, categories) {
         dislikes: Number(post.dislikes || 0),
         isNotice: Boolean(post.isNotice),
         isRich: Boolean(post.isRich),
-        comments: Array.isArray(post.comments) ? post.comments : [],
+        comments: normalizeBoardComments(post.comments),
         category: categories.includes(post.category) ? post.category : categories[0]
     }));
 }

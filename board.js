@@ -858,11 +858,69 @@ function setupCommentStickerPicker() {
         return savedPost;
     }
 
+    function createBoardCommentId() {
+        return `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    }
+
+    function getCommentDomKey(commentId) {
+        return String(commentId || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
+
+    function normalizeCommentNodes(value) {
+        const comments = Array.isArray(value) ? value : [];
+        return comments.map((comment) => {
+            const source = comment && typeof comment === 'object' ? comment : {};
+            const legacyReplies = source.reply && typeof source.reply === 'object' ? [source.reply] : [];
+            const repliesSource = Array.isArray(source.replies) ? source.replies : legacyReplies;
+            return {
+                id: String(source.id || createBoardCommentId()),
+                author: String(source.author || '익명').trim() || '익명',
+                text: String(source.text || ''),
+                date: String(source.date || ''),
+                editedAt: source.editedAt ? String(source.editedAt) : '',
+                replies: normalizeCommentNodes(repliesSource)
+            };
+        });
+    }
+
+    function createCommentNode(author, text) {
+        return {
+            id: createBoardCommentId(),
+            author,
+            text,
+            date: new Date().toLocaleString('ko-KR'),
+            editedAt: '',
+            replies: []
+        };
+    }
+
+    function findCommentNodeById(comments, commentId) {
+        if (!Array.isArray(comments)) return null;
+        for (const comment of comments) {
+            if (String(comment.id) === String(commentId)) {
+                return comment;
+            }
+            const childMatch = findCommentNodeById(comment.replies, commentId);
+            if (childMatch) return childMatch;
+        }
+        return null;
+    }
+
+    function removeCommentNodeById(comments, commentId) {
+        if (!Array.isArray(comments)) return false;
+        const targetIndex = comments.findIndex((comment) => String(comment.id) === String(commentId));
+        if (targetIndex >= 0) {
+            comments.splice(targetIndex, 1);
+            return true;
+        }
+        return comments.some((comment) => removeCommentNodeById(comment.replies, commentId));
+    }
+
     function normalizePost(post) {
         return {
             ...post,
             category: boardCategories.includes(post && post.category) ? post.category : boardCategories[0],
-            comments: Array.isArray(post && post.comments) ? post.comments : []
+            comments: normalizeCommentNodes(post && post.comments)
         };
     }
 
@@ -1061,7 +1119,10 @@ function setupCommentStickerPicker() {
 
     function getCommentCount(post) {
         if (!Array.isArray(post.comments)) return 0;
-        return post.comments.reduce((sum, comment) => sum + 1 + (comment.reply ? 1 : 0), 0);
+        const countNodes = (comments) => comments.reduce((sum, comment) => {
+            return sum + 1 + countNodes(Array.isArray(comment.replies) ? comment.replies : []);
+        }, 0);
+        return countNodes(post.comments);
     }
 
     function getAuthorDisplayName(authorId) {
@@ -1493,129 +1554,107 @@ function setupCommentStickerPicker() {
             commentsList.innerHTML = '<div style="color:#94a3b8; padding:12px 0;">첫 댓글을 남겨보세요.</div>';
             return;
         }
-        post.comments.forEach((comment, index) => {
+
+        const renderNode = (comment, depth = 0) => {
+            const domKey = getCommentDomKey(comment.id);
             const authorChip = renderAuthorWithAvatar(comment.author);
             const commentText = renderCommentRichText(comment.text || '');
             const commentDate = escapeHtml(comment.date || '');
-            const hasReply = Boolean(comment.reply && comment.reply.text);
-            const canReply = Boolean(currentUser && currentUser !== '익명') && !hasReply;
+            const editedDate = comment.editedAt ? ` · 수정 ${escapeHtml(comment.editedAt)}` : '';
+            const canReply = Boolean(currentUser && currentUser !== '익명');
             const canManageComment = currentUser === 'admin' || currentUser === comment.author;
-            const canManageReply = Boolean(comment.reply) && (currentUser === 'admin' || currentUser === comment.reply.author);
-            const item = document.createElement('div');
-            item.className = 'comment-item';
-            item.innerHTML = `
-                <div class="comment-meta">
-                    <div class="c-author">${authorChip}</div>
-                    <div>${commentDate}</div>
-                    <div class="comment-action-group">
-                        ${canReply ? `<button type="button" class="btn-reply" onclick="toggleReplyForm(${index})">답글 달기</button>` : ''}
-                        ${canManageComment ? `<button type="button" class="btn-reply" onclick="toggleCommentEditForm(${index})">수정</button>` : ''}
-                        ${canManageComment ? `<button type="button" class="btn-reply" onclick="deleteComment(${index})">삭제</button>` : ''}
-                    </div>
-                </div>
-                <div class="comment-body">${commentText}</div>
-                ${canReply ? `
-                    <form class="reply-form-container" id="replyForm-${index}" onsubmit="submitReply(event, ${index})">
-                        <input type="text" id="replyInput-${index}" placeholder="답글을 입력해 주세요." autocomplete="off" maxlength="300">
-                        <button type="submit">등록</button>
-                    </form>
-                ` : ''}
-                ${canManageComment ? `
-                    <form class="comment-edit-form" id="commentEditForm-${index}" onsubmit="submitCommentEdit(event, ${index})">
-                        <input type="text" id="commentEditInput-${index}" value="${escapeHtml(comment.text || '')}" autocomplete="off" maxlength="300">
-                        <button type="submit">저장</button>
-                    </form>
-                ` : ''}
-            `;
-            commentsList.appendChild(item);
-            if (comment.reply) {
-                const reply = document.createElement('div');
-                reply.className = 'comment-reply';
-                reply.innerHTML = `
+            const wrapper = document.createElement('div');
+            wrapper.className = 'comment-thread';
+            wrapper.innerHTML = `
+                <div class="${depth > 0 ? 'comment-reply' : 'comment-item'}" style="${depth > 0 ? `margin-left:${Math.min(depth, 5) * 28}px;` : ''}">
                     <div class="comment-meta">
-                        <div class="c-author author-marker">${renderAuthorWithAvatar(comment.reply.author || 'admin')}</div>
-                        <div>${escapeHtml(comment.reply.date || '')}</div>
+                        <div class="c-author ${depth > 0 ? 'author-marker' : ''}">${authorChip}</div>
+                        <div>${commentDate}${editedDate}</div>
                         <div class="comment-action-group">
-                            ${canManageReply ? `<button type="button" class="btn-reply" onclick="toggleReplyEditForm(${index})">수정</button>` : ''}
-                            ${canManageReply ? `<button type="button" class="btn-reply" onclick="deleteReply(${index})">삭제</button>` : ''}
+                            ${canReply ? `<button type="button" class="btn-reply" onclick='toggleReplyForm(${JSON.stringify(comment.id)})'>답글 달기</button>` : ''}
+                            ${canManageComment ? `<button type="button" class="btn-reply" onclick='toggleCommentEditForm(${JSON.stringify(comment.id)})'>수정</button>` : ''}
+                            ${canManageComment ? `<button type="button" class="btn-reply" onclick='deleteComment(${JSON.stringify(comment.id)})'>삭제</button>` : ''}
                         </div>
                     </div>
-                    <div class="comment-body">${renderCommentRichText(comment.reply.text || '')}</div>
-                    ${canManageReply ? `
-                        <form class="reply-edit-form" id="replyEditForm-${index}" onsubmit="submitReplyEdit(event, ${index})">
-                            <input type="text" id="replyEditInput-${index}" value="${escapeHtml(comment.reply.text || '')}" autocomplete="off" maxlength="300">
+                    <div class="comment-body">${commentText}</div>
+                    ${canReply ? `
+                        <form class="reply-form-container" id="replyForm-${domKey}" onsubmit='submitReply(event, ${JSON.stringify(comment.id)})'>
+                            <textarea id="replyInput-${domKey}" placeholder="답글을 입력해 주세요." autocomplete="off" rows="3" maxlength="5000"></textarea>
+                            <button type="submit">등록</button>
+                        </form>
+                    ` : ''}
+                    ${canManageComment ? `
+                        <form class="comment-edit-form" id="commentEditForm-${domKey}" onsubmit='submitCommentEdit(event, ${JSON.stringify(comment.id)})'>
+                            <textarea id="commentEditInput-${domKey}" autocomplete="off" rows="3" maxlength="5000">${escapeHtml(comment.text || '')}</textarea>
                             <button type="submit">저장</button>
                         </form>
                     ` : ''}
-                `;
-                commentsList.appendChild(reply);
-            }
+                </div>
+            `;
+
+            const replies = Array.isArray(comment.replies) ? comment.replies : [];
+            replies.forEach((reply) => {
+                wrapper.appendChild(renderNode(reply, depth + 1));
+            });
+            return wrapper;
+        };
+
+        post.comments.forEach((comment) => {
+            commentsList.appendChild(renderNode(comment, 0));
         });
     }
 
-    window.toggleReplyForm = function (index) {
-        const targetForm = document.getElementById(`replyForm-${index}`);
+    window.toggleReplyForm = function (commentId) {
+        const domKey = getCommentDomKey(commentId);
+        const targetForm = document.getElementById(`replyForm-${domKey}`);
         if (!targetForm) return;
 
         document.querySelectorAll('.reply-form-container').forEach((form) => {
-            if (form !== targetForm) {
-                form.style.display = 'none';
-            }
+            if (form !== targetForm) form.style.display = 'none';
         });
 
         targetForm.style.display = targetForm.style.display === 'flex' ? 'none' : 'flex';
         if (targetForm.style.display === 'flex') {
-            const input = document.getElementById(`replyInput-${index}`);
+            const input = document.getElementById(`replyInput-${domKey}`);
             if (input) input.focus();
         }
     };
 
-    window.toggleCommentEditForm = function (index) {
-        const targetForm = document.getElementById(`commentEditForm-${index}`);
+    window.toggleCommentEditForm = function (commentId) {
+        const domKey = getCommentDomKey(commentId);
+        const targetForm = document.getElementById(`commentEditForm-${domKey}`);
         if (!targetForm) return;
         document.querySelectorAll('.comment-edit-form').forEach((form) => {
             if (form !== targetForm) form.style.display = 'none';
         });
         targetForm.style.display = targetForm.style.display === 'flex' ? 'none' : 'flex';
         if (targetForm.style.display === 'flex') {
-            const input = document.getElementById(`commentEditInput-${index}`);
+            const input = document.getElementById(`commentEditInput-${domKey}`);
             if (input) input.focus();
         }
     };
 
-    window.toggleReplyEditForm = function (index) {
-        const targetForm = document.getElementById(`replyEditForm-${index}`);
-        if (!targetForm) return;
-        document.querySelectorAll('.reply-edit-form').forEach((form) => {
-            if (form !== targetForm) form.style.display = 'none';
-        });
-        targetForm.style.display = targetForm.style.display === 'flex' ? 'none' : 'flex';
-        if (targetForm.style.display === 'flex') {
-            const input = document.getElementById(`replyEditInput-${index}`);
-            if (input) input.focus();
-        }
-    };
+    window.toggleReplyEditForm = window.toggleCommentEditForm;
 
-    window.submitReply = async function (event, index) {
+    window.submitReply = async function (event, commentId) {
         event.preventDefault();
         if (!ensureBoardReady() || !currentOpenPostId || !currentUser || currentUser === '익명') return;
 
-        const input = document.getElementById(`replyInput-${index}`);
+        const domKey = getCommentDomKey(commentId);
+        const input = document.getElementById(`replyInput-${domKey}`);
         const text = input ? input.value.trim() : '';
         if (!text) return;
 
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
-        if (!post || !Array.isArray(post.comments) || !post.comments[index]) return;
+        const targetComment = post ? findCommentNodeById(post.comments, commentId) : null;
+        if (!post || !targetComment) return;
         const previousPost = JSON.parse(JSON.stringify(post));
 
-        post.comments[index].reply = {
-            author: currentUser,
-            text,
-            date: new Date().toLocaleString('ko-KR')
-        };
+        targetComment.replies = Array.isArray(targetComment.replies) ? targetComment.replies : [];
+        targetComment.replies.push(createCommentNode(currentUser, text));
 
-        if (typeof window.createUserNotification === 'function' && post.comments[index].author && post.comments[index].author !== currentUser) {
-            window.createUserNotification(post.comments[index].author, {
+        if (typeof window.createUserNotification === 'function' && targetComment.author && targetComment.author !== currentUser) {
+            window.createUserNotification(targetComment.author, {
                 type: 'reply',
                 title: '댓글에 새 답글이 도착했습니다.',
                 message: `"${post.title || '게시글'}" 댓글에 ${getAuthorDisplayName(currentUser)}님이 답글을 남겼습니다.`,
@@ -1637,14 +1676,14 @@ function setupCommentStickerPicker() {
         updateDetailNavigation(post.id);
     };
 
-    window.submitCommentEdit = async function (event, index) {
+    window.submitCommentEdit = async function (event, commentId) {
         event.preventDefault();
         if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
-        if (!post || !post.comments[index]) return;
-        const targetComment = post.comments[index];
+        const targetComment = post ? findCommentNodeById(post.comments, commentId) : null;
+        if (!post || !targetComment) return;
         if (currentUser !== 'admin' && currentUser !== targetComment.author) return;
-        const input = document.getElementById(`commentEditInput-${index}`);
+        const input = document.getElementById(`commentEditInput-${getCommentDomKey(commentId)}`);
         const text = input ? input.value.trim() : '';
         if (!text) return;
         const previousPost = JSON.parse(JSON.stringify(post));
@@ -1663,39 +1702,17 @@ function setupCommentStickerPicker() {
         updateDetailNavigation(post.id);
     };
 
-    window.submitReplyEdit = async function (event, index) {
-        event.preventDefault();
-        if (!ensureBoardReady() || !currentOpenPostId) return;
-        const post = boardPosts.find((item) => item.id === currentOpenPostId);
-        if (!post || !post.comments[index] || !post.comments[index].reply) return;
-        if (currentUser !== 'admin' && currentUser !== post.comments[index].reply.author) return;
-        const input = document.getElementById(`replyEditInput-${index}`);
-        const text = input ? input.value.trim() : '';
-        if (!text) return;
-        const previousPost = JSON.parse(JSON.stringify(post));
-        post.comments[index].reply.text = text;
-        post.comments[index].reply.editedAt = new Date().toLocaleString('ko-KR');
-        try {
-            replaceBoardPost(await persistExistingPost(post));
-        } catch (error) {
-            replaceBoardPost(previousPost);
-            alert(error.message || '답글 수정에 실패했습니다.');
-            return;
-        }
-        savePosts();
-        renderComments(boardPosts.find((item) => item.id === currentOpenPostId));
-        renderBoard(currentSearchType, currentSearchQuery);
-        updateDetailNavigation(post.id);
-    };
+    window.submitReplyEdit = window.submitCommentEdit;
 
-    window.deleteComment = async function (index) {
+    window.deleteComment = async function (commentId) {
         if (!ensureBoardReady() || !currentOpenPostId) return;
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
-        if (!post || !post.comments[index]) return;
-        if (currentUser !== 'admin' && currentUser !== post.comments[index].author) return;
+        const targetComment = post ? findCommentNodeById(post.comments, commentId) : null;
+        if (!post || !targetComment) return;
+        if (currentUser !== 'admin' && currentUser !== targetComment.author) return;
         if (!confirm('이 댓글을 삭제하시겠습니까?')) return;
         const previousPost = JSON.parse(JSON.stringify(post));
-        post.comments.splice(index, 1);
+        removeCommentNodeById(post.comments, commentId);
         try {
             replaceBoardPost(await persistExistingPost(post));
         } catch (error) {
@@ -1709,26 +1726,7 @@ function setupCommentStickerPicker() {
         updateDetailNavigation(post.id);
     };
 
-    window.deleteReply = async function (index) {
-        if (!ensureBoardReady() || !currentOpenPostId) return;
-        const post = boardPosts.find((item) => item.id === currentOpenPostId);
-        if (!post || !post.comments[index] || !post.comments[index].reply) return;
-        if (currentUser !== 'admin' && currentUser !== post.comments[index].reply.author) return;
-        if (!confirm('이 답글을 삭제하시겠습니까?')) return;
-        const previousPost = JSON.parse(JSON.stringify(post));
-        delete post.comments[index].reply;
-        try {
-            replaceBoardPost(await persistExistingPost(post));
-        } catch (error) {
-            replaceBoardPost(previousPost);
-            alert(error.message || '답글 삭제에 실패했습니다.');
-            return;
-        }
-        savePosts();
-        renderComments(boardPosts.find((item) => item.id === currentOpenPostId));
-        renderBoard(currentSearchType, currentSearchQuery);
-        updateDetailNavigation(post.id);
-    };
+    window.deleteReply = window.deleteComment;
 
     window.openPostDetail = function (id) {
         if (!ensureBoardReady()) return;
@@ -1895,8 +1893,8 @@ document.getElementById('commentForm').onsubmit = async function (event) {
     const post = boardPosts.find((item) => item.id === currentOpenPostId);
     if (!post) return;
     const previousPost = JSON.parse(JSON.stringify(post));
-    post.comments = Array.isArray(post.comments) ? post.comments : [];
-    post.comments.push({ author: currentUser, text, date: new Date().toLocaleString('ko-KR') });
+    post.comments = normalizeCommentNodes(post.comments);
+    post.comments.push(createCommentNode(currentUser, text));
         if (typeof window.createUserNotification === 'function' && post.author && post.author !== currentUser) {
             window.createUserNotification(post.author, {
                 type: 'comment',

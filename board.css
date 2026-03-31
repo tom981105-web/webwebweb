@@ -344,9 +344,13 @@ body {
 .search-box select,
 .search-box input,
 .comment-form input,
+.comment-form textarea,
 .title-input,
 .category-select,
-.reply-form-container input {
+.reply-form-container input,
+.reply-form-container textarea,
+.comment-edit-form textarea,
+.reply-edit-form textarea {
     font: inherit;
 }
 
@@ -698,8 +702,10 @@ body {
 
 .title-input,
 .comment-form input,
+.comment-form textarea,
 .category-select,
-.reply-form-container input {
+.reply-form-container input,
+.reply-form-container textarea {
     width: 100%;
     min-height: 54px;
     padding: 0 18px;
@@ -712,8 +718,12 @@ body {
 
 .title-input:focus,
 .comment-form input:focus,
+.comment-form textarea:focus,
 .category-select:focus,
-.reply-form-container input:focus {
+.reply-form-container input:focus,
+.reply-form-container textarea:focus,
+.comment-edit-form textarea:focus,
+.reply-edit-form textarea:focus {
     border-color: rgba(159, 79, 46, 0.48);
     box-shadow: 0 0 0 4px rgba(159, 79, 46, 0.08);
 }
@@ -798,6 +808,16 @@ body {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+}
+
+.comment-form textarea,
+.reply-form-container textarea,
+.comment-edit-form textarea,
+.reply-edit-form textarea {
+    min-height: 108px;
+    padding: 14px 18px;
+    resize: vertical;
+    line-height: 1.6;
 }
 
 .comment-form-has-sticker {
@@ -1063,6 +1083,12 @@ body {
     background: rgba(244, 236, 225, 0.96);
 }
 
+.comment-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
 .comment-meta {
     justify-content: flex-start;
     flex-wrap: wrap;
@@ -1119,7 +1145,9 @@ body {
 }
 
 .comment-edit-form input,
-.reply-edit-form input {
+.reply-edit-form input,
+.comment-edit-form textarea,
+.reply-edit-form textarea {
     width: 100%;
     min-height: 54px;
     padding: 0 18px;
@@ -1131,7 +1159,9 @@ body {
 }
 
 .comment-edit-form input:focus,
-.reply-edit-form input:focus {
+.reply-edit-form input:focus,
+.comment-edit-form textarea:focus,
+.reply-edit-form textarea:focus {
     border-color: rgba(159, 79, 46, 0.48);
     box-shadow: 0 0 0 4px rgba(159, 79, 46, 0.08);
 }
