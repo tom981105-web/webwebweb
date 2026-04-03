@@ -19,6 +19,10 @@
         }
     }
 
+    function clampNumber(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+    }
+
     let boardPosts = safeParse(localStorage.getItem('board_posts') || '[]', []);
     const currentUser = localStorage.getItem('current_user') || '익명';
     let currentOpenPostId = null;
@@ -438,6 +442,100 @@
         if (window.location.protocol !== 'file:') return content;
         return content.replace(/(["'])\/uploads\/([^"')\s>]+)\1/gi, (match, quote, pathValue) => {
             return `${quote}${getApiBase()}/uploads/${pathValue}${quote}`;
+        });
+    }
+
+    function readPixelValue(value) {
+        const rawValue = String(value || '').trim();
+        if (!rawValue || /min\(|max\(|calc\(/i.test(rawValue)) return NaN;
+        const parsed = Number.parseFloat(rawValue.replace(/px$/i, ''));
+        return Number.isFinite(parsed) ? parsed : NaN;
+    }
+
+    function getImageContainer(target) {
+        return target ? target.closest('#richEditor, #detailContent, .post-detail-body') : null;
+    }
+
+    function getImageContainerWidth(target) {
+        const container = getImageContainer(target);
+        return Math.max(220, container ? container.clientWidth : 860);
+    }
+
+    function getStoredImageWidth(target, fallbackWidth = 820) {
+        if (!target) return fallbackWidth;
+        const containerWidth = getImageContainerWidth(target);
+        const dataWidth = Number.parseFloat(target.dataset.imageWidth || '');
+        const styleWidth = readPixelValue(target.style.width);
+        const rectWidth = target.getBoundingClientRect ? target.getBoundingClientRect().width : NaN;
+        const width = Number.isFinite(dataWidth)
+            ? dataWidth
+            : Number.isFinite(styleWidth)
+                ? styleWidth
+                : Number.isFinite(rectWidth) && rectWidth > 0
+                    ? rectWidth
+                    : Math.min(containerWidth, fallbackWidth);
+        return clampNumber(width, 140, containerWidth);
+    }
+
+    function getStoredImagePosition(target, width) {
+        if (!target) return 50;
+        const containerWidth = getImageContainerWidth(target);
+        const dataPosition = Number.parseFloat(target.dataset.imagePosition || '');
+        if (Number.isFinite(dataPosition)) {
+            return clampNumber(dataPosition, 0, 100);
+        }
+
+        const marginLeft = readPixelValue(target.style.marginLeft);
+        const available = Math.max(0, containerWidth - width);
+        if (Number.isFinite(marginLeft) && available > 0) {
+            return clampNumber((marginLeft / available) * 100, 0, 100);
+        }
+
+        return 50;
+    }
+
+    function applyEditorImageLayout(target, options = {}) {
+        if (!target) return;
+
+        const containerWidth = options.containerWidth || getImageContainerWidth(target);
+        const width = clampNumber(
+            Number.isFinite(options.width) ? options.width : getStoredImageWidth(target),
+            140,
+            containerWidth
+        );
+        const position = clampNumber(
+            Number.isFinite(options.position) ? options.position : getStoredImagePosition(target, width),
+            0,
+            100
+        );
+        const available = Math.max(0, containerWidth - width);
+        const marginLeft = available * (position / 100);
+
+        target.dataset.imageWidth = String(Math.round(width));
+        target.dataset.imagePosition = String(Math.round(position));
+        target.classList.add('editor-inline-image');
+        target.style.width = `${Math.round(width)}px`;
+        target.style.maxWidth = '100%';
+        target.style.height = 'auto';
+        target.style.display = 'block';
+        target.style.borderRadius = '8px';
+        target.style.marginTop = '18px';
+        target.style.marginBottom = '18px';
+        target.style.marginLeft = `${Math.round(marginLeft)}px`;
+        target.style.marginRight = '0';
+        target.style.objectFit = 'contain';
+    }
+
+    function applyContentImageLayouts(container) {
+        if (!container) return;
+        container.querySelectorAll('img').forEach((img) => {
+            applyEditorImageLayout(img, {
+                containerWidth: container.clientWidth || getImageContainerWidth(img)
+            });
+            img.classList.remove('selected-editor-image');
+            img.style.outline = '';
+            img.style.boxShadow = '';
+            img.style.cursor = 'default';
         });
     }
 
@@ -926,32 +1024,92 @@ function setupCommentStickerPicker() {
 
     function clearSelectedEditorImage() {
         if (selectedEditorImage) {
+            selectedEditorImage.classList.remove('selected-editor-image');
             selectedEditorImage.style.outline = '';
             selectedEditorImage.style.boxShadow = '';
         }
         selectedEditorImage = null;
         const resizeControls = document.getElementById('editorImageResizeControls');
         if (resizeControls) resizeControls.style.display = 'none';
+        updateEditorImageControlState();
     }
 
     function selectEditorImage(img) {
         clearSelectedEditorImage();
         selectedEditorImage = img;
+        applyEditorImageLayout(selectedEditorImage);
+        selectedEditorImage.classList.add('selected-editor-image');
         selectedEditorImage.style.outline = '2px solid #60a5fa';
         selectedEditorImage.style.boxShadow = '0 0 0 4px rgba(96, 165, 250, 0.2)';
         const resizeControls = document.getElementById('editorImageResizeControls');
         if (resizeControls) resizeControls.style.display = 'inline-flex';
+        updateEditorImageControlState();
     }
 
     function adjustSelectedEditorImage(delta) {
         if (!selectedEditorImage) return;
-        const editorWidth = document.getElementById('richEditor').clientWidth || 860;
-        const currentWidth = selectedEditorImage.getBoundingClientRect().width || 680;
-        const nextWidth = Math.max(140, Math.min(editorWidth, currentWidth + delta));
-        selectedEditorImage.style.width = `${nextWidth}px`;
-        selectedEditorImage.style.maxWidth = '100%';
-        selectedEditorImage.style.height = 'auto';
+        const editorWidth = getImageContainerWidth(selectedEditorImage);
+        const currentWidth = getStoredImageWidth(selectedEditorImage);
+        const nextWidth = clampNumber(currentWidth + delta, 140, editorWidth);
+        applyEditorImageLayout(selectedEditorImage, { width: nextWidth });
+        updateEditorImageControlState();
         queueBoardDraftSave();
+    }
+
+    function setSelectedEditorImageWidth(width) {
+        if (!selectedEditorImage) return;
+        const editorWidth = getImageContainerWidth(selectedEditorImage);
+        applyEditorImageLayout(selectedEditorImage, {
+            width: clampNumber(width, 140, editorWidth)
+        });
+        updateEditorImageControlState();
+        queueBoardDraftSave();
+    }
+
+    function setSelectedEditorImagePosition(position) {
+        if (!selectedEditorImage) return;
+        applyEditorImageLayout(selectedEditorImage, {
+            position: clampNumber(position, 0, 100)
+        });
+        updateEditorImageControlState();
+        queueBoardDraftSave();
+    }
+
+    function nudgeSelectedEditorImagePosition(delta) {
+        if (!selectedEditorImage) return;
+        const currentPosition = getStoredImagePosition(selectedEditorImage, getStoredImageWidth(selectedEditorImage));
+        setSelectedEditorImagePosition(currentPosition + delta);
+    }
+
+    function updateEditorImageControlState() {
+        const controls = document.getElementById('editorImageResizeControls');
+        const widthSlider = document.getElementById('editorImageWidthSlider');
+        const widthValue = document.getElementById('editorImageWidthValue');
+        const positionSlider = document.getElementById('editorImagePositionSlider');
+        const alignButtons = document.querySelectorAll('[data-image-align]');
+
+        if (!controls || !widthSlider || !widthValue || !positionSlider) return;
+
+        if (!selectedEditorImage) {
+            controls.style.display = 'none';
+            widthSlider.value = '820';
+            widthValue.textContent = '선택 없음';
+            positionSlider.value = '50';
+            alignButtons.forEach((button) => button.classList.remove('is-active'));
+            return;
+        }
+
+        const width = Math.round(getStoredImageWidth(selectedEditorImage));
+        const position = Math.round(getStoredImagePosition(selectedEditorImage, width));
+        const editorWidth = getImageContainerWidth(selectedEditorImage);
+        widthSlider.max = String(Math.max(220, Math.round(editorWidth)));
+        widthSlider.value = String(clampNumber(width, 140, editorWidth));
+        widthValue.textContent = `${width}px`;
+        positionSlider.value = String(position);
+        alignButtons.forEach((button) => {
+            const value = Number(button.getAttribute('data-image-align'));
+            button.classList.toggle('is-active', Math.abs(value - position) <= 3);
+        });
     }
 
     function focusEditorForInsertion() {
@@ -976,16 +1134,45 @@ function setupCommentStickerPicker() {
         if (!toolbar || document.getElementById('editorImageResizeControls')) return;
         const controls = document.createElement('div');
         controls.id = 'editorImageResizeControls';
+        controls.className = 'editor-image-controls';
         controls.style.display = 'none';
-        controls.style.gap = '8px';
-        controls.style.alignItems = 'center';
         controls.innerHTML = `
-            <button type="button" class="tool-btn" id="shrinkEditorImageBtn" title="이미지 줄이기">-</button>
-            <button type="button" class="tool-btn" id="growEditorImageBtn" title="이미지 키우기">+</button>
+            <div class="editor-image-controls__group">
+                <span class="editor-image-controls__label">크기</span>
+                <button type="button" class="tool-btn" id="shrinkEditorImageBtn" title="이미지 줄이기">-</button>
+                <input type="range" id="editorImageWidthSlider" min="140" max="960" step="10" value="820">
+                <button type="button" class="tool-btn" id="growEditorImageBtn" title="이미지 키우기">+</button>
+                <span class="editor-image-controls__value" id="editorImageWidthValue">선택 없음</span>
+            </div>
+            <div class="editor-image-controls__group">
+                <span class="editor-image-controls__label">위치</span>
+                <div class="editor-image-align-buttons">
+                    <button type="button" class="tool-btn tool-btn--compact" data-image-align="0">왼쪽</button>
+                    <button type="button" class="tool-btn tool-btn--compact" data-image-align="50">가운데</button>
+                    <button type="button" class="tool-btn tool-btn--compact" data-image-align="100">오른쪽</button>
+                </div>
+                <button type="button" class="tool-btn tool-btn--compact" id="nudgeEditorImageLeftBtn" title="왼쪽으로 이동">←</button>
+                <input type="range" id="editorImagePositionSlider" min="0" max="100" step="1" value="50">
+                <button type="button" class="tool-btn tool-btn--compact" id="nudgeEditorImageRightBtn" title="오른쪽으로 이동">→</button>
+            </div>
         `;
         toolbar.appendChild(controls);
         document.getElementById('shrinkEditorImageBtn').onclick = () => adjustSelectedEditorImage(-60);
         document.getElementById('growEditorImageBtn').onclick = () => adjustSelectedEditorImage(60);
+        document.getElementById('editorImageWidthSlider').oninput = (event) => {
+            setSelectedEditorImageWidth(Number(event.target.value));
+        };
+        document.getElementById('editorImagePositionSlider').oninput = (event) => {
+            setSelectedEditorImagePosition(Number(event.target.value));
+        };
+        document.getElementById('nudgeEditorImageLeftBtn').onclick = () => nudgeSelectedEditorImagePosition(-8);
+        document.getElementById('nudgeEditorImageRightBtn').onclick = () => nudgeSelectedEditorImagePosition(8);
+        controls.querySelectorAll('[data-image-align]').forEach((button) => {
+            button.addEventListener('click', () => {
+                setSelectedEditorImagePosition(Number(button.getAttribute('data-image-align')));
+            });
+        });
+        updateEditorImageControlState();
     }
 
     function bindEditorImages() {
@@ -993,9 +1180,10 @@ function setupCommentStickerPicker() {
         if (!editor) return;
 
         editor.querySelectorAll('img').forEach((img) => {
+            applyEditorImageLayout(img, {
+                containerWidth: editor.clientWidth || getImageContainerWidth(img)
+            });
             img.style.cursor = 'pointer';
-            img.style.maxWidth = '100%';
-            img.style.height = 'auto';
             img.onclick = (event) => {
                 event.preventDefault();
                 event.stopPropagation();
@@ -1015,10 +1203,12 @@ function setupCommentStickerPicker() {
                 selectEditorImage(img);
                 isResizingImage = true;
                 resizeStartX = event.clientX;
-                resizeStartWidth = img.getBoundingClientRect().width;
+                resizeStartWidth = getStoredImageWidth(img);
                 document.body.style.userSelect = 'none';
             };
         });
+
+        updateEditorImageControlState();
     }
 
     async function insertInlineImage(file) {
@@ -1027,10 +1217,21 @@ function setupCommentStickerPicker() {
             ? `${getApiBase()}${imageUrl}`
             : imageUrl;
         focusEditorForInsertion();
-        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" style="max-width:100%; width:min(100%, 820px); height:auto; border-radius:8px; margin:15px auto; display:block;">`;
+        const editor = document.getElementById('richEditor');
+        const editorWidth = editor ? editor.clientWidth || 860 : 860;
+        const initialWidth = Math.min(editorWidth, 820);
+        const html = `<img src="${displayUrl}" data-upload-path="${imageUrl}" data-image-width="${Math.round(initialWidth)}" data-image-position="50" style="width:${Math.round(initialWidth)}px; max-width:100%; height:auto; border-radius:8px; margin:18px auto; display:block;">`;
         document.execCommand('insertHTML', false, html);
-        bindEditorImages();
-        queueBoardDraftSave();
+        window.requestAnimationFrame(() => {
+            bindEditorImages();
+            const insertedImage = [...(editor ? editor.querySelectorAll('img') : [])]
+                .reverse()
+                .find((img) => img.dataset.uploadPath === imageUrl || img.getAttribute('src') === displayUrl);
+            if (insertedImage) {
+                selectEditorImage(insertedImage);
+            }
+            queueBoardDraftSave();
+        });
     }
 
     function extractYoutubeVideoId(value) {
@@ -1754,6 +1955,7 @@ function setupCommentStickerPicker() {
         document.getElementById('detailContent').innerHTML = post.isRich
             ? linkifyRichHtml(post.content || '')
             : linkifyRichHtml(escapeHtml(post.content || '').replace(/\n/g, '<br>'));
+        applyContentImageLayouts(document.getElementById('detailContent'));
         document.getElementById('authorActions').style.display = post.author === currentUser || currentUser === 'admin' ? 'flex' : 'none';
         updateVoteUI(post);
         renderComments(post);
@@ -1960,17 +2162,22 @@ document.getElementById('richEditor').addEventListener('click', (event) => {
     document.addEventListener('mousemove', (event) => {
         if (!isResizingImage || !selectedEditorImage) return;
         const deltaX = event.clientX - resizeStartX;
-        const editorWidth = document.getElementById('richEditor').clientWidth;
-        const nextWidth = Math.max(120, Math.min(editorWidth, resizeStartWidth + deltaX));
-        selectedEditorImage.style.width = `${nextWidth}px`;
-        selectedEditorImage.style.maxWidth = '100%';
-        selectedEditorImage.style.height = 'auto';
+        const editorWidth = getImageContainerWidth(selectedEditorImage);
+        const nextWidth = clampNumber(resizeStartWidth + deltaX, 140, editorWidth);
+        applyEditorImageLayout(selectedEditorImage, { width: nextWidth });
+        updateEditorImageControlState();
     });
 
     document.addEventListener('mouseup', () => {
         if (!isResizingImage) return;
         isResizingImage = false;
         document.body.style.userSelect = '';
+        queueBoardDraftSave();
+    });
+
+    window.addEventListener('resize', () => {
+        bindEditorImages();
+        applyContentImageLayouts(document.getElementById('detailContent'));
     });
 
     window.deleteCurrentPost = function () {
