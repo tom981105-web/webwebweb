@@ -246,6 +246,8 @@ function getServiceGateForPath(pathname) {
     if (normalizedPath.includes('mountain.html')) return { key: 'mountain', label: '등산' };
     if (normalizedPath.includes('ai.html')) return { key: 'ai', label: 'AI' };
     if (normalizedPath.includes('/stock-sim-app')) return { key: 'stockSim', label: '주식장' };
+    if (normalizedPath.includes('/probability-forge-app')) return { key: 'stockSim', label: '확률조작게임' };
+    if (normalizedPath.includes('/auto-pvp-app')) return { key: 'stockSim', label: 'Auto PvP' };
     return null;
 }
 

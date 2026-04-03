@@ -1,0 +1,451 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --ap-bg: #08111c;
+  --ap-surface: rgba(16, 27, 45, 0.84);
+  --ap-surface-strong: rgba(20, 35, 56, 0.94);
+  --ap-line: rgba(140, 178, 223, 0.16);
+  --ap-text: #f3f7fb;
+  --ap-muted: #9ab0c8;
+  --ap-accent: #69c9ff;
+  --ap-gold: #f4c971;
+  --ap-mint: #7fe3c8;
+  --ap-rose: #ff7394;
+  --ap-shadow: 0 32px 80px rgba(2, 10, 24, 0.42);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  margin: 0;
+  background:
+    radial-gradient(circle at top left, rgba(105, 201, 255, 0.16), transparent 28%),
+    radial-gradient(circle at 80% 0%, rgba(244, 201, 113, 0.12), transparent 22%),
+    linear-gradient(180deg, #08111c 0%, #0d1828 50%, #07101a 100%);
+}
+
+body {
+  color: var(--ap-text);
+  font-family: 'Pretendard', 'Pretendard Variable', 'IBM Plex Sans KR', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+a {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.ap-shell {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+
+.ap-topbar,
+.ap-nav,
+.ap-card,
+.ap-blocked-card {
+  border: 1px solid var(--ap-line);
+  background: var(--ap-surface);
+  box-shadow: var(--ap-shadow);
+  backdrop-filter: blur(16px);
+}
+
+.ap-topbar,
+.ap-nav {
+  border-radius: 28px;
+}
+
+.ap-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: end;
+  padding: 28px;
+}
+
+.ap-topbar h1,
+.ap-blocked-card h1 {
+  margin: 6px 0;
+  font-family: 'Sora', 'Pretendard', sans-serif;
+  font-size: clamp(2rem, 4vw, 3.3rem);
+}
+
+.ap-topbar span,
+.ap-card-subtitle,
+.ap-blocked-card p,
+.ap-character-card p,
+.ap-equipment-item p,
+.ap-mission-card p,
+.ap-report-card p,
+.ap-growth-item span,
+.ap-extension-card p {
+  color: var(--ap-muted);
+}
+
+.ap-kicker {
+  margin: 0;
+  color: var(--ap-gold);
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.ap-profile-chip {
+  min-width: 220px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ap-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px;
+  margin-top: 16px;
+}
+
+.ap-nav-button,
+.ap-button,
+.ap-tab-button {
+  border: 1px solid var(--ap-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ap-text);
+  border-radius: 16px;
+  transition: 160ms ease;
+}
+
+.ap-nav-button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 16px;
+}
+
+.ap-nav-button.is-active,
+.ap-tab-button.is-active,
+.ap-button-primary {
+  background: linear-gradient(135deg, rgba(105, 201, 255, 0.24), rgba(127, 227, 200, 0.18));
+  border-color: rgba(105, 201, 255, 0.44);
+}
+
+.ap-main {
+  margin-top: 20px;
+}
+
+.ap-view-grid,
+.ap-dashboard-columns,
+.ap-two-column,
+.ap-hero-grid,
+.ap-equipment-summary,
+.ap-stat-grid,
+.ap-currency-grid,
+.ap-metric-grid,
+.ap-extension-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.ap-view-grid,
+.ap-dashboard-columns {
+  grid-template-columns: 1.6fr 1fr 1fr;
+}
+
+.ap-two-column,
+.ap-hero-grid,
+.ap-equipment-summary,
+.ap-extension-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ap-stat-grid,
+.ap-currency-grid,
+.ap-metric-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ap-card {
+  border-radius: 28px;
+  padding: 22px;
+}
+
+.ap-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.ap-card-title {
+  margin: 6px 0 4px;
+  font-size: 1.35rem;
+}
+
+.ap-card-subtitle {
+  margin: 0;
+  font-size: 0.94rem;
+}
+
+.ap-hero-card {
+  grid-column: 1 / -1;
+}
+
+.ap-result-panel,
+.ap-highlight-panel,
+.ap-analysis-box,
+.ap-equip-panel,
+.ap-extension-card,
+.ap-slot-card,
+.ap-character-card,
+.ap-report-card,
+.ap-mission-card,
+.ap-feed-item,
+.ap-equipment-item,
+.ap-growth-item,
+.ap-metric-item,
+.ap-currency-item,
+.ap-blocked-card,
+.ap-profile-chip {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ap-result-panel,
+.ap-highlight-panel,
+.ap-analysis-box,
+.ap-equip-panel,
+.ap-extension-card,
+.ap-feed-item,
+.ap-report-card,
+.ap-mission-card,
+.ap-equipment-item,
+.ap-growth-item,
+.ap-metric-item,
+.ap-currency-item {
+  padding: 16px;
+}
+
+.ap-result-stats,
+.ap-result-footer,
+.ap-report-metrics,
+.ap-ranking-row,
+.ap-equipped-row,
+.ap-inline-line,
+.ap-inline-actions,
+.ap-hero-actions,
+.ap-equipment-actions,
+.ap-feed-header,
+.ap-result-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ap-result-stats > div,
+.ap-result-footer > div,
+.ap-report-metrics > div {
+  min-width: 120px;
+}
+
+.ap-result-stats span,
+.ap-result-footer span,
+.ap-report-metrics span,
+.ap-metric-item span,
+.ap-currency-item span,
+.ap-equipped-row span {
+  display: block;
+  color: var(--ap-muted);
+  font-size: 0.82rem;
+}
+
+.ap-stack,
+.ap-growth-list,
+.ap-report-feed,
+.ap-report-list,
+.ap-mission-list,
+.ap-equipment-list,
+.ap-team-roster,
+.ap-token-list,
+.ap-feed-log,
+.ap-compact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ap-compact-list,
+.ap-token-list,
+.ap-feed-log {
+  padding-left: 0;
+  list-style: none;
+  margin: 0;
+}
+
+.ap-compact-list li,
+.ap-ranking-row,
+.ap-token-list li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ap-character-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ap-character-card,
+.ap-growth-item {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  text-align: left;
+}
+
+.ap-character-card.is-active,
+.ap-slot-card.is-active,
+.ap-ranking-row.is-current {
+  border-color: rgba(105, 201, 255, 0.44);
+  box-shadow: 0 0 0 1px rgba(105, 201, 255, 0.16);
+}
+
+.ap-character-art,
+.ap-detail-avatar,
+.ap-mini-avatar {
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  color: white;
+}
+
+.ap-character-art {
+  width: 64px;
+  height: 64px;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.ap-detail-avatar {
+  width: 140px;
+  min-height: 160px;
+  padding: 16px;
+  font-weight: 700;
+}
+
+.ap-mini-avatar {
+  width: 42px;
+  height: 42px;
+  font-weight: 700;
+}
+
+.ap-role-chip,
+.ap-tier-pill,
+.ap-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.ap-role-chip,
+.ap-tier-pill {
+  background: rgba(105, 201, 255, 0.12);
+  color: var(--ap-accent);
+}
+
+.ap-badge-win {
+  background: rgba(127, 227, 200, 0.14);
+  color: var(--ap-mint);
+}
+
+.ap-badge-loss {
+  background: rgba(255, 115, 148, 0.14);
+  color: var(--ap-rose);
+}
+
+.ap-button,
+.ap-tab-button {
+  padding: 10px 14px;
+}
+
+.ap-positive {
+  color: var(--ap-mint);
+}
+
+.ap-negative {
+  color: var(--ap-rose);
+}
+
+.ap-blocked-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.ap-blocked-card {
+  width: min(680px, 100%);
+  padding: 28px;
+}
+
+.ap-ranking-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ap-ranking-row {
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+@media (max-width: 1100px) {
+  .ap-view-grid,
+  .ap-dashboard-columns,
+  .ap-two-column,
+  .ap-hero-grid,
+  .ap-equipment-summary,
+  .ap-extension-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .ap-shell {
+    padding: 16px;
+  }
+
+  .ap-topbar {
+    padding: 20px;
+    flex-direction: column;
+    align-items: start;
+  }
+
+  .ap-character-grid,
+  .ap-stat-grid,
+  .ap-currency-grid,
+  .ap-metric-grid {
+    grid-template-columns: 1fr;
+  }
+}

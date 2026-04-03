@@ -55,6 +55,8 @@ ensureDataLayout();
 
 const STOCK_SIM_DIST_DIR = path.resolve(APP_DIR, '13', 'dist');
 const RELIC_SEAL_DIST_DIR = path.resolve(APP_DIR, '14', 'dist');
+const AUTO_PVP_DIST_DIR = path.resolve(APP_DIR, '15', 'dist');
+const PROBABILITY_FORGE_DIST_DIR = path.resolve(APP_DIR, '16', 'dist');
 
 app.use('/stock-sim-app', express.static(STOCK_SIM_DIST_DIR, {
     index: false,
@@ -86,6 +88,38 @@ app.use('/relic-seal-app', express.static(RELIC_SEAL_DIST_DIR, {
 app.get(['/relic-seal-app', '/relic-seal-app/'], (req, res) => {
     res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.sendFile(path.join(RELIC_SEAL_DIST_DIR, 'index.html'));
+});
+
+app.use('/auto-pvp-app', express.static(AUTO_PVP_DIST_DIR, {
+    index: false,
+    setHeaders(res, filePath) {
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            return;
+        }
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    }
+}));
+
+app.get(['/auto-pvp-app', '/auto-pvp-app/'], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    res.sendFile(path.join(AUTO_PVP_DIST_DIR, 'index.html'));
+});
+
+app.use('/probability-forge-app', express.static(PROBABILITY_FORGE_DIST_DIR, {
+    index: false,
+    setHeaders(res, filePath) {
+        if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+            return;
+        }
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    }
+}));
+
+app.get(['/probability-forge-app', '/probability-forge-app/'], (req, res) => {
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
+    res.sendFile(path.join(PROBABILITY_FORGE_DIST_DIR, 'index.html'));
 });
 
 app.use('/uploads', express.static(UPLOADS_DIR));
@@ -148,7 +182,7 @@ function normalizePrototypeSlotState(value) {
     const source = value && typeof value === 'object' ? value : {};
     const hasActiveKey = Object.prototype.hasOwnProperty.call(source, 'activeKey');
     const activeKey = String(hasActiveKey ? source.activeKey : DEFAULT_PROTOTYPE_SLOT_STATE.activeKey).trim();
-    if (activeKey === 'stockSim' || activeKey === 'relicSeal') {
+    if (activeKey === 'stockSim' || activeKey === 'relicSeal' || activeKey === 'probabilityForge' || activeKey === 'autoPvp') {
         return { activeKey };
     }
     return { activeKey: '' };

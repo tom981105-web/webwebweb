@@ -1,0 +1,47 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": [
+    "src/main.tsx",
+    "src/app/App.tsx",
+    "src/components/CharactersView.tsx",
+    "src/components/EquipmentView.tsx",
+    "src/components/HomeDashboard.tsx",
+    "src/components/MissionsView.tsx",
+    "src/components/RankingView.tsx",
+    "src/components/ReportsView.tsx",
+    "src/components/SectionCard.tsx",
+    "src/components/TeamBuilderView.tsx",
+    "src/config/gameConfig.ts",
+    "src/data/characters.ts",
+    "src/data/content.ts",
+    "src/data/equipment.ts",
+    "src/data/seedState.ts",
+    "src/game/battleEngine.ts",
+    "src/game/progression.ts",
+    "src/store/gameStore.ts",
+    "src/types/game.ts",
+    "src/utils/format.ts"
+  ]
+}

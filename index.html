@@ -439,6 +439,16 @@
             return apiBase ? `${apiBase}/relic-seal-app/` : 'relic-seal-app/';
         }
 
+        function getProbabilityForgeUrl() {
+            const apiBase = getApiBase();
+            return apiBase ? `${apiBase}/probability-forge-app/` : 'probability-forge-app/';
+        }
+
+        function getAutoPvpUrl() {
+            const apiBase = getApiBase();
+            return apiBase ? `${apiBase}/auto-pvp-app/` : 'auto-pvp-app/';
+        }
+
         const INDEX_SERVICE_ACCESS_DEFAULTS = {
             board: 'open',
             mountain: 'open',
@@ -461,6 +471,18 @@
                 icon: '유물',
                 href: () => getRelicSealUrl(),
                 desc: '직접 긁는 손맛과 자동화 성장 루프를 함께 즐기는 스크래치 인크리멘탈 프로토타입입니다.'
+            },
+            probabilityForge: {
+                title: '확률조작게임',
+                icon: '확률',
+                href: () => getProbabilityForgeUrl(),
+                desc: '확률을 조작하는 공방을 운영하며 강화·연구·원정·제작·자동화를 장기적으로 키워 가는 성장형 프로토타입입니다.'
+            },
+            autoPvp: {
+                title: 'Auto PvP',
+                icon: 'PvP',
+                href: () => getAutoPvpUrl(),
+                desc: '팀 세팅과 오프라인 누적 전투 결과를 중심으로 운영하는 장기 성장형 Auto PvP 프로토타입입니다.'
             }
         };
         const SERVICE_CARD_META = {
@@ -645,7 +667,7 @@
             }
 
             if (!isRegular) {
-                alert('승인된 회원만 주식장에 입장할 수 있습니다. 관리자 승인 후 다시 시도해 주세요.');
+                alert(`승인된 회원만 ${PROTOTYPE_SLOT_META[activeKey].title}에 입장할 수 있습니다. 관리자 승인 후 다시 시도해 주세요.`);
                 return;
             }
 
