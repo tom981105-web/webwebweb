@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Sparkles, Wand2 } from 'lucide-react';
 
 import { PANEL_RARITIES, SYMBOL_DEFINITIONS } from '@/data/balance';
@@ -41,15 +41,17 @@ export function ScratchPanel({
   const revealHint = Math.max(0, panel.autoRevealThreshold - panel.scratchedPercent);
   const isRareHit = RARE_SET.has(panel.rarity);
   const isJackpotHit = JACKPOT_SET.has(panel.rarity) || panel.specialEffect.id === 'jackpot';
-  const [bursting, setBursting] = useState(false);
-  const previousRevealStateRef = useRef(panel.revealed);
   const thresholdMarker = Math.max(0, Math.min(100, panel.autoRevealThreshold));
-  const sparkOffsets = buildSparkOffsets(isJackpotHit ? 12 : 8);
+  const scratchIntensity = useRef(0);
+  const previousRevealStateRef = useRef(panel.revealed);
+  const [bursting, setBursting] = useState(false);
+  const [scratchActive, setScratchActive] = useState(false);
+  const [scratchTick, setScratchTick] = useState(0);
+  const sparkOffsets = useMemo(() => buildSparkOffsets(isJackpotHit ? 12 : 8), [isJackpotHit]);
 
   useEffect(() => {
     const didRevealNow = !previousRevealStateRef.current && panel.revealed;
     previousRevealStateRef.current = panel.revealed;
-
     if (!didRevealNow) return;
     setBursting(true);
     const timer = window.setTimeout(() => setBursting(false), reducedMotion ? 850 : 1800);
@@ -63,11 +65,42 @@ export function ScratchPanel({
     }
   }, [panel.id, panel.revealed]);
 
+  const progressClass = panel.scratchedPercent >= panel.autoRevealThreshold - 6 && !panel.revealed ? 'rg-scratch-shell--primed' : '';
+  const shellStyle =
+    scratchActive || scratchIntensity.current > 0
+      ? ({
+          '--relic-glow': rarityMeta.glow,
+          transform: `perspective(1200px) rotateX(${Math.min(2, scratchIntensity.current * 1.1)}deg) scale(${1 + scratchIntensity.current * 0.008})`,
+        } as CSSProperties)
+      : panel.revealed
+        ? ({ '--relic-glow': rarityMeta.glow } as CSSProperties)
+        : undefined;
+
+  const handleScratchProgress = useCallback(
+    (percent: number, distance: number) => {
+      scratchIntensity.current = Math.min(1, Math.max(scratchIntensity.current * 0.78, Math.min(1, distance / 60)));
+      setScratchTick((value) => value + 1);
+      onScratchProgress(percent, distance);
+    },
+    [onScratchProgress],
+  );
+
+  useEffect(() => {
+    if (!scratchActive) {
+      if (scratchIntensity.current <= 0.02) return;
+      const timer = window.setTimeout(() => {
+        scratchIntensity.current *= 0.72;
+        setScratchTick((value) => value + 1);
+      }, 48);
+      return () => window.clearTimeout(timer);
+    }
+  }, [scratchActive, scratchTick]);
+
   return (
     <section className="rg-overflow-hidden rg-rounded-[34px] rg-border rg-border-white/10 rg-bg-[linear-gradient(180deg,rgba(16,23,39,0.94),rgba(9,13,22,0.96))] rg-shadow-card">
       <div className="rg-flex rg-flex-wrap rg-items-center rg-justify-between rg-gap-3 rg-border-b rg-border-white/8 rg-px-5 rg-py-4">
         <div>
-          <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-slate-400">현재 봉인</p>
+          <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-slate-400">현재 열린 봉인 패널</p>
           <h2 className="rg-mt-1 rg-font-display rg-text-[clamp(1.8rem,3vw,2.5rem)] rg-font-semibold rg-text-white">{panel.statusLine}</h2>
         </div>
         <div className="rg-flex rg-items-center rg-gap-3">
@@ -88,14 +121,8 @@ export function ScratchPanel({
           <div
             className={`rg-scratch-shell rg-relative rg-aspect-[7/4.2] rg-overflow-hidden rg-rounded-[30px] rg-border rg-border-white/10 rg-bg-[radial-gradient(circle_at_top,rgba(113,217,255,0.14),transparent_32%),linear-gradient(180deg,#121a2a,#0a101b)] ${
               panel.revealed ? 'rg-scratch-shell--revealed' : ''
-            } ${bursting && isRareHit ? 'rg-scratch-shell--rare' : ''}`}
-            style={
-              panel.revealed
-                ? ({
-                    '--relic-glow': rarityMeta.glow,
-                  } as CSSProperties)
-                : undefined
-            }
+            } ${bursting && isRareHit ? 'rg-scratch-shell--rare' : ''} ${progressClass}`}
+            style={shellStyle}
           >
             <div className="rg-absolute rg-inset-0 rg-bg-runes" />
             <div className="rg-absolute rg-inset-0 rg-grid rg-grid-cols-3 rg-gap-4 rg-p-5">
@@ -105,13 +132,10 @@ export function ScratchPanel({
                   className={`rg-flex rg-flex-col rg-items-center rg-justify-center rg-rounded-[24px] rg-border rg-border-white/8 rg-bg-white/[0.05] rg-shadow-soft ${
                     panel.revealed ? 'rg-symbol-slot--revealed' : ''
                   }`}
+                  style={panel.revealed ? ({ animationDelay: `${index * 70}ms` } as CSSProperties) : undefined}
                 >
-                  <span className="rg-font-display rg-text-[clamp(2rem,5vw,3.25rem)] rg-font-semibold rg-text-white">
-                    {SYMBOL_DEFINITIONS[symbol].icon}
-                  </span>
-                  <span className="rg-mt-2 rg-text-xs rg-font-semibold rg-tracking-[0.18em] rg-text-slate-300">
-                    {SYMBOL_DEFINITIONS[symbol].label}
-                  </span>
+                  <span className="rg-font-display rg-text-[clamp(2rem,5vw,3.25rem)] rg-font-semibold rg-text-white">{SYMBOL_DEFINITIONS[symbol].icon}</span>
+                  <span className="rg-mt-2 rg-text-xs rg-font-semibold rg-tracking-[0.18em] rg-text-slate-300">{SYMBOL_DEFINITIONS[symbol].label}</span>
                 </div>
               ))}
             </div>
@@ -123,9 +147,13 @@ export function ScratchPanel({
             {!panel.revealed && panel.scratchedPercent < 6 ? (
               <div className="rg-pointer-events-none rg-absolute rg-inset-x-0 rg-top-1/2 rg-flex rg--translate-y-1/2 rg-justify-center">
                 <div className="rg-rounded-full rg-border rg-border-white/12 rg-bg-slate-950/52 rg-px-5 rg-py-3 rg-text-sm rg-font-medium rg-text-slate-100">
-                  패널을 문질러 숨겨진 룬을 드러내세요
+                  패널 표면을 문질러 숨겨진 룬을 드러내세요
                 </div>
               </div>
+            ) : null}
+
+            {!panel.revealed && panel.scratchedPercent >= panel.autoRevealThreshold - 6 ? (
+              <div className="rg-pointer-events-none rg-absolute rg-inset-0 rg-bg-[radial-gradient(circle_at_center,rgba(242,205,114,0.16),transparent_60%)] rg-animate-pulse" />
             ) : null}
 
             {bursting ? (
@@ -140,9 +168,9 @@ export function ScratchPanel({
                         top: spark.top,
                         animationDelay: spark.delay,
                         animationDuration: spark.duration,
-                    } as CSSProperties
-                  }
-                />
+                      } as CSSProperties
+                    }
+                  />
                 ))}
               </div>
             ) : null}
@@ -153,7 +181,8 @@ export function ScratchPanel({
               revealed={panel.revealed}
               brushRadius={brushRadius}
               reducedMotion={reducedMotion}
-              onProgress={onScratchProgress}
+              onProgress={handleScratchProgress}
+              onScratchStateChange={setScratchActive}
             />
 
             {panel.revealed ? (
@@ -162,7 +191,7 @@ export function ScratchPanel({
                   isRareHit ? 'rg-bg-mystic-violet/16 rg-text-mystic-violet' : 'rg-bg-mystic-gold/12 rg-text-mystic-gold'
                 }`}>
                   <Sparkles size={14} />
-                  {isRareHit ? '희귀 봉인 해제' : '공개 완료'}
+                  {isRareHit ? '희귀 결과 공개' : '결과 확인'}
                 </div>
                 <strong className={`rg-result-value rg-font-display rg-text-[clamp(2.8rem,7vw,4.6rem)] rg-font-semibold ${isRareHit ? 'rg-text-mystic-violet' : 'rg-text-white'}`}>
                   +{formatCompact(panel.reward, compactNumbers)}
@@ -195,7 +224,7 @@ export function ScratchPanel({
                 <span>{panel.comboLabel}</span>
                 {!panel.revealed ? (
                   <span className="rg-text-mystic-teal">
-                    {canForceReveal ? '지금 공개 가능' : `${formatPercent(revealHint, 1)}만 더 긁으면 공개 가능`}
+                    {canForceReveal ? '지금 바로 공개 가능' : `${formatPercent(revealHint, 1)}만 더 긁으면 자동 공개`}
                   </span>
                 ) : null}
               </div>
@@ -232,20 +261,9 @@ export function ScratchPanel({
           <div className="rg-rounded-[28px] rg-border rg-border-white/8 rg-bg-white/[0.03] rg-p-5">
             <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-slate-400">패널 정보</p>
             <div className="rg-mt-4 rg-space-y-3 rg-text-sm rg-text-slate-300">
-              <div className="rg-flex rg-items-center rg-justify-between">
-                <span>패널 비용</span>
-                <strong className="rg-text-white">{formatCompact(panel.costPaid, compactNumbers)}</strong>
-              </div>
-              <div className="rg-flex rg-items-center rg-justify-between">
-                <span>특수 효과</span>
-                <strong className="rg-text-white">{panel.specialEffect.label}</strong>
-              </div>
-              <div className="rg-flex rg-items-center rg-justify-between">
-                <span>최종 보상</span>
-                <strong className={isRareHit ? 'rg-text-mystic-violet' : 'rg-text-mystic-gold'}>
-                  {formatCompact(panel.reward, compactNumbers)}
-                </strong>
-              </div>
+              <div className="rg-flex rg-items-center rg-justify-between"><span>패널 비용</span><strong className="rg-text-white">{formatCompact(panel.costPaid, compactNumbers)}</strong></div>
+              <div className="rg-flex rg-items-center rg-justify-between"><span>특수 효과</span><strong className="rg-text-white">{panel.specialEffect.label}</strong></div>
+              <div className="rg-flex rg-items-center rg-justify-between"><span>최종 보상</span><strong className={isRareHit ? 'rg-text-mystic-violet' : 'rg-text-mystic-gold'}>{formatCompact(panel.reward, compactNumbers)}</strong></div>
             </div>
           </div>
 
@@ -257,15 +275,15 @@ export function ScratchPanel({
                   <Wand2 size={16} />
                 </div>
                 <div className="rg-text-sm rg-leading-7 rg-text-slate-300">
-                  덮개를 전부 지울 필요는 없습니다. 기준선 근처까지만 밀어도 보상을 먼저 열 수 있습니다.
+                  끝까지 다 긁을 필요는 없습니다. 기준선 가까이까지만 밝혀도 결과를 먼저 확인할 수 있습니다.
                 </div>
               </div>
               <div className="rg-rounded-[22px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4 rg-text-sm rg-leading-7 rg-text-slate-300">
-                결과는 패널이 생성되는 순간 이미 정해집니다. 지금은 그 결과를 손으로 드러내는 과정만 남아 있습니다.
+                결과는 패널을 여는 순간 이미 정해져 있습니다. 지금 하는 일은 그 결과를 직접 밝혀내는 과정입니다.
               </div>
               {isRareHit ? (
                 <div className="rg-rounded-[22px] rg-border rg-border-mystic-violet/18 rg-bg-mystic-violet/10 rg-p-4 rg-text-sm rg-leading-7 rg-text-mystic-violet">
-                  희귀 봉인은 업그레이드 체감이 크게 느껴지는 구간입니다. 다음 패널을 열기 전에 여운을 한번 즐겨보세요.
+                  희귀 패널이 드러났습니다. 다음 업그레이드 직전이라면 지금 공개를 사용해 흐름을 더 빠르게 이어가세요.
                 </div>
               ) : null}
             </div>

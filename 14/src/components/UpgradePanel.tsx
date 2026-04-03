@@ -15,6 +15,8 @@ const CATEGORY_LABELS: Record<UpgradeCategory, string> = {
   utility: '보조 장치',
 };
 
+type FilterMode = 'all' | 'ready' | 'locked';
+
 function clampPercent(value: number) {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
@@ -43,8 +45,8 @@ function describeUpgradeEffect(id: UpgradeCardState['definition']['id'], level: 
       };
     case 'rareSight':
       return {
-        current: `희귀도 감지 +${(level * 1.4).toFixed(1)}`,
-        next: `희귀도 감지 +${((level + 1) * 1.4).toFixed(1)}`,
+        current: `희귀 감지 +${(level * 1.4).toFixed(1)}`,
+        next: `희귀 감지 +${((level + 1) * 1.4).toFixed(1)}`,
       };
     case 'revealEase':
       return {
@@ -199,11 +201,7 @@ export function UpgradePanel({
   onBuyMetaUpgrade: (id: MetaUpgradeCardState['definition']['id']) => void;
 }) {
   const [category, setCategory] = useState<UpgradeCategory>('manual');
-
-  const grouped = useMemo(
-    () => upgrades.filter((item) => item.definition.category === category),
-    [category, upgrades],
-  );
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
 
   const categoryMeta = useMemo(() => {
     return (Object.keys(CATEGORY_LABELS) as UpgradeCategory[]).map((key) => {
@@ -216,14 +214,37 @@ export function UpgradePanel({
     });
   }, [upgrades]);
 
+  const grouped = useMemo(() => {
+    const items = upgrades.filter((item) => item.definition.category === category);
+    const filtered = items.filter((item) => {
+      if (filterMode === 'ready') return !item.locked && item.affordable && Number.isFinite(item.price);
+      if (filterMode === 'locked') return item.locked;
+      return true;
+    });
+
+    return filtered.sort((left, right) => {
+      const leftScore = (left.locked ? 0 : 100) + (left.affordable ? 20 : 0) - left.level;
+      const rightScore = (right.locked ? 0 : 100) + (right.affordable ? 20 : 0) - right.level;
+      return rightScore - leftScore;
+    });
+  }, [category, filterMode, upgrades]);
+
+  const metaSorted = useMemo(() => {
+    return [...metaUpgrades].sort((left, right) => {
+      const leftScore = (left.affordable ? 10 : 0) - left.level;
+      const rightScore = (right.affordable ? 10 : 0) - right.level;
+      return rightScore - leftScore;
+    });
+  }, [metaUpgrades]);
+
   return (
     <section className="rg-rounded-[30px] rg-border rg-border-white/10 rg-bg-[linear-gradient(180deg,rgba(15,21,37,0.94),rgba(9,13,22,0.95))] rg-p-5 rg-shadow-card">
       <div className="rg-flex rg-flex-wrap rg-items-start rg-justify-between rg-gap-4">
         <div>
-          <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-slate-400">성장 패널</p>
+          <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-slate-400">성장 장치</p>
           <h2 className="rg-mt-2 rg-font-display rg-text-2xl rg-font-semibold rg-text-white">업그레이드</h2>
           <p className="rg-mb-0 rg-mt-2 rg-text-sm rg-leading-7 rg-text-slate-300">
-            긁는 감촉, 보상 기대치, 자동화 속도를 원하는 방향으로 조율해 보세요.
+            긁는 감촉, 보상 기대치, 자동화 속도를 원하는 방향으로 밀어 올리세요.
           </p>
         </div>
 
@@ -259,7 +280,30 @@ export function UpgradePanel({
         ))}
       </div>
 
-      <div className="rg-mt-5 rg-space-y-3">
+      <div className="rg-mt-4 rg-flex rg-flex-wrap rg-gap-2">
+        {(
+          [
+            ['all', '전체 보기'],
+            ['ready', '지금 구매 가능'],
+            ['locked', '잠긴 항목'],
+          ] as Array<[FilterMode, string]>
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setFilterMode(key)}
+            className={`rg-rounded-full rg-border rg-px-4 rg-py-2 rg-text-xs rg-font-semibold ${
+              filterMode === key
+                ? 'rg-border-mystic-teal/24 rg-bg-mystic-teal/14 rg-text-mystic-teal'
+                : 'rg-border-white/8 rg-bg-white/[0.03] rg-text-slate-400'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div className="rg-mt-5 rg-space-y-3 rg-max-h-[620px] rg-overflow-y-auto rg-pr-1 rg-scrollbar">
         {grouped.map((card) => {
           const atMax = !Number.isFinite(card.price);
           const disabled = card.locked || atMax || !card.affordable;
@@ -295,7 +339,7 @@ export function UpgradePanel({
                     <div className="rg-rounded-2xl rg-border rg-border-white/8 rg-bg-black/12 rg-px-3 rg-py-2">
                       <div className="rg-text-[11px] rg-font-semibold rg-uppercase rg-tracking-[0.2em] rg-text-slate-500">다음 효과</div>
                       <div className="rg-mt-1 rg-text-sm rg-font-semibold rg-text-mystic-gold">
-                        {atMax ? '최대 레벨 도달' : effectText.next}
+                        {atMax ? '최대 단계 도달' : effectText.next}
                       </div>
                     </div>
                   </div>
@@ -319,7 +363,7 @@ export function UpgradePanel({
                   ) : (
                     <div className="rg-mt-3">
                       <div className="rg-mb-1 rg-flex rg-items-center rg-justify-between rg-text-[11px] rg-font-semibold rg-uppercase rg-tracking-[0.18em] rg-text-slate-500">
-                        <span>구매 준비</span>
+                        <span>구매 준비도</span>
                         <span>{atMax ? '완료' : `${formatCompact(coins, compactNumbers)} / ${formatCompact(card.price, compactNumbers)}`}</span>
                       </div>
                       <div className="rg-h-2 rg-overflow-hidden rg-rounded-full rg-bg-white/[0.06]">
@@ -354,7 +398,7 @@ export function UpgradePanel({
         <div className="rg-flex rg-items-center rg-justify-between">
           <div>
             <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-mystic-violet/75">메타 강화</p>
-            <h3 className="rg-mt-2 rg-font-display rg-text-xl rg-font-semibold rg-text-white">재조율 상점</h3>
+            <h3 className="rg-mt-2 rg-font-display rg-text-xl rg-font-semibold rg-text-white">재조율 특전</h3>
           </div>
           <div className="rg-rounded-full rg-bg-black/20 rg-px-4 rg-py-2 rg-text-sm rg-font-semibold rg-text-mystic-violet">
             공명 가루 {formatCompact(dust, compactNumbers)}
@@ -362,7 +406,7 @@ export function UpgradePanel({
         </div>
 
         <div className="rg-mt-4 rg-space-y-3">
-          {metaUpgrades.map((card) => {
+          {metaSorted.map((card) => {
             const atMax = !Number.isFinite(card.price);
             const disabled = atMax || !card.affordable;
             const progress = atMax ? 100 : clampPercent((dust / Math.max(card.price, 1)) * 100);
@@ -394,14 +438,14 @@ export function UpgradePanel({
                       <div className="rg-rounded-2xl rg-border rg-border-white/8 rg-bg-black/12 rg-px-3 rg-py-2">
                         <div className="rg-text-[11px] rg-font-semibold rg-uppercase rg-tracking-[0.2em] rg-text-slate-500">다음 효과</div>
                         <div className="rg-mt-1 rg-text-sm rg-font-semibold rg-text-mystic-violet">
-                          {atMax ? '최대 레벨 도달' : effectText.next}
+                          {atMax ? '최대 단계 도달' : effectText.next}
                         </div>
                       </div>
                     </div>
 
                     <div className="rg-mt-3">
                       <div className="rg-mb-1 rg-flex rg-items-center rg-justify-between rg-text-[11px] rg-font-semibold rg-uppercase rg-tracking-[0.18em] rg-text-slate-500">
-                        <span>구매 준비</span>
+                        <span>구매 준비도</span>
                         <span>{atMax ? '완료' : `${formatCompact(dust, compactNumbers)} / ${formatCompact(card.price, compactNumbers)}`}</span>
                       </div>
                       <div className="rg-h-2 rg-overflow-hidden rg-rounded-full rg-bg-white/[0.06]">
@@ -432,7 +476,7 @@ export function UpgradePanel({
         </div>
 
         <p className="rg-mb-0 rg-mt-4 rg-text-xs rg-leading-6 rg-text-slate-400">
-          재조율 후에도 남는 영구 강화입니다. 초반 5분의 성장 속도를 다시 끌어올리는 핵심 축입니다.
+          재조율 특전은 다음 순환에 남는 영구 강화입니다. 초반 5분의 성장 속도를 다시 끌어올리는 핵심 투자입니다.
         </p>
       </div>
     </section>

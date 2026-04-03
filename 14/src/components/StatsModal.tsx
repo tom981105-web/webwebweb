@@ -20,20 +20,16 @@ export function StatsModal({
   const bestTierRows = Object.entries(stats.tierOpenCount).map(([tier, openCount]) => {
     const totalReward = stats.tierRewards[tier as keyof typeof stats.tierRewards];
     const efficiency = openCount > 0 ? totalReward / openCount : 0;
-    return {
-      tier,
-      openCount,
-      totalReward,
-      efficiency,
-    };
+    return { tier, openCount, totalReward, efficiency };
   });
+  const autoRevealCount = Math.max(0, stats.totalPanelsScratched - stats.totalManualReveals);
 
   return (
     <ModalShell
       open={open}
       onClose={onClose}
       title="서고 통계"
-      description="지금까지 얼마나 긁었고, 어떤 패널이 가장 효율적이었는지 한 번에 볼 수 있습니다."
+      description="지금까지 어떤 패널이 효율적이었고, 수동과 자동화가 얼마나 기여했는지 한눈에 확인합니다."
     >
       <div className="rg-grid rg-gap-3 md:rg-grid-cols-2 xl:rg-grid-cols-4">
         {[
@@ -41,10 +37,10 @@ export function StatsModal({
           ['총 긁은 횟수', formatCompact(stats.totalPanelsScratched, compactNumbers)],
           ['최고 단일 보상', formatCompact(stats.highestReward, compactNumbers)],
           ['현재 초당 수익', `${formatCompact(cps, compactNumbers)}/s`],
-          ['희귀 심볼 횟수', formatCompact(stats.rareSymbolsFound, compactNumbers)],
+          ['희귀 룬 발견', formatCompact(stats.rareSymbolsFound, compactNumbers)],
           ['자동화 수익', formatCompact(stats.automationCoinsEarned, compactNumbers)],
-          ['프레스티지 횟수', formatCompact(stats.prestigeCount, compactNumbers)],
-          ['총 긁은 거리', formatCompact(stats.totalScratchDistance, compactNumbers)],
+          ['수동 공개', formatCompact(stats.totalManualReveals, compactNumbers)],
+          ['자동 공개', formatCompact(autoRevealCount, compactNumbers)],
         ].map(([label, value]) => (
           <div key={label} className="rg-rounded-[22px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4">
             <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.18em] rg-text-slate-400">{label}</p>
@@ -60,8 +56,8 @@ export function StatsModal({
             {bestTierRows.map((row) => (
               <div key={row.tier} className="rg-rounded-[18px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4">
                 <div className="rg-flex rg-items-center rg-justify-between rg-gap-3">
-                    <strong className="rg-text-white">{formatTierLabel(row.tier as PanelTierId)}</strong>
-                  <span className="rg-text-sm rg-font-semibold rg-text-mystic-gold">{formatCompact(row.efficiency, compactNumbers)} / 장</span>
+                  <strong className="rg-text-white">{formatTierLabel(row.tier as PanelTierId)}</strong>
+                  <span className="rg-text-sm rg-font-semibold rg-text-mystic-gold">{formatCompact(row.efficiency, compactNumbers)} / 회</span>
                 </div>
                 <div className="rg-mt-2 rg-grid rg-gap-2 rg-text-sm rg-text-slate-400 sm:rg-grid-cols-2">
                   <span>오픈 횟수 {formatCompact(row.openCount, compactNumbers)}</span>

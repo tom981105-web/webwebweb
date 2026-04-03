@@ -15,10 +15,10 @@ export function TierSelector({
     <section className="rg-rounded-[28px] rg-border rg-border-white/10 rg-bg-white/[0.03] rg-p-5">
       <div className="rg-flex rg-items-end rg-justify-between rg-gap-4">
         <div>
-          <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-slate-400">패널 티어</p>
+          <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-slate-400">패널 등급</p>
           <h2 className="rg-mt-2 rg-font-display rg-text-2xl rg-font-semibold rg-text-white">오늘 긁어볼 봉인판</h2>
         </div>
-        <p className="rg-m-0 rg-text-sm rg-text-slate-400">비싼 티어가 항상 정답은 아닙니다.</p>
+        <p className="rg-m-0 rg-text-sm rg-text-slate-400">비싼 패널이 항상 정답은 아닙니다.</p>
       </div>
 
       <div className="rg-mt-4 rg-grid rg-gap-3 lg:rg-grid-cols-5">

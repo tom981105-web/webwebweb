@@ -30,12 +30,12 @@ export function TopBar({
               <Sparkles size={18} />
             </div>
             <div>
-              <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-mystic-gold/76">Relic Scratch Incremental</p>
+              <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-mystic-gold/76">Mystic Scratch Incremental</p>
               <h1 className="rg-mt-1 rg-font-display rg-text-[clamp(1.7rem,3vw,2.35rem)] rg-font-semibold rg-text-white">봉인된 행운의 서고</h1>
             </div>
           </div>
           <p className="rg-mb-0 rg-mt-3 rg-text-sm rg-leading-7 rg-text-slate-300">
-            패널을 직접 긁어 룬을 깨우고, 자동화와 재조율로 서고를 확장해 보세요.
+            직접 긁어 룬을 깨우고 자동 장치를 해금한 뒤, 재조율로 더 빠른 순환을 만드는 성장형 서고 실험입니다.
           </p>
         </div>
 
@@ -49,7 +49,7 @@ export function TopBar({
             <strong className="rg-mt-2 rg-block rg-text-xl rg-font-semibold rg-text-mystic-violet">{formatCompact(dust, compactNumbers)}</strong>
           </div>
           <div className="rg-rounded-2xl rg-border rg-border-white/8 rg-bg-white/[0.04] rg-px-4 rg-py-3">
-            <p className="rg-m-0 rg-text-[11px] rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-slate-400">예상 초당 수익</p>
+            <p className="rg-m-0 rg-text-[11px] rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-slate-400">초당 수익</p>
             <strong className="rg-mt-2 rg-block rg-text-xl rg-font-semibold rg-text-mystic-teal">{formatCompact(cps, compactNumbers)}/s</strong>
           </div>
           <div className="rg-rounded-2xl rg-border rg-border-white/8 rg-bg-white/[0.04] rg-px-4 rg-py-3">
@@ -62,20 +62,20 @@ export function TopBar({
       <div className="rg-mt-4 rg-flex rg-flex-wrap rg-gap-2">
         <a
           href="/index.html"
-          className="rg-inline-flex rg-min-h-[42px] rg-items-center rg-gap-2 rg-rounded-full rg-border rg-border-white/10 rg-bg-white/[0.04] rg-px-4 rg-text-sm rg-font-semibold rg-text-slate-100 rg-no-underline"
+          className="rg-inline-flex rg-min-h-[42px] rg-items-center rg-gap-2 rg-rounded-full rg-border rg-border-white/10 rg-bg-white/[0.04] rg-px-4 rg-text-sm rg-font-semibold rg-text-slate-100 rg-no-underline hover:rg-border-white/20 hover:rg-bg-white/[0.08]"
         >
           <Home size={16} />
           홈으로
         </a>
-        <button type="button" onClick={onOpenStats} className="rg-inline-flex rg-min-h-[42px] rg-items-center rg-gap-2 rg-rounded-full rg-border rg-border-white/10 rg-bg-white/[0.04] rg-px-4 rg-text-sm rg-font-semibold rg-text-slate-100">
+        <button type="button" onClick={onOpenStats} className="rg-inline-flex rg-min-h-[42px] rg-items-center rg-gap-2 rg-rounded-full rg-border rg-border-white/10 rg-bg-white/[0.04] rg-px-4 rg-text-sm rg-font-semibold rg-text-slate-100 hover:rg-border-white/20 hover:rg-bg-white/[0.08]">
           <BarChart3 size={16} />
           통계
         </button>
-        <button type="button" onClick={onOpenPrestige} className="rg-inline-flex rg-min-h-[42px] rg-items-center rg-gap-2 rg-rounded-full rg-border rg-border-mystic-violet/20 rg-bg-mystic-violet/12 rg-px-4 rg-text-sm rg-font-semibold rg-text-mystic-violet">
+        <button type="button" onClick={onOpenPrestige} className="rg-inline-flex rg-min-h-[42px] rg-items-center rg-gap-2 rg-rounded-full rg-border rg-border-mystic-violet/20 rg-bg-mystic-violet/12 rg-px-4 rg-text-sm rg-font-semibold rg-text-mystic-violet hover:rg-bg-mystic-violet/18">
           <RotateCcw size={16} />
           재조율
         </button>
-        <button type="button" onClick={onOpenSettings} className="rg-inline-flex rg-min-h-[42px] rg-items-center rg-gap-2 rg-rounded-full rg-border rg-border-white/10 rg-bg-white/[0.04] rg-px-4 rg-text-sm rg-font-semibold rg-text-slate-100">
+        <button type="button" onClick={onOpenSettings} className="rg-inline-flex rg-min-h-[42px] rg-items-center rg-gap-2 rg-rounded-full rg-border rg-border-white/10 rg-bg-white/[0.04] rg-px-4 rg-text-sm rg-font-semibold rg-text-slate-100 hover:rg-border-white/20 hover:rg-bg-white/[0.08]">
           <Settings2 size={16} />
           설정
         </button>

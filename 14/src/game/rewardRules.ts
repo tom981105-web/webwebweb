@@ -18,10 +18,10 @@ export function buildComboLabel(symbols: SymbolId[]) {
 
   if (topCount >= 4) return `${SYMBOL_DEFINITIONS[topSymbol].label} 완전 공명`;
   if (topCount === 3) return `${SYMBOL_DEFINITIONS[topSymbol].label} 3중 결속`;
-  if (counts.relic >= 1 && counts.crown >= 1) return '왕관 유물 교감';
+  if (counts.relic >= 1 && counts.crown >= 1) return '유물·왕관 공진';
   if (counts.skull >= 2) return '균열 과다 반응';
-  if (counts.clover >= 2) return '행운엽 군집';
-  if (counts.moon >= 1 && counts.star >= 1) return '천체 상응';
+  if (counts.clover >= 2) return '행운 잎새 집결';
+  if (counts.moon >= 1 && counts.star >= 1) return '천체 정렬';
   return '잔향 분포';
 }
 

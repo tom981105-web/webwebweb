@@ -1,6 +1,6 @@
 import { MARKET_MOOD_CYCLE } from '@/data/balance';
 import type { ResultLogEntry, StatsState } from '@/types/game';
-import { formatCompact, formatDateTime } from '@/utils/format';
+import { formatCompact, formatDateTime, formatTierLabel } from '@/utils/format';
 
 export function ActivityRail({
   moodIndex,
@@ -16,7 +16,9 @@ export function ActivityRail({
   compactNumbers: boolean;
 }) {
   const mood = MARKET_MOOD_CYCLE[moodIndex % MARKET_MOOD_CYCLE.length];
-  const hotTier = Object.entries(stats.tierRewards).sort((a, b) => b[1] - a[1])[0]?.[0] || 'basic';
+  const hotTier = (Object.entries(stats.tierRewards).sort((a, b) => b[1] - a[1])[0]?.[0] || 'basic') as keyof typeof stats.tierRewards;
+  const autoRevealCount = Math.max(0, stats.totalPanelsScratched - stats.totalManualReveals);
+  const autoShare = stats.totalCoinsEarned > 0 ? (stats.automationCoinsEarned / stats.totalCoinsEarned) * 100 : 0;
 
   return (
     <aside className="rg-space-y-4">
@@ -26,19 +28,21 @@ export function ActivityRail({
           <div className="rg-rounded-[22px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4">
             <div className="rg-text-sm rg-text-slate-400">공명 분위기</div>
             <div className="rg-mt-2 rg-font-display rg-text-2xl rg-font-semibold rg-text-white">{mood.label}</div>
-            <p className="rg-mb-0 rg-mt-2 rg-text-xs rg-leading-6 rg-text-slate-400">현재 가속 계수 x{mood.multiplier.toFixed(2)}</p>
+            <p className="rg-mb-0 rg-mt-2 rg-text-xs rg-leading-6 rg-text-slate-400">이번 흐름 보정 x{mood.multiplier.toFixed(2)}</p>
           </div>
           <div className="rg-rounded-[22px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4">
-            <div className="rg-text-sm rg-text-slate-400">자동 수익 추정</div>
+            <div className="rg-text-sm rg-text-slate-400">자동화 수익</div>
             <div className="rg-mt-2 rg-font-display rg-text-2xl rg-font-semibold rg-text-mystic-teal">
               {formatCompact(currentCps, compactNumbers)}/s
             </div>
-            <p className="rg-mb-0 rg-mt-2 rg-text-xs rg-leading-6 rg-text-slate-400">후반 자동화가 열릴수록 수익이 가팔라집니다.</p>
+            <p className="rg-mb-0 rg-mt-2 rg-text-xs rg-leading-6 rg-text-slate-400">총 수익 중 자동화 기여 {autoShare.toFixed(1)}%</p>
           </div>
           <div className="rg-rounded-[22px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4">
-            <div className="rg-text-sm rg-text-slate-400">오늘의 효율 티어</div>
-            <div className="rg-mt-2 rg-font-display rg-text-2xl rg-font-semibold rg-text-mystic-gold">{hotTier}</div>
-            <p className="rg-mb-0 rg-mt-2 rg-text-xs rg-leading-6 rg-text-slate-400">누적 수익 기준으로 가장 많은 코인을 벌어준 티어입니다.</p>
+            <div className="rg-text-sm rg-text-slate-400">가장 뜨거운 패널</div>
+            <div className="rg-mt-2 rg-font-display rg-text-2xl rg-font-semibold rg-text-mystic-gold">{formatTierLabel(hotTier)}</div>
+            <p className="rg-mb-0 rg-mt-2 rg-text-xs rg-leading-6 rg-text-slate-400">
+              수동 공개 {formatCompact(stats.totalManualReveals, compactNumbers)}회 · 자동 공개 {formatCompact(autoRevealCount, compactNumbers)}회
+            </p>
           </div>
         </div>
       </section>
@@ -50,7 +54,7 @@ export function ActivityRail({
             <h3 className="rg-mt-2 rg-font-display rg-text-xl rg-font-semibold rg-text-white">행운 기록</h3>
           </div>
         </div>
-        <div className="rg-scrollbar rg-mt-4 rg-max-h-[380px] rg-space-y-3 rg-overflow-y-auto">
+        <div className="rg-scrollbar rg-mt-4 rg-max-h-[420px] rg-space-y-3 rg-overflow-y-auto">
           {recentResults.length ? (
             recentResults.map((entry) => (
               <div key={entry.id} className="rg-rounded-[20px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4">

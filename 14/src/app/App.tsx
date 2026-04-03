@@ -118,7 +118,7 @@ function getBlockedMessage(
   if (!prototypeSlot.activeKey) return '현재 적용된 프로토타입이 없습니다.';
   if (prototypeSlot.activeKey !== 'relicSeal') return '현재 다른 프로토타입이 적용되어 있습니다.';
   if (userRecord?.isAdmin) return '';
-  if (accessSettings.stockSim === 'maintenance') return '프로토타입이 현재 점검중입니다.';
+  if (accessSettings.stockSim === 'maintenance') return '프로토타입이 현재 점검 중입니다.';
   if (accessSettings.stockSim === 'admin') return '현재 관리자만 입장할 수 있습니다.';
   if (userRecord?.status === 'pending') return '승인된 회원만 이용할 수 있습니다. 관리자 승인 후 다시 시도해 주세요.';
   return '현재 계정은 이 프로토타입에 접근할 수 없습니다.';
@@ -198,50 +198,44 @@ export function App() {
   const importSaveString = useGameStore((state) => state.importSaveString);
   const resetProgress = useGameStore((state) => state.resetProgress);
 
-  const upgradeCards = useMemo(
-    () =>
-      buildUpgradeCards({
-        version,
-        coins,
-        resonanceDust,
-        selectedTier,
-        currentPanel,
-        upgrades,
-        metaUpgrades: metaUpgradesState,
-        stats,
-        recentResults,
-        settings,
-        tutorial,
-        sessionId,
-        lastSavedAt,
-        lastOpenedAt,
-      }),
-    [coins, resonanceDust, selectedTier, currentPanel, upgrades, metaUpgradesState, stats, recentResults, settings, tutorial, version, sessionId, lastSavedAt, lastOpenedAt],
+  const snapshot = useMemo(
+    () => ({
+      version,
+      coins,
+      resonanceDust,
+      selectedTier,
+      currentPanel,
+      upgrades,
+      metaUpgrades: metaUpgradesState,
+      stats,
+      recentResults,
+      settings,
+      tutorial,
+      sessionId,
+      lastSavedAt,
+      lastOpenedAt,
+    }),
+    [
+      coins,
+      currentPanel,
+      lastOpenedAt,
+      lastSavedAt,
+      metaUpgradesState,
+      recentResults,
+      resonanceDust,
+      selectedTier,
+      sessionId,
+      settings,
+      stats,
+      tutorial,
+      upgrades,
+      version,
+    ],
   );
-  const metaUpgradeCards = useMemo(
-    () =>
-      buildMetaUpgradeCards({
-        version,
-        coins,
-        resonanceDust,
-        selectedTier,
-        currentPanel,
-        upgrades,
-        metaUpgrades: metaUpgradesState,
-        stats,
-        recentResults,
-        settings,
-        tutorial,
-        sessionId,
-        lastSavedAt,
-        lastOpenedAt,
-      }),
-    [coins, resonanceDust, selectedTier, currentPanel, upgrades, metaUpgradesState, stats, recentResults, settings, tutorial, version, sessionId, lastSavedAt, lastOpenedAt],
-  );
-  const prestigePreview = useMemo(
-    () => getPrestigePreview(stats.totalCoinsEarned, stats.prestigeCount),
-    [stats.totalCoinsEarned, stats.prestigeCount],
-  );
+
+  const upgradeCards = useMemo(() => buildUpgradeCards(snapshot), [snapshot]);
+  const metaUpgradeCards = useMemo(() => buildMetaUpgradeCards(snapshot), [snapshot]);
+  const prestigePreview = useMemo(() => getPrestigePreview(stats.totalCoinsEarned, stats.prestigeCount), [stats.totalCoinsEarned, stats.prestigeCount]);
 
   const [statsOpen, setStatsOpen] = useState(false);
   const [prestigeOpen, setPrestigeOpen] = useState(false);
@@ -289,6 +283,7 @@ export function App() {
           setAccessSettings(nextSettings);
         }
       } catch {
+        // keep cached access state
       }
     }
 
@@ -302,6 +297,7 @@ export function App() {
           setPrototypeSlot(nextSlot);
         }
       } catch {
+        // keep cached slot state
       }
     }
 
@@ -318,7 +314,7 @@ export function App() {
     [computed.brushRadius, computed.scratchPower],
   );
   const autoLabel = computed.autoLoopEnabled
-    ? '구매 · 긁기 · 공개 자동화'
+    ? '구매 · 긁기 · 공개 자동'
     : computed.autoScratchEnabled
       ? '자동 긁기 활성'
       : '수동 플레이 중심';
@@ -332,7 +328,7 @@ export function App() {
       <div className="rg-flex rg-min-h-screen rg-items-center rg-justify-center rg-bg-vault rg-px-6">
         <div className="rg-rounded-[28px] rg-border rg-border-white/10 rg-bg-white/[0.04] rg-p-8 rg-text-center rg-shadow-card">
           <div className="rg-font-display rg-text-3xl rg-font-semibold rg-text-white">서고를 여는 중입니다</div>
-          <p className="rg-mb-0 rg-mt-3 rg-text-sm rg-leading-7 rg-text-slate-300">저장 데이터를 불러오고 첫 패널을 준비하고 있습니다.</p>
+          <p className="rg-mb-0 rg-mt-3 rg-text-sm rg-leading-7 rg-text-slate-300">저장된 기록을 불러오고 첫 패널을 준비하고 있습니다.</p>
         </div>
       </div>
     );

@@ -25,8 +25,8 @@ export function PrestigeModal({
     <ModalShell
       open={open}
       onClose={onClose}
-      title="재조율"
-      description="초기 자원을 비우는 대신 공명 가루를 얻고, 영구 메타 강화로 다음 사이클을 더 빠르게 밀어 올릴 수 있습니다."
+      title="운명의 재조율"
+      description="현재 코인과 일반 업그레이드를 비우는 대신 영구 자원인 공명 가루를 얻어 다음 순환을 더 빠르게 시작합니다."
       footer={
         <div className="rg-flex rg-flex-wrap rg-items-center rg-justify-between rg-gap-3">
           <div className="rg-text-sm rg-text-slate-300">
@@ -54,8 +54,18 @@ export function PrestigeModal({
             +{formatCompact(preview.dustGain, compactNumbers)}
           </h3>
           <p className="rg-mt-3 rg-text-sm rg-leading-7 rg-text-slate-300">
-            누적 수익이 기준을 넘으면 재조율이 열립니다. 코인과 일반 업그레이드는 초기화되지만, 공명 가루와 메타 강화는 영구 유지됩니다.
+            누적 수익이 높을수록 재조율 보상이 커집니다. 일반 업그레이드는 초기화되지만 메타 업그레이드는 그대로 남습니다.
           </p>
+          <div className="rg-mt-4 rg-grid rg-gap-3 sm:rg-grid-cols-2">
+            <div className="rg-rounded-[20px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4">
+              <div className="rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.18em] rg-text-slate-400">유지되는 것</div>
+              <div className="rg-mt-2 rg-text-sm rg-leading-7 rg-text-slate-200">공명 가루, 메타 업그레이드, 설정</div>
+            </div>
+            <div className="rg-rounded-[20px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4">
+              <div className="rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.18em] rg-text-slate-400">초기화되는 것</div>
+              <div className="rg-mt-2 rg-text-sm rg-leading-7 rg-text-slate-200">코인, 일반 업그레이드, 현재 패널</div>
+            </div>
+          </div>
           <div className="rg-mt-4 rg-rounded-[20px] rg-border rg-border-white/8 rg-bg-white/[0.04] rg-p-4">
             <div className="rg-flex rg-items-center rg-justify-between">
               <span className="rg-text-sm rg-text-slate-400">다음 필요 누적 수익</span>

@@ -9,7 +9,7 @@ const toneClass: Record<ScratchFeedback['tone'], string> = {
 
 const toneLabel: Record<ScratchFeedback['tone'], string> = {
   reward: '획득',
-  rare: '희귀 해제',
+  rare: '희귀 공개',
   warning: '주의',
   system: '안내',
 };

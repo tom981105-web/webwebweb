@@ -1,6 +1,7 @@
 import type { PanelTierId, SymbolId } from '@/types/game';
 
 export function formatCompact(value: number, compact = true) {
+  if (!Number.isFinite(value)) return '0';
   if (!compact) return Math.round(value).toLocaleString('ko-KR');
 
   const abs = Math.abs(value);
@@ -50,13 +51,13 @@ export function formatTierLabel(tier: PanelTierId) {
 
 export function formatSymbolLabel(symbol: SymbolId) {
   return {
-    coin: '금전',
-    star: '별빛',
-    moon: '달무늬',
+    coin: '코인',
+    star: '별문',
+    moon: '월흔',
     gem: '보석핵',
     skull: '균열흔',
-    clover: '행운엽',
-    crown: '왕관인',
+    clover: '행운잎',
+    crown: '왕관룬',
     relic: '유물핵',
   }[symbol];
 }
@@ -65,6 +66,5 @@ export function formatDateTime(timestamp: number) {
   return new Date(timestamp).toLocaleTimeString('ko-KR', {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
   });
 }

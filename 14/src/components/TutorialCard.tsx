@@ -13,10 +13,10 @@ export function TutorialCard({
     <section className="rg-rounded-[28px] rg-border rg-border-mystic-gold/18 rg-bg-[linear-gradient(135deg,rgba(242,205,114,0.12),rgba(169,140,255,0.08))] rg-p-5 rg-shadow-glow">
       <div className="rg-flex rg-items-start rg-justify-between rg-gap-4">
         <div>
-          <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-mystic-gold/78">첫 안내</p>
-          <h3 className="rg-mt-2 rg-font-display rg-text-2xl rg-font-semibold rg-text-white">패널을 문질러 첫 보상을 깨워보세요</h3>
+          <p className="rg-m-0 rg-text-xs rg-font-semibold rg-uppercase rg-tracking-[0.24em] rg-text-mystic-gold/78">빠른 안내</p>
+          <h3 className="rg-mt-2 rg-font-display rg-text-2xl rg-font-semibold rg-text-white">패널을 긁고, 보상을 받고, 더 빠르게 성장하세요</h3>
         </div>
-        <button type="button" onClick={onClose} className="rg-rounded-full rg-border rg-border-white/10 rg-bg-white/5 rg-px-4 rg-py-2 rg-text-xs rg-font-semibold rg-text-slate-200">
+        <button type="button" onClick={onClose} className="rg-rounded-full rg-border rg-border-white/10 rg-bg-white/5 rg-px-4 rg-py-2 rg-text-xs rg-font-semibold rg-text-slate-200 hover:rg-bg-white/10">
           닫기
         </button>
       </div>

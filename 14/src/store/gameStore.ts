@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { INITIAL_SETTINGS, PANEL_TIERS } from '@/data/balance';
+import { INITIAL_SETTINGS } from '@/data/balance';
 import { estimateOfflineGain, getPrestigePreview } from '@/game/offline';
 import {
   appendLog,
@@ -14,6 +14,7 @@ import {
   getTierCost,
   getUpgradeLevel,
   getUpgradePrice,
+  normalizeSaveState,
 } from '@/game/economy';
 import { clearGameSave, exportGameSave, importGameSave, loadGameSave, saveGameSave } from '@/utils/storage';
 import type {
@@ -87,7 +88,7 @@ function ensurePanel(state: GameSaveState) {
 }
 
 export const useGameStore = create<StoreState>((set, get) => {
-  const base = ensurePanel(createEmptySave());
+  const base = ensurePanel(normalizeSaveState(null));
 
   return {
     ...withComputed(base),
@@ -97,19 +98,19 @@ export const useGameStore = create<StoreState>((set, get) => {
     feedbacks: [],
     offlineSummary: null,
     initialize: () => {
-      const loaded = loadGameSave();
-      const initial = ensurePanel(loaded || createEmptySave());
+      const loaded = normalizeSaveState(loadGameSave());
+      const initial = ensurePanel(loaded);
       const computed = deriveComputedState(initial);
       const offlineSummary =
         loaded && loaded.lastSavedAt
           ? estimateOfflineGain(initial, computed, Date.now() - loaded.lastSavedAt)
           : { gain: 0, durationMs: 0 };
 
-      const withOffline = {
+      const withOffline = normalizeSaveState({
         ...initial,
         coins: initial.coins + offlineSummary.gain,
         lastOpenedAt: Date.now(),
-      };
+      });
 
       set({
         ...withComputed(withOffline),
@@ -174,7 +175,7 @@ export const useGameStore = create<StoreState>((set, get) => {
       if (state.currentPanel && !state.currentPanel.revealed) return false;
       if (state.coins < cost) return false;
 
-      const panel = createTierPanel(state, targetTier, PANEL_TIERS[targetTier].cost - cost);
+      const panel = createTierPanel(state, targetTier, cost === 0 ? 0 : 0);
       set({
         currentPanel: panel,
         coins: state.coins - cost,
@@ -211,9 +212,10 @@ export const useGameStore = create<StoreState>((set, get) => {
         revealed: true,
         scratchedPercent: 100,
       };
-      const automationShare = source === 'auto' ? panel.reward : 0;
+      const automated = source === 'auto';
+      const automationShare = automated ? panel.reward : 0;
       const nextCoins = state.coins + panel.reward;
-      const nextStats = applyRewardToStats(state.stats, revealedPanel, panel.reward, automationShare);
+      const nextStats = applyRewardToStats(state.stats, revealedPanel, panel.reward, { automated, automationShare });
       const resultEntry = {
         id: `${revealedPanel.id}_result`,
         tier: revealedPanel.tier,
@@ -239,6 +241,7 @@ export const useGameStore = create<StoreState>((set, get) => {
         stats: nextStats,
         recentResults: appendLog(state.recentResults, resultEntry),
         lastRevealAt: Date.now(),
+        moodIndex: Math.min(3, state.moodIndex + (tone === 'rare' ? 2 : 1)),
         feedbacks: appendToast(state.feedbacks, {
           id: `reward_${Date.now()}`,
           label: `${revealedPanel.specialEffect.label} +${revealedPanel.reward.toLocaleString('ko-KR')}`,
@@ -253,11 +256,11 @@ export const useGameStore = create<StoreState>((set, get) => {
       if (state.coins < price || !Number.isFinite(price)) return;
 
       const upgrades = { ...state.upgrades, [id]: level + 1 };
-      const nextCore = {
+      const nextCore = normalizeSaveState({
         ...state,
         upgrades,
         coins: state.coins - price,
-      };
+      });
 
       set({
         upgrades,
@@ -277,11 +280,11 @@ export const useGameStore = create<StoreState>((set, get) => {
       if (state.resonanceDust < price || !Number.isFinite(price)) return;
 
       const metaUpgrades = { ...state.metaUpgrades, [id]: level + 1 };
-      const nextCore = {
+      const nextCore = normalizeSaveState({
         ...state,
         metaUpgrades,
         resonanceDust: state.resonanceDust - price,
-      };
+      });
 
       set({
         metaUpgrades,
@@ -295,17 +298,19 @@ export const useGameStore = create<StoreState>((set, get) => {
       if (!preview.canPrestige) return;
 
       const fresh = createEmptySave();
-      const nextCore = ensurePanel({
-        ...fresh,
-        resonanceDust: state.resonanceDust + preview.dustGain,
-        metaUpgrades: { ...state.metaUpgrades },
-        settings: { ...state.settings },
-        tutorial: { ...state.tutorial, dismissed: true },
-        stats: {
-          ...fresh.stats,
-          prestigeCount: state.stats.prestigeCount + 1,
-        },
-      });
+      const nextCore = ensurePanel(
+        normalizeSaveState({
+          ...fresh,
+          resonanceDust: state.resonanceDust + preview.dustGain,
+          metaUpgrades: { ...state.metaUpgrades },
+          settings: { ...state.settings },
+          tutorial: { ...state.tutorial, dismissed: true },
+          stats: {
+            ...fresh.stats,
+            prestigeCount: state.stats.prestigeCount + 1,
+          },
+        }),
+      );
 
       set({
         ...withComputed(nextCore),
@@ -333,12 +338,14 @@ export const useGameStore = create<StoreState>((set, get) => {
     exportSaveString: () => exportGameSave(get()),
     importSaveString: (payload) => {
       try {
-        const imported = importGameSave(payload);
-        const merged = ensurePanel({
-          ...createEmptySave(),
-          ...imported,
-          settings: { ...INITIAL_SETTINGS, ...(imported.settings || {}) },
-        });
+        const imported = normalizeSaveState(importGameSave(payload));
+        const merged = ensurePanel(
+          normalizeSaveState({
+            ...createEmptySave(),
+            ...imported,
+            settings: { ...INITIAL_SETTINGS, ...(imported.settings || {}) },
+          }),
+        );
         set({
           ...withComputed(merged),
           hydrated: true,

@@ -11,12 +11,12 @@ export function estimateOfflineGain(state: GameSaveState, computed: GameComputed
   const tier = PANEL_TIERS[state.selectedTier];
   const cyclesPerSecond = 1000 / computed.autoBuyIntervalMs;
   const averageReward = Math.max(tier.cost * tier.expectedValue, tier.baseReward);
-  const cps = cyclesPerSecond * averageReward * 0.5 * computed.offlineEfficiency;
+  const cps = cyclesPerSecond * averageReward * 0.58 * computed.offlineEfficiency;
   return { gain: Math.floor(cps * (capped / 1000)), durationMs: capped };
 }
 
 export function getPrestigePreview(totalCoinsEarned: number, prestigeCount: number): PrestigePreview {
-  const requirement = PRESTIGE_BASE_REQUIREMENT * Math.max(1, Math.pow(2.15, prestigeCount));
+  const requirement = PRESTIGE_BASE_REQUIREMENT * Math.max(1, Math.pow(2.1, prestigeCount));
   const dustGain = Math.max(0, Math.floor(Math.sqrt(totalCoinsEarned / requirement)));
   return {
     dustGain,

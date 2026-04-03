@@ -18,17 +18,17 @@ export const RECENT_LOG_LIMIT = 10;
 export const TUTORIAL_MESSAGES = [
   '패널을 문질러 숨겨진 룬을 드러내세요.',
   '보상 코인으로 업그레이드를 구입하세요.',
-  '자동화를 해금하면 더 빠르게 성장합니다.',
+  '자동화를 해금하면 성장이 훨씬 빨라집니다.',
 ];
 
 export const PANEL_TIERS: Record<PanelTierId, PanelTierDefinition> = {
   basic: {
     id: 'basic',
     name: '기본 패널',
-    flavor: '처음 손맛을 익히는 가벼운 봉인판입니다.',
+    flavor: '처음 손맛을 익히기에 좋은 얇은 봉인막입니다.',
     cost: 10,
-    baseReward: 15,
-    expectedValue: 1.18,
+    baseReward: 16,
+    expectedValue: 1.2,
     revealThreshold: 55,
     rarityWeights: { common: 50, uncommon: 27, rare: 13, epic: 6, legendary: 3, mythic: 1 },
     specialWeights: { none: 72, jackpot: 6, echo: 8, surge: 7, omen: 4, curse: 3 },
@@ -36,46 +36,46 @@ export const PANEL_TIERS: Record<PanelTierId, PanelTierDefinition> = {
   advanced: {
     id: 'advanced',
     name: '고급 패널',
-    flavor: '빛나는 문양과 함께 희귀 심볼이 조금 더 고개를 듭니다.',
-    cost: 72,
-    baseReward: 102,
-    expectedValue: 1.2,
+    flavor: '룬의 반짝임이 짙어져 희귀 결과가 자주 스며듭니다.',
+    cost: 68,
+    baseReward: 104,
+    expectedValue: 1.22,
     revealThreshold: 53,
-    rarityWeights: { common: 34, uncommon: 28, rare: 20, epic: 11, legendary: 5.5, mythic: 1.5 },
-    specialWeights: { none: 67, jackpot: 8, echo: 8, surge: 9, omen: 5, curse: 3 },
+    rarityWeights: { common: 33, uncommon: 28, rare: 20, epic: 11, legendary: 6, mythic: 2 },
+    specialWeights: { none: 66, jackpot: 8, echo: 8, surge: 9, omen: 6, curse: 3 },
   },
   rare: {
     id: 'rare',
     name: '희귀 패널',
-    flavor: '희귀 룬 조합과 배율이 본격적으로 살아나는 구간입니다.',
-    cost: 360,
-    baseReward: 520,
-    expectedValue: 1.23,
+    flavor: '보상과 조합이 본격적으로 살아나는 중반 핵심 구간입니다.',
+    cost: 330,
+    baseReward: 510,
+    expectedValue: 1.25,
     revealThreshold: 51,
-    rarityWeights: { common: 22, uncommon: 27, rare: 24, epic: 16, legendary: 8.5, mythic: 2.5 },
-    specialWeights: { none: 59, jackpot: 10, echo: 9, surge: 10, omen: 7, curse: 5 },
+    rarityWeights: { common: 21, uncommon: 27, rare: 24, epic: 16, legendary: 9, mythic: 3 },
+    specialWeights: { none: 58, jackpot: 10, echo: 9, surge: 10, omen: 8, curse: 5 },
   },
   legendary: {
     id: 'legendary',
     name: '전설 패널',
-    flavor: '자동화와 고배율이 동시에 존재감을 드러내는 상위 등급입니다.',
-    cost: 1680,
-    baseReward: 2550,
-    expectedValue: 1.27,
+    flavor: '한 번의 공개가 성장 방향을 크게 바꿀 수 있는 상위 패널입니다.',
+    cost: 1560,
+    baseReward: 2520,
+    expectedValue: 1.29,
     revealThreshold: 49,
-    rarityWeights: { common: 9, uncommon: 16, rare: 27, epic: 24, legendary: 17, mythic: 7 },
-    specialWeights: { none: 53, jackpot: 12, echo: 10, surge: 12, omen: 8, curse: 5 },
+    rarityWeights: { common: 8, uncommon: 16, rare: 27, epic: 24, legendary: 17, mythic: 8 },
+    specialWeights: { none: 52, jackpot: 12, echo: 10, surge: 12, omen: 9, curse: 5 },
   },
   mythic: {
     id: 'mythic',
     name: '신화 패널',
-    flavor: '거대한 배율과 유물 공명을 품은 최상위 유물 패널입니다.',
-    cost: 7600,
-    baseReward: 12500,
-    expectedValue: 1.31,
+    flavor: '거대한 보상과 강한 광원 연출을 품은 최상위 패널입니다.',
+    cost: 7100,
+    baseReward: 12200,
+    expectedValue: 1.33,
     revealThreshold: 47,
-    rarityWeights: { common: 3, uncommon: 10, rare: 22, epic: 25, legendary: 26, mythic: 14 },
-    specialWeights: { none: 47, jackpot: 15, echo: 11, surge: 12, omen: 9, curse: 6 },
+    rarityWeights: { common: 3, uncommon: 10, rare: 22, epic: 25, legendary: 25, mythic: 15 },
+    specialWeights: { none: 46, jackpot: 15, echo: 11, surge: 12, omen: 10, curse: 6 },
   },
 };
 
@@ -83,32 +83,32 @@ export const PANEL_RARITIES: Record<string, PanelRarityDefinition> = {
   common: { id: 'common', label: '평범', multiplier: 1, glow: 'rgba(255,255,255,0.22)' },
   uncommon: { id: 'uncommon', label: '희미', multiplier: 1.24, glow: 'rgba(83,211,194,0.28)' },
   rare: { id: 'rare', label: '희귀', multiplier: 1.72, glow: 'rgba(113,217,255,0.34)' },
-  epic: { id: 'epic', label: '영롱', multiplier: 2.4, glow: 'rgba(169,140,255,0.4)' },
-  legendary: { id: 'legendary', label: '전설', multiplier: 3.45, glow: 'rgba(242,205,114,0.46)' },
-  mythic: { id: 'mythic', label: '신화', multiplier: 5.2, glow: 'rgba(255,122,162,0.5)' },
+  epic: { id: 'epic', label: '영롱', multiplier: 2.42, glow: 'rgba(169,140,255,0.4)' },
+  legendary: { id: 'legendary', label: '전설', multiplier: 3.5, glow: 'rgba(242,205,114,0.46)' },
+  mythic: { id: 'mythic', label: '신화', multiplier: 5.28, glow: 'rgba(255,122,162,0.5)' },
 };
 
 export const SYMBOL_DEFINITIONS: Record<string, SymbolDefinition> = {
-  coin: { id: 'coin', icon: '◌', label: '금전', family: 'fortune', weight: 22, rarityBias: 0.2 },
-  star: { id: 'star', icon: '✦', label: '별빛', family: 'celestial', weight: 18, rarityBias: 0.8 },
-  moon: { id: 'moon', icon: '☾', label: '달무늬', family: 'celestial', weight: 16, rarityBias: 0.6 },
+  coin: { id: 'coin', icon: '◉', label: '코인', family: 'fortune', weight: 22, rarityBias: 0.2 },
+  star: { id: 'star', icon: '✦', label: '별문', family: 'celestial', weight: 18, rarityBias: 0.8 },
+  moon: { id: 'moon', icon: '☾', label: '월흔', family: 'celestial', weight: 16, rarityBias: 0.6 },
   gem: { id: 'gem', icon: '◆', label: '보석핵', family: 'fortune', weight: 14, rarityBias: 1 },
   skull: { id: 'skull', icon: '✕', label: '균열흔', family: 'curse', weight: 9, rarityBias: -0.3 },
-  clover: { id: 'clover', icon: '✤', label: '행운엽', family: 'fortune', weight: 11, rarityBias: 1.2 },
-  crown: { id: 'crown', icon: '♛', label: '왕관인', family: 'royal', weight: 7, rarityBias: 1.8 },
-  relic: { id: 'relic', icon: '✧', label: '유물핵', family: 'royal', weight: 3, rarityBias: 2.4 },
+  clover: { id: 'clover', icon: '✤', label: '행운잎', family: 'fortune', weight: 11, rarityBias: 1.2 },
+  crown: { id: 'crown', icon: '♛', label: '왕관룬', family: 'royal', weight: 7, rarityBias: 1.8 },
+  relic: { id: 'relic', icon: '⬡', label: '유물핵', family: 'royal', weight: 3, rarityBias: 2.4 },
 };
 
 export const SPECIAL_EFFECTS: Record<SpecialEffectId, { label: string; description: string; modifier: number }> = {
-  none: { label: '잔온 없음', description: '추가 변동 없이 안정적인 결과를 냅니다.', modifier: 1 },
-  jackpot: { label: '왕관 폭주', description: '완전 일치에 가까울수록 더 큰 배율을 얻습니다.', modifier: 1.24 },
-  echo: { label: '메아리 공명', description: '다음 패널의 희귀 체감이 조금 더 살아납니다.', modifier: 1.14 },
-  surge: { label: '급등 분출', description: '패널 보상과 크리티컬 계수를 함께 밀어 올립니다.', modifier: 1.18 },
-  omen: { label: '예언 조각', description: '희귀 결과와 룬 조합이 살짝 더 잘 이어집니다.', modifier: 1.12 },
-  curse: { label: '균열 저주', description: '저주 흔적이 많을수록 보상이 줄어듭니다.', modifier: 0.84 },
+  none: { label: '잔향 없음', description: '추가 변조 없이 안정적인 결과가 나옵니다.', modifier: 1 },
+  jackpot: { label: '황금 공명', description: '완전 일치 계열 보상이 크게 강화됩니다.', modifier: 1.24 },
+  echo: { label: '메아리 룬', description: '이번 패널이 남기는 여운이 보상을 살짝 밀어 올립니다.', modifier: 1.12 },
+  surge: { label: '광채 폭주', description: '고점 보상이 터질 확률이 조금 더 살아납니다.', modifier: 1.18 },
+  omen: { label: '예언 조각', description: '희귀 룬과 높은 등급 결과가 더 자주 연결됩니다.', modifier: 1.1 },
+  curse: { label: '균열 저주', description: '해골 문양이 많을수록 보상이 크게 깎입니다.', modifier: 0.84 },
 };
 
-export const PRESTIGE_BASE_REQUIREMENT = 32000;
+export const PRESTIGE_BASE_REQUIREMENT = 30000;
 
 export const META_UPGRADE_DEFAULTS: Record<MetaUpgradeId, number> = {
   legacyMint: 0,
@@ -154,8 +154,8 @@ export const INITIAL_STATS = {
 };
 
 export const MARKET_MOOD_CYCLE = [
-  { id: 'calm', label: '고요한 창고', multiplier: 1 },
-  { id: 'bright', label: '빛나는 진동', multiplier: 1.14 },
-  { id: 'frenzy', label: '분출 공명', multiplier: 1.28 },
+  { id: 'calm', label: '고요한 금고', multiplier: 1 },
+  { id: 'bright', label: '빛나는 파동', multiplier: 1.12 },
+  { id: 'frenzy', label: '과열 공명', multiplier: 1.24 },
   { id: 'omen', label: '불안한 그림자', multiplier: 0.92 },
 ] as const;
