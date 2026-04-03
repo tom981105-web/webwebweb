@@ -25,7 +25,7 @@ export function CharactersView({
 
   return (
     <div className="ap-two-column">
-      <SectionCard kicker="Roster" title="캐릭터 목록" subtitle="역할군, 희귀도, 레벨, 성장 상태를 한 번에 확인합니다.">
+      <SectionCard kicker="Roster" title="캐릭터 목록" subtitle="역할군과 성장 상태를 한 번에 비교할 수 있습니다.">
         <div className="ap-character-grid">
           {roster.map((character) => {
             const characterDefinition = CHARACTER_DEFINITION_MAP[character.definitionId];

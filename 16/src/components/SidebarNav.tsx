@@ -7,12 +7,12 @@ import { useGameStore } from '@/store/useGameStore';
 const NAV_ITEMS: Array<{ id: NavView; label: string; icon: typeof Sparkles }> = [
   { id: 'dashboard', label: '대시보드', icon: BarChart3 },
   { id: 'equipment', label: '장비 관리', icon: Backpack },
-  { id: 'enhancement', label: '강화 패널', icon: ShieldPlus },
-  { id: 'research', label: '연구실', icon: FlaskConical },
-  { id: 'crafting', label: '제작/분해실', icon: Hammer },
-  { id: 'expeditions', label: '원정 지도', icon: Map },
+  { id: 'enhancement', label: '강화 계획', icon: ShieldPlus },
+  { id: 'research', label: '연구소', icon: FlaskConical },
+  { id: 'crafting', label: '제작 / 분해', icon: Hammer },
+  { id: 'expeditions', label: '원정 지역', icon: Map },
   { id: 'workshop', label: '공방 시설', icon: Wrench },
-  { id: 'collection', label: '도감/업적', icon: Library },
+  { id: 'collection', label: '도감 / 업적', icon: Library },
   { id: 'shop', label: '상점', icon: ShoppingBag },
   { id: 'records', label: '기록실', icon: Sparkles },
   { id: 'settings', label: '설정', icon: Settings2 },
@@ -33,7 +33,7 @@ export function SidebarNav() {
               key={item.id}
               type="button"
               onClick={() => changeView(item.id)}
-              className={`pg-relative pg-flex pg-min-w-[128px] pg-items-center pg-gap-3 pg-rounded-2xl pg-border pg-px-4 pg-py-3 pg-text-left ${
+              className={`pg-relative pg-flex pg-min-w-[136px] pg-items-center pg-gap-3 pg-rounded-2xl pg-border pg-px-4 pg-py-3 pg-text-left ${
                 active ? 'pg-border-sky-300/30 pg-bg-sky-300/10 pg-text-white' : 'pg-border-white/8 pg-bg-transparent pg-text-slate-300'
               }`}
             >

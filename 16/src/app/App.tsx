@@ -27,6 +27,7 @@ type ServiceAccessSettings = {
   ai: ServiceAccessMode;
   stockSim: ServiceAccessMode;
 };
+
 type PrototypeSlotState = {
   activeKey: string;
 };
@@ -48,11 +49,19 @@ function normalizeServiceAccessSettings(value: unknown): ServiceAccessSettings {
     const next = String(mode || '').trim().toLowerCase();
     return next === 'admin' || next === 'maintenance' ? next : 'open';
   };
+
   return {
     board: normalize(source.board),
     mountain: normalize(source.mountain),
     ai: normalize(source.ai),
     stockSim: normalize(source.stockSim),
+  };
+}
+
+function normalizePrototypeSlotState(value: unknown): PrototypeSlotState {
+  const source = value && typeof value === 'object' ? (value as Partial<PrototypeSlotState>) : {};
+  return {
+    activeKey: String(source.activeKey || '').trim(),
   };
 }
 
@@ -85,19 +94,18 @@ function canAccessPrototype(currentUser: string, accessSettings: ServiceAccessSe
 
 function getBlockedMessage(currentUser: string, accessSettings: ServiceAccessSettings, prototypeSlot: PrototypeSlotState) {
   const user = getCurrentUserRecord(currentUser);
-  if (!currentUser) return '로그인 후 입장할 수 있습니다.';
+  if (!currentUser) return '로그인 후에만 확률조작게임 프로토타입에 입장할 수 있습니다.';
   if (!prototypeSlot.activeKey) return '현재 적용된 프로토타입이 없습니다.';
-  if (prototypeSlot.activeKey !== 'probabilityForge') return '현재는 다른 프로토타입이 메인 슬롯에 적용되어 있습니다.';
+  if (prototypeSlot.activeKey !== 'probabilityForge') return '현재 메인 프로토타입 슬롯에 확률조작게임이 적용되어 있지 않습니다.';
   if (user?.isAdmin) return '';
-  if (accessSettings.stockSim === 'maintenance') return '프로토타입이 현재 점검 중입니다.';
-  if (accessSettings.stockSim === 'admin') return '현재 관리자만 입장할 수 있습니다.';
-  if (user?.status === 'pending') return '승인된 회원만 입장할 수 있습니다.';
-  return '현재 계정은 이 프로토타입에 접근할 수 없습니다.';
+  if (accessSettings.stockSim === 'maintenance') return '확률조작게임은 현재 점검중입니다.';
+  if (accessSettings.stockSim === 'admin') return '현재 관리자만 확률조작게임에 입장할 수 있습니다.';
+  if (user?.status === 'pending') return '승인된 회원만 확률조작게임을 이용할 수 있습니다.';
+  return '현재 계정은 확률조작게임에 접근할 수 없습니다.';
 }
 
 function AccessBlocked({ accessSettings, prototypeSlot }: { accessSettings: ServiceAccessSettings; prototypeSlot: PrototypeSlotState }) {
   const currentUser = getCurrentUser();
-  const message = getBlockedMessage(currentUser, accessSettings, prototypeSlot);
   const loggedIn = Boolean(currentUser);
 
   return (
@@ -105,9 +113,14 @@ function AccessBlocked({ accessSettings, prototypeSlot }: { accessSettings: Serv
       <div className="pg-w-full pg-max-w-2xl pg-rounded-[36px] pg-border pg-border-white/10 pg-bg-forge-900/92 pg-p-8 pg-shadow-shell">
         <p className="pg-m-0 pg-text-xs pg-font-semibold pg-uppercase pg-tracking-[0.24em] pg-text-sky-200/70">Prototype Access</p>
         <h1 className="pg-mb-0 pg-mt-3 pg-font-display pg-text-4xl pg-font-semibold pg-text-white">확률조작게임</h1>
-        <p className="pg-mt-4 pg-text-base pg-leading-8 pg-text-slate-300">{message}</p>
+        <p className="pg-mt-4 pg-text-base pg-leading-8 pg-text-slate-300">
+          {getBlockedMessage(currentUser, accessSettings, prototypeSlot)}
+        </p>
         <div className="pg-mt-8 pg-flex pg-flex-wrap pg-gap-3">
-          <a href={loggedIn ? '/index.html' : '/login.html'} className="pg-inline-flex pg-min-h-[48px] pg-items-center pg-justify-center pg-rounded-full pg-bg-white pg-px-6 pg-text-sm pg-font-semibold pg-text-slate-900 pg-no-underline">
+          <a
+            href={loggedIn ? '/index.html' : '/login.html'}
+            className="pg-inline-flex pg-min-h-[48px] pg-items-center pg-justify-center pg-rounded-full pg-bg-white pg-px-6 pg-text-sm pg-font-semibold pg-text-slate-900 pg-no-underline"
+          >
             {loggedIn ? '메인으로 돌아가기' : '로그인하러 가기'}
           </a>
         </div>
@@ -136,6 +149,7 @@ export function App() {
   const saveNow = useGameStore((state) => state.saveNow);
   const hydrated = useGameStore((state) => state.hydrated);
   const selectedView = useGameStore((state) => state.selectedView);
+  const [accessReady, setAccessReady] = useState(false);
   const [accessSettings, setAccessSettings] = useState<ServiceAccessSettings>(() => {
     try {
       return normalizeServiceAccessSettings(JSON.parse(window.localStorage.getItem('service_access_settings') || '{}'));
@@ -145,7 +159,7 @@ export function App() {
   });
   const [prototypeSlot, setPrototypeSlot] = useState<PrototypeSlotState>(() => {
     try {
-      return JSON.parse(window.localStorage.getItem('prototype_slot_state') || '{}') as PrototypeSlotState;
+      return normalizePrototypeSlotState(JSON.parse(window.localStorage.getItem('prototype_slot_state') || '{}'));
     } catch {
       return DEFAULT_PROTOTYPE_SLOT_STATE;
     }
@@ -170,32 +184,84 @@ export function App() {
 
   useEffect(() => {
     let cancelled = false;
-    const load = async () => {
+
+    const refreshAccessSnapshot = async () => {
+      const localAccess = (() => {
+        try {
+          return normalizeServiceAccessSettings(JSON.parse(window.localStorage.getItem('service_access_settings') || '{}'));
+        } catch {
+          return DEFAULT_SERVICE_ACCESS_SETTINGS;
+        }
+      })();
+      const localSlot = (() => {
+        try {
+          return normalizePrototypeSlotState(JSON.parse(window.localStorage.getItem('prototype_slot_state') || '{}'));
+        } catch {
+          return DEFAULT_PROTOTYPE_SLOT_STATE;
+        }
+      })();
+
+      let nextAccess = localAccess;
+      let nextSlot = localSlot;
+
       try {
-        const accessResponse = await fetch(new URL('/api/access-settings', window.location.origin), { cache: 'no-store' });
+        const [accessResponse, slotResponse] = await Promise.all([
+          fetch(new URL('/api/access-settings', window.location.origin), { cache: 'no-store' }),
+          fetch(new URL('/api/prototype-slot', window.location.origin), { cache: 'no-store' }),
+        ]);
         const accessResult = await accessResponse.json().catch(() => ({}));
-        if (!cancelled && accessResponse.ok && accessResult.accessSettings) {
-          setAccessSettings(normalizeServiceAccessSettings(accessResult.accessSettings));
-        }
-      } catch {
-      }
-      try {
-        const slotResponse = await fetch(new URL('/api/prototype-slot', window.location.origin), { cache: 'no-store' });
         const slotResult = await slotResponse.json().catch(() => ({}));
-        if (!cancelled && slotResponse.ok && slotResult.prototypeSlot) {
-          setPrototypeSlot(slotResult.prototypeSlot);
+
+        if (accessResponse.ok && accessResult.accessSettings) {
+          nextAccess = normalizeServiceAccessSettings(accessResult.accessSettings);
+        }
+        if (slotResponse.ok && slotResult.prototypeSlot) {
+          nextSlot = normalizePrototypeSlotState(slotResult.prototypeSlot);
         }
       } catch {
+        // local cache fallback is enough
+      }
+
+      if (!cancelled) {
+        setAccessSettings(nextAccess);
+        setPrototypeSlot(nextSlot);
+        setAccessReady(true);
       }
     };
-    load();
+
+    refreshAccessSnapshot();
+
+    const refreshHandler = () => {
+      refreshAccessSnapshot();
+    };
+
+    window.addEventListener('prototype-slot:updated', refreshHandler);
+    window.addEventListener('service-access:updated', refreshHandler);
+    window.addEventListener('auth:login-success', refreshHandler);
+    window.addEventListener('storage', refreshHandler);
+
     return () => {
       cancelled = true;
+      window.removeEventListener('prototype-slot:updated', refreshHandler);
+      window.removeEventListener('service-access:updated', refreshHandler);
+      window.removeEventListener('auth:login-success', refreshHandler);
+      window.removeEventListener('storage', refreshHandler);
     };
   }, []);
 
   const currentUser = getCurrentUser();
   const CurrentPanel = useMemo(() => VIEW_COMPONENTS[selectedView], [selectedView]);
+
+  if (!accessReady) {
+    return (
+      <div className="pg-flex pg-min-h-screen pg-items-center pg-justify-center pg-bg-shell">
+        <div className="pg-rounded-[28px] pg-border pg-border-white/10 pg-bg-white/[0.04] pg-p-8 pg-text-center pg-shadow-card">
+          <div className="pg-font-display pg-text-3xl pg-font-semibold pg-text-white">프로토타입 확인중</div>
+          <p className="pg-mb-0 pg-mt-3 pg-text-sm pg-leading-7 pg-text-slate-300">접근 상태와 적용된 슬롯 정보를 불러오고 있습니다.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!canAccessPrototype(currentUser, accessSettings, prototypeSlot)) {
     return <AccessBlocked accessSettings={accessSettings} prototypeSlot={prototypeSlot} />;
@@ -206,7 +272,7 @@ export function App() {
       <div className="pg-flex pg-min-h-screen pg-items-center pg-justify-center pg-bg-shell">
         <div className="pg-rounded-[28px] pg-border pg-border-white/10 pg-bg-white/[0.04] pg-p-8 pg-text-center pg-shadow-card">
           <div className="pg-font-display pg-text-3xl pg-font-semibold pg-text-white">공방을 가동하는 중입니다</div>
-          <p className="pg-mb-0 pg-mt-3 pg-text-sm pg-leading-7 pg-text-slate-300">저장 데이터를 불러오고 장기 성장 루프를 정렬하고 있습니다.</p>
+          <p className="pg-mb-0 pg-mt-3 pg-text-sm pg-leading-7 pg-text-slate-300">저장된 진행 데이터를 불러오고 장치 상태를 정리하고 있습니다.</p>
         </div>
       </div>
     );

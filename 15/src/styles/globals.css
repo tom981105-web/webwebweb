@@ -49,7 +49,7 @@ button {
 .ap-shell {
   max-width: 1440px;
   margin: 0 auto;
-  padding: 28px 20px 48px;
+  padding: 32px 24px 56px;
 }
 
 .ap-topbar,
@@ -70,9 +70,9 @@ button {
 .ap-topbar {
   display: flex;
   justify-content: space-between;
-  gap: 20px;
+  gap: 24px;
   align-items: end;
-  padding: 28px;
+  padding: 30px;
 }
 
 .ap-topbar h1,
@@ -104,18 +104,18 @@ button {
 }
 
 .ap-profile-chip {
-  min-width: 220px;
-  padding: 16px 18px;
+  min-width: 250px;
+  padding: 18px 20px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.04);
 }
 
 .ap-nav {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
-  padding: 10px;
-  margin-top: 16px;
+  padding: 12px;
+  margin-top: 18px;
 }
 
 .ap-nav-button,
@@ -132,7 +132,8 @@ button {
   display: inline-flex;
   gap: 8px;
   align-items: center;
-  padding: 12px 16px;
+  min-height: 50px;
+  padding: 13px 18px;
 }
 
 .ap-nav-button.is-active,
@@ -179,7 +180,7 @@ button {
 
 .ap-card {
   border-radius: 28px;
-  padding: 22px;
+  padding: 24px;
 }
 
 .ap-card-header {
@@ -187,7 +188,7 @@ button {
   justify-content: space-between;
   gap: 16px;
   align-items: start;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .ap-card-title {
@@ -223,6 +224,7 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.03);
+  transition: transform 160ms ease, border-color 160ms ease, background-color 160ms ease;
 }
 
 .ap-result-panel,
@@ -238,6 +240,17 @@ button {
 .ap-metric-item,
 .ap-currency-item {
   padding: 16px;
+}
+
+.ap-character-card:hover,
+.ap-feed-item:hover,
+.ap-growth-item:hover,
+.ap-report-card:hover,
+.ap-equipment-item:hover,
+.ap-nav-button:hover,
+.ap-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(105, 201, 255, 0.26);
 }
 
 .ap-result-stats,

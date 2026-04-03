@@ -13,14 +13,14 @@ export function TopBar() {
           <p className="pg-m-0 pg-text-[11px] pg-font-semibold pg-uppercase pg-tracking-[0.26em] pg-text-sky-200/70">Probability Forge</p>
           <h1 className="pg-mb-0 pg-mt-2 pg-font-display pg-text-[clamp(1.8rem,4vw,3.2rem)] pg-font-semibold pg-text-white">확률조작게임</h1>
           <p className="pg-mb-0 pg-mt-2 pg-max-w-3xl pg-text-sm pg-leading-7 pg-text-slate-300">
-            강화, 연구, 원정, 제작, 자동화를 하나의 장기 성장 루프로 엮은 공방 운영 프로토타입
+            강화, 연구, 제작, 원정, 자동화를 묶어 운용하는 실험형 공방 성장 프로토타입입니다.
           </p>
         </div>
         <div className="pg-grid pg-grid-cols-2 pg-gap-3 sm:pg-grid-cols-4">
-          <Metric label="계정 Lv" value={String(account.level)} />
+          <Metric label="계정 레벨" value={String(account.level)} />
           <Metric label="명성" value={formatNumber(account.fame, compact)} />
-          <Metric label="공방력" value={formatNumber(computed.workshopPower, compact)} />
-          <Metric label="활성 칭호" value={computed.titleLabel} />
+          <Metric label="공방 전력" value={formatNumber(computed.workshopPower, compact)} />
+          <Metric label="현재 칭호" value={computed.titleLabel} />
         </div>
       </div>
     </header>
