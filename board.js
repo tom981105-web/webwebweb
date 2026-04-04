@@ -259,7 +259,7 @@
                 editor.innerHTML = resolveContentForDisplay(remoteDraft.content || '<p><br></p>');
                 categoryInput.value = remoteDraft.category || activeCategory;
                 if (noticeInput) noticeInput.checked = Boolean(remoteDraft.isNotice);
-                bindEditorImages();
+                prepareEditorImagesForEditing();
                 return true;
             }
         } catch (error) {
@@ -343,7 +343,7 @@
         editor.innerHTML = resolveContentForDisplay(draft.content || '<p><br></p>');
         categoryInput.value = draft.category || activeCategory;
         if (noticeInput) noticeInput.checked = Boolean(draft.isNotice);
-        bindEditorImages();
+        prepareEditorImagesForEditing();
         return true;
     }
 
@@ -542,6 +542,13 @@
                 containerWidth
             });
         });
+    }
+
+    function prepareEditorImagesForEditing() {
+        const editor = document.getElementById('richEditor');
+        if (!editor) return;
+        normalizeEditorImagesForSave(editor);
+        bindEditorImages();
     }
 
     function applyContentImageLayouts(container) {
@@ -2027,7 +2034,7 @@ window.closeDetailModal = function () {
         }
         const submitButton = document.querySelector('#writeForm .board-submit');
         if (submitButton) submitButton.innerText = '수정 저장';
-        bindEditorImages();
+        prepareEditorImagesForEditing();
         restoreBoardDraft(post.id);
         void hydrateBoardDraftFromServer(post.id);
     };
