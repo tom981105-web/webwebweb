@@ -104,6 +104,7 @@
         const noticeInput = document.getElementById('isNotice');
         if (!titleInput || !editor || !categoryInput) return null;
 
+        normalizeEditorImagesForSave(editor);
         const title = titleInput.value.trim();
         const content = normalizeContentForStorage(editor.innerHTML.trim());
         const isEffectivelyEmpty = !title && (!content || content === '<p><br></p>');
@@ -2035,8 +2036,7 @@ window.closeDetailModal = function () {
         const submitButton = document.querySelector('#writeForm .board-submit');
         if (submitButton) submitButton.innerText = '수정 저장';
         prepareEditorImagesForEditing();
-        restoreBoardDraft(post.id);
-        void hydrateBoardDraftFromServer(post.id);
+        clearBoardDraft(post.id, { remote: false });
     };
 
     async function persistVotes(post, fallbackPost) {
