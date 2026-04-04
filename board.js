@@ -670,6 +670,23 @@
         });
     }
 
+    function scheduleContentImageRelayout(img, container) {
+        if (!img || !container) return;
+        const rerender = () => {
+            if (!img.isConnected) return;
+            applyEditorImageLayout(img, {
+                width: getNaturalContentImageWidth(img),
+                position: 50,
+                containerWidth: container.clientWidth || getImageContainerWidth(img),
+                persist: false
+            });
+        };
+
+        window.setTimeout(rerender, 80);
+        window.setTimeout(rerender, 240);
+        window.setTimeout(rerender, 600);
+    }
+
     function applyContentImageLayouts(container) {
         if (!container) return;
         container.querySelectorAll('img').forEach((img) => {
@@ -685,12 +702,12 @@
                     persist: false
                 });
             } else {
-                img.style.maxWidth = '100%';
-                img.style.width = 'auto';
-                img.style.height = 'auto';
-                img.style.display = 'block';
-                img.style.marginTop = '18px';
-                img.style.marginBottom = '18px';
+                applyEditorImageLayout(img, {
+                    width: Math.min(containerWidth, 820),
+                    position: 50,
+                    containerWidth,
+                    persist: false
+                });
                 img.addEventListener('load', () => {
                     applyEditorImageLayout(img, {
                         width: getNaturalContentImageWidth(img),
@@ -699,12 +716,20 @@
                         persist: false
                     });
                 }, { once: true });
+                scheduleContentImageRelayout(img, container);
             }
             img.classList.remove('selected-editor-image');
             img.style.outline = '';
             img.style.boxShadow = '';
             img.style.cursor = 'default';
         });
+    }
+
+    function refreshDetailImageLayouts() {
+        const detailContent = document.getElementById('detailContent');
+        if (!detailContent) return;
+        applySavedImageLayouts(detailContent, currentOpenPostId ? (boardPosts.find((item) => item.id === currentOpenPostId)?.imageLayouts || []) : []);
+        applyContentImageLayouts(detailContent);
     }
 
     function normalizeLinkHref(value) {
@@ -2124,20 +2149,24 @@ function setupCommentStickerPicker() {
         document.getElementById('detailAuthor').innerHTML = renderAuthorWithAvatar(post.author);
         document.getElementById('detailTime').innerText = formatDate(post.date);
         document.getElementById('detailViews').innerText = post.views || 0;
+        if (boardListView) boardListView.classList.add('is-hidden');
+        boardDetailView.style.display = 'block';
+        boardDetailView.classList.add('is-active');
         document.getElementById('detailContent').innerHTML = post.isRich
             ? linkifyRichHtml(post.content || '')
             : linkifyRichHtml(escapeHtml(post.content || '').replace(/\n/g, '<br>'));
-        applySavedImageLayouts(document.getElementById('detailContent'), post.imageLayouts);
-        applyContentImageLayouts(document.getElementById('detailContent'));
+        refreshDetailImageLayouts();
+        window.requestAnimationFrame(() => {
+            refreshDetailImageLayouts();
+            window.setTimeout(refreshDetailImageLayouts, 60);
+            window.setTimeout(refreshDetailImageLayouts, 220);
+        });
         document.getElementById('authorActions').style.display = post.author === currentUser || currentUser === 'admin' ? 'flex' : 'none';
         updateVoteUI(post);
         renderComments(post);
         renderBoard(currentSearchType, currentSearchQuery);
         updateDetailNavigation(post.id);
         renderRelatedPosts(post.id);
-        if (boardListView) boardListView.classList.add('is-hidden');
-        boardDetailView.style.display = 'block';
-        boardDetailView.classList.add('is-active');
         boardDetailView.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
