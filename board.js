@@ -525,6 +525,30 @@
         return 50;
     }
 
+    function hasExplicitImageLayout(target) {
+        if (!target) return false;
+        return Boolean(
+            String(target.dataset.imageWidth || '').trim()
+            || String(target.getAttribute('width') || '').trim()
+            || Number.isFinite(readPixelValue(target.style.width))
+            || String(target.dataset.imagePosition || '').trim()
+        );
+    }
+
+    function getNaturalContentImageWidth(target) {
+        if (!target) return 820;
+        const containerWidth = getImageContainerWidth(target);
+        const naturalWidth = Number(target.naturalWidth || 0);
+        const naturalHeight = Number(target.naturalHeight || 0);
+        if (naturalWidth > 0 && naturalHeight > 0) {
+            if (naturalWidth >= naturalHeight) {
+                return Math.min(containerWidth, 820);
+            }
+            return Math.min(containerWidth, 560);
+        }
+        return Math.min(containerWidth, 820);
+    }
+
     function collectImageLayouts(container) {
         if (!container) return [];
         return [...container.querySelectorAll('img')].map((img) => {
@@ -538,6 +562,7 @@
         if (!target) return;
 
         const containerWidth = options.containerWidth || getImageContainerWidth(target);
+        const persistLayout = options.persist !== false;
         const width = clampNumber(
             Number.isFinite(options.width) ? options.width : getStoredImageWidth(target),
             140,
@@ -551,9 +576,11 @@
         const available = Math.max(0, containerWidth - width);
         const marginLeft = available * (position / 100);
 
-        target.dataset.imageWidth = String(Math.round(width));
-        target.dataset.imagePosition = String(Math.round(position));
-        target.setAttribute('width', String(Math.round(width)));
+        if (persistLayout) {
+            target.dataset.imageWidth = String(Math.round(width));
+            target.dataset.imagePosition = String(Math.round(position));
+            target.setAttribute('width', String(Math.round(width)));
+        }
         target.classList.add('editor-inline-image');
         target.style.setProperty('width', `${Math.round(width)}px`, 'important');
         target.style.maxWidth = '100%';
@@ -646,13 +673,30 @@
     function applyContentImageLayouts(container) {
         if (!container) return;
         container.querySelectorAll('img').forEach((img) => {
-            applyEditorImageLayout(img, {
-                containerWidth: container.clientWidth || getImageContainerWidth(img)
-            });
-            if (!img.dataset.imageWidth && !img.complete) {
+            const containerWidth = container.clientWidth || getImageContainerWidth(img);
+            const hasLayout = hasExplicitImageLayout(img);
+            if (hasLayout) {
+                applyEditorImageLayout(img, { containerWidth });
+            } else if (img.complete) {
+                applyEditorImageLayout(img, {
+                    width: getNaturalContentImageWidth(img),
+                    position: 50,
+                    containerWidth,
+                    persist: false
+                });
+            } else {
+                img.style.maxWidth = '100%';
+                img.style.width = 'auto';
+                img.style.height = 'auto';
+                img.style.display = 'block';
+                img.style.marginTop = '18px';
+                img.style.marginBottom = '18px';
                 img.addEventListener('load', () => {
                     applyEditorImageLayout(img, {
-                        containerWidth: container.clientWidth || getImageContainerWidth(img)
+                        width: getNaturalContentImageWidth(img),
+                        position: 50,
+                        containerWidth: container.clientWidth || getImageContainerWidth(img),
+                        persist: false
                     });
                 }, { once: true });
             }
