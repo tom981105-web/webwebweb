@@ -106,7 +106,7 @@
 
         normalizeEditorImagesForSave(editor);
         const title = titleInput.value.trim();
-        const content = normalizeContentForStorage(editor.innerHTML.trim());
+        const content = serializeEditorContent(editor);
         const isEffectivelyEmpty = !title && (!content || content === '<p><br></p>');
         if (isEffectivelyEmpty) return null;
 
@@ -543,6 +543,45 @@
                 containerWidth
             });
         });
+    }
+
+    function serializeEditorContent(editor) {
+        if (!editor) return '';
+        normalizeEditorImagesForSave(editor);
+        const clone = editor.cloneNode(true);
+        const sourceImages = [...editor.querySelectorAll('img')];
+        const cloneImages = [...clone.querySelectorAll('img')];
+        const containerWidth = editor.clientWidth || getImageContainerWidth(editor);
+
+        sourceImages.forEach((sourceImage, index) => {
+            const cloneImage = cloneImages[index];
+            if (!cloneImage) return;
+
+            const width = getStoredImageWidth(sourceImage);
+            const position = getStoredImagePosition(sourceImage, width);
+            const available = Math.max(0, containerWidth - width);
+            const marginLeft = available * (position / 100);
+
+            cloneImage.setAttribute('width', String(Math.round(width)));
+            cloneImage.setAttribute('data-image-width', String(Math.round(width)));
+            cloneImage.setAttribute('data-image-position', String(Math.round(position)));
+            cloneImage.classList.add('editor-inline-image');
+            cloneImage.style.width = `${Math.round(width)}px`;
+            cloneImage.style.maxWidth = '100%';
+            cloneImage.style.height = 'auto';
+            cloneImage.style.display = 'block';
+            cloneImage.style.borderRadius = '8px';
+            cloneImage.style.marginTop = '18px';
+            cloneImage.style.marginBottom = '18px';
+            cloneImage.style.marginLeft = `${Math.round(marginLeft)}px`;
+            cloneImage.style.marginRight = '0';
+            cloneImage.style.objectFit = 'contain';
+            cloneImage.style.removeProperty('cursor');
+            cloneImage.style.removeProperty('outline');
+            cloneImage.style.removeProperty('box-shadow');
+        });
+
+        return normalizeContentForStorage(clone.innerHTML.trim());
     }
 
     function prepareEditorImagesForEditing() {
@@ -1636,7 +1675,7 @@ function setupCommentStickerPicker() {
         const title = document.getElementById('postTitle').value.trim();
         const editor = document.getElementById('richEditor');
         normalizeEditorImagesForSave(editor);
-        const content = normalizeContentForStorage(editor.innerHTML.trim());
+        const content = serializeEditorContent(editor);
         const isNotice = currentUser === 'admin' && document.getElementById('isNotice').checked;
         const category = document.getElementById('postCategory').value || activeCategory;
         if (!title || !content || content === '<p><br></p>') {
