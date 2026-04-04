@@ -6,11 +6,6 @@
   color-scheme: dark;
   font-family: 'IBM Plex Sans KR', 'Segoe UI', sans-serif;
   background: #060812;
-  color: #ecf2ff;
-}
-
-* {
-  box-sizing: border-box;
 }
 
 html,
@@ -22,33 +17,90 @@ body,
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top, rgba(127, 214, 255, 0.08), transparent 24%),
-    radial-gradient(circle at 84% 10%, rgba(182, 148, 255, 0.12), transparent 24%),
-    linear-gradient(180deg, #070b15 0%, #050812 100%);
-  color: #ecf2ff;
+    radial-gradient(circle at top, rgba(127, 214, 255, 0.12), transparent 22%),
+    radial-gradient(circle at 80% 10%, rgba(182, 148, 255, 0.14), transparent 24%),
+    linear-gradient(180deg, rgba(8, 12, 22, 0.98), rgba(6, 9, 18, 1));
+  color: #e2e8f0;
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
+* {
+  box-sizing: border-box;
 }
 
-a {
-  color: inherit;
+::selection {
+  background: rgba(45, 212, 191, 0.25);
+  color: #fff;
 }
 
-::-webkit-scrollbar {
+.pg-font-display {
+  letter-spacing: -0.03em;
+}
+
+.pg-panel-glow {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 22px 60px rgba(0, 0, 0, 0.42);
+}
+
+.pg-soft-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.pg-soft-scrollbar::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.28);
+.pg-soft-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
   border-radius: 999px;
 }
 
-::-webkit-scrollbar-track {
+.pg-soft-scrollbar::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.pg-burst-ring {
+  animation: pg-burst-ring 0.72s ease-out;
+}
+
+.pg-panel-breath {
+  animation: pg-panel-breath 2.6s ease-in-out infinite;
+}
+
+.pg-slide-in {
+  animation: pg-slide-in 0.26s ease-out;
+}
+
+@keyframes pg-burst-ring {
+  0% {
+    transform: scale(0.96);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.06);
+    opacity: 0;
+  }
+}
+
+@keyframes pg-panel-breath {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes pg-slide-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

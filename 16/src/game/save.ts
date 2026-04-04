@@ -1,33 +1,43 @@
-import { STORAGE_KEY } from '@/config/balance';
-import { migrateSave } from '@/game/migrations';
-import type { GameSaveState } from '@/types/game';
+import { SAVE_KEY, SAVE_VERSION } from '@/data/balance';
+import type { SaveState } from '@/types/game';
+import { safeParseJson } from '@/utils/format';
 
-export function loadSave(): GameSaveState | null {
-  if (typeof window === 'undefined') return null;
+export function loadSave(): SaveState | null {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return migrateSave(JSON.parse(raw));
+    const raw = window.localStorage.getItem(SAVE_KEY);
+    const parsed = safeParseJson<SaveState | null>(raw, null);
+    if (!parsed || parsed.version !== SAVE_VERSION) return null;
+    return parsed;
   } catch {
     return null;
   }
 }
 
-export function saveGame(state: GameSaveState) {
-  if (typeof window === 'undefined') return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+export function saveGame(state: SaveState) {
+  try {
+    window.localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  } catch {
+    // local-only game: ignore storage edge cases quietly
+  }
 }
 
 export function clearSave() {
-  if (typeof window === 'undefined') return;
-  window.localStorage.removeItem(STORAGE_KEY);
+  try {
+    window.localStorage.removeItem(SAVE_KEY);
+  } catch {
+    // ignore
+  }
 }
 
-export function exportSave(state: GameSaveState) {
+export function exportSave(state: SaveState) {
   return btoa(unescape(encodeURIComponent(JSON.stringify(state))));
 }
 
-export function importSave(payload: string) {
-  const decoded = decodeURIComponent(escape(atob(payload)));
-  return migrateSave(JSON.parse(decoded));
+export function importSave(payload: string): SaveState {
+  const decoded = decodeURIComponent(escape(atob(payload.trim())));
+  const parsed = JSON.parse(decoded) as SaveState;
+  if (!parsed || parsed.version !== SAVE_VERSION) {
+    throw new Error('This backup string is invalid or out of date.');
+  }
+  return parsed;
 }

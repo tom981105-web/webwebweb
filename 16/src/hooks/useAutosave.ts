@@ -1,17 +1,12 @@
 import { useEffect } from 'react';
 
-export function useAutosave(onSave: () => void, intervalMs = 15000) {
+export function useAutosave(callback: () => void, enabled: boolean) {
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      onSave();
-    }, intervalMs);
-
-    const handleBeforeUnload = () => onSave();
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [intervalMs, onSave]);
+    if (!enabled) return undefined;
+    const handle = window.setInterval(() => {
+      callback();
+    }, 8000);
+    return () => window.clearInterval(handle);
+  }, [callback, enabled]);
 }
+

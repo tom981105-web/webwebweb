@@ -1,18 +1,25 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
-export function useGameLoop(onTick: (deltaMs: number) => void) {
+export function useGameLoop(callback: (deltaMs: number) => void, enabled = true) {
+  const callbackRef = useRef(callback);
+
   useEffect(() => {
-    let frame = 0;
-    let previous = performance.now();
+    callbackRef.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let frameId = 0;
+    let last = performance.now();
 
     const loop = (now: number) => {
-      const delta = now - previous;
-      previous = now;
-      onTick(delta);
-      frame = window.requestAnimationFrame(loop);
+      const delta = now - last;
+      last = now;
+      callbackRef.current(delta);
+      frameId = window.requestAnimationFrame(loop);
     };
 
-    frame = window.requestAnimationFrame(loop);
-    return () => window.cancelAnimationFrame(frame);
-  }, [onTick]);
+    frameId = window.requestAnimationFrame(loop);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [enabled]);
 }
