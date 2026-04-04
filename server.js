@@ -259,6 +259,19 @@ function normalizeBoardComments(value) {
     });
 }
 
+function normalizeBoardImageLayouts(value) {
+    const layouts = Array.isArray(value) ? value : [];
+    return layouts.map((entry) => {
+        const source = entry && typeof entry === 'object' ? entry : {};
+        const width = Number(source.width);
+        const position = Number(source.position);
+        return {
+            width: Number.isFinite(width) ? Math.min(2000, Math.max(140, Math.round(width))) : 820,
+            position: Number.isFinite(position) ? Math.min(100, Math.max(0, Math.round(position))) : 50
+        };
+    });
+}
+
 function normalizeBoardPosts(value, categories) {
     const posts = Array.isArray(value) ? value : [];
     return posts.map((post) => ({
@@ -274,6 +287,7 @@ function normalizeBoardPosts(value, categories) {
         isNotice: Boolean(post.isNotice),
         isRich: Boolean(post.isRich),
         comments: normalizeBoardComments(post.comments),
+        imageLayouts: normalizeBoardImageLayouts(post.imageLayouts),
         category: categories.includes(post.category) ? post.category : categories[0]
     }));
 }
@@ -300,6 +314,7 @@ function normalizeBoardDrafts(value, categories) {
             postId: normalizedPostId > 0 ? normalizedPostId : null,
             title: String(draft.title || ''),
             content: normalizeBoardContent(draft.content || ''),
+            imageLayouts: normalizeBoardImageLayouts(draft.imageLayouts),
             category: categories.includes(draft.category) ? draft.category : categories[0],
             isNotice: Boolean(draft.isNotice),
             updatedAt: draft.updatedAt || new Date().toISOString()
@@ -1660,6 +1675,7 @@ app.post('/api/board/posts', async (req, res) => {
         likes: payload.likes || 0,
         dislikes: payload.dislikes || 0,
         comments: payload.comments || [],
+        imageLayouts: payload.imageLayouts || [],
         isNotice: Boolean(payload.isNotice),
         isRich: Boolean(payload.isRich),
         category: payload.category || state.board.categories[0]
@@ -1734,6 +1750,7 @@ app.post('/api/board/drafts', async (req, res) => {
             postId: postId > 0 ? postId : null,
             title: payload.title || '',
             content: payload.content || '',
+            imageLayouts: payload.imageLayouts || [],
             category: payload.category || state.board.categories[0],
             isNotice: Boolean(payload.isNotice),
             updatedAt: payload.updatedAt || new Date().toISOString()

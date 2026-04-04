@@ -89,6 +89,7 @@
             draft.postId || null,
             draft.title || '',
             draft.content || '',
+            Array.isArray(draft.imageLayouts) ? draft.imageLayouts : [],
             draft.category || '',
             Boolean(draft.isNotice)
         ]);
@@ -115,6 +116,7 @@
             postId: currentEditingPostId || null,
             title,
             content,
+            imageLayouts: collectImageLayouts(editor),
             category: categoryInput.value || activeCategory,
             isNotice: Boolean(noticeInput && noticeInput.checked),
             updatedAt: new Date().toISOString()
@@ -160,6 +162,7 @@
             postId: draft.postId || null,
             title: draft.title || '',
             content: draft.content || '',
+            imageLayouts: Array.isArray(draft.imageLayouts) ? draft.imageLayouts : [],
             category: draft.category || activeCategory,
             isNotice: Boolean(draft.isNotice),
             updatedAt: draft.updatedAt || new Date().toISOString()
@@ -261,6 +264,7 @@
                 categoryInput.value = remoteDraft.category || activeCategory;
                 if (noticeInput) noticeInput.checked = Boolean(remoteDraft.isNotice);
                 prepareEditorImagesForEditing();
+                applySavedImageLayouts(editor, remoteDraft.imageLayouts);
                 return true;
             }
         } catch (error) {
@@ -345,6 +349,7 @@
         categoryInput.value = draft.category || activeCategory;
         if (noticeInput) noticeInput.checked = Boolean(draft.isNotice);
         prepareEditorImagesForEditing();
+        applySavedImageLayouts(editor, draft.imageLayouts);
         return true;
     }
 
@@ -438,6 +443,19 @@
         return String(html || '').replace(/https?:\/\/localhost:\d+(\/uploads\/[^"' )]+)/gi, '$1');
     }
 
+    function normalizeImageLayouts(value) {
+        if (!Array.isArray(value)) return [];
+        return value.map((entry) => {
+            const source = entry && typeof entry === 'object' ? entry : {};
+            const rawWidth = Number(source.width);
+            const rawPosition = Number(source.position);
+            return {
+                width: clampNumber(Number.isFinite(rawWidth) ? rawWidth : 820, 140, 2000),
+                position: clampNumber(Number.isFinite(rawPosition) ? rawPosition : 50, 0, 100)
+            };
+        });
+    }
+
     function resolveContentForDisplay(html) {
         const content = String(html || '');
         if (window.location.protocol !== 'file:') return content;
@@ -505,6 +523,15 @@
         }
 
         return 50;
+    }
+
+    function collectImageLayouts(container) {
+        if (!container) return [];
+        return [...container.querySelectorAll('img')].map((img) => {
+            const width = Math.round(getStoredImageWidth(img));
+            const position = Math.round(getStoredImagePosition(img, width));
+            return { width, position };
+        });
     }
 
     function applyEditorImageLayout(target, options = {}) {
@@ -598,6 +625,22 @@
         if (!editor) return;
         normalizeEditorImagesForSave(editor);
         bindEditorImages();
+    }
+
+    function applySavedImageLayouts(container, layouts) {
+        if (!container) return;
+        const normalizedLayouts = normalizeImageLayouts(layouts);
+        if (!normalizedLayouts.length) return;
+
+        [...container.querySelectorAll('img')].forEach((img, index) => {
+            const layout = normalizedLayouts[index];
+            if (!layout) return;
+            applyEditorImageLayout(img, {
+                width: layout.width,
+                position: layout.position,
+                containerWidth: container.clientWidth || getImageContainerWidth(img)
+            });
+        });
     }
 
     function applyContentImageLayouts(container) {
@@ -1099,7 +1142,8 @@ function setupCommentStickerPicker() {
         return {
             ...post,
             category: boardCategories.includes(post && post.category) ? post.category : boardCategories[0],
-            comments: normalizeCommentNodes(post && post.comments)
+            comments: normalizeCommentNodes(post && post.comments),
+            imageLayouts: normalizeImageLayouts(post && post.imageLayouts)
         };
     }
 
@@ -1715,6 +1759,7 @@ function setupCommentStickerPicker() {
             ...(targetPost || {}),
             title,
             content,
+            imageLayouts: collectImageLayouts(editor),
             category,
             author: targetPost ? targetPost.author : currentUser,
             date: targetPost ? targetPost.date : dateStr,
@@ -2038,6 +2083,7 @@ function setupCommentStickerPicker() {
         document.getElementById('detailContent').innerHTML = post.isRich
             ? linkifyRichHtml(post.content || '')
             : linkifyRichHtml(escapeHtml(post.content || '').replace(/\n/g, '<br>'));
+        applySavedImageLayouts(document.getElementById('detailContent'), post.imageLayouts);
         applyContentImageLayouts(document.getElementById('detailContent'));
         document.getElementById('authorActions').style.display = post.author === currentUser || currentUser === 'admin' ? 'flex' : 'none';
         updateVoteUI(post);
@@ -2091,6 +2137,7 @@ window.closeDetailModal = function () {
         const submitButton = document.querySelector('#writeForm .board-submit');
         if (submitButton) submitButton.innerText = '수정 저장';
         prepareEditorImagesForEditing();
+        applySavedImageLayouts(document.getElementById('richEditor'), post.imageLayouts);
         clearBoardDraft(post.id, { remote: false });
     };
 
