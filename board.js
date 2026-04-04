@@ -465,10 +465,13 @@
         if (!target) return fallbackWidth;
         const containerWidth = getImageContainerWidth(target);
         const dataWidth = Number.parseFloat(target.dataset.imageWidth || '');
+        const attrWidth = Number.parseFloat(target.getAttribute('width') || '');
         const styleWidth = readPixelValue(target.style.width);
         const rectWidth = target.getBoundingClientRect ? target.getBoundingClientRect().width : NaN;
         const width = Number.isFinite(dataWidth)
             ? dataWidth
+            : Number.isFinite(attrWidth)
+                ? attrWidth
             : Number.isFinite(styleWidth)
                 ? styleWidth
                 : Number.isFinite(rectWidth) && rectWidth > 0
@@ -513,17 +516,32 @@
 
         target.dataset.imageWidth = String(Math.round(width));
         target.dataset.imagePosition = String(Math.round(position));
+        target.setAttribute('width', String(Math.round(width)));
         target.classList.add('editor-inline-image');
-        target.style.width = `${Math.round(width)}px`;
+        target.style.setProperty('width', `${Math.round(width)}px`, 'important');
         target.style.maxWidth = '100%';
         target.style.height = 'auto';
         target.style.display = 'block';
         target.style.borderRadius = '8px';
         target.style.marginTop = '18px';
         target.style.marginBottom = '18px';
-        target.style.marginLeft = `${Math.round(marginLeft)}px`;
-        target.style.marginRight = '0';
+        target.style.setProperty('margin-left', `${Math.round(marginLeft)}px`, 'important');
+        target.style.setProperty('margin-right', '0', 'important');
         target.style.objectFit = 'contain';
+    }
+
+    function normalizeEditorImagesForSave(editor) {
+        if (!editor) return;
+        const containerWidth = editor.clientWidth || getImageContainerWidth(editor);
+        editor.querySelectorAll('img').forEach((img) => {
+            const computedWidth = getStoredImageWidth(img);
+            const computedPosition = getStoredImagePosition(img, computedWidth);
+            applyEditorImageLayout(img, {
+                width: computedWidth,
+                position: computedPosition,
+                containerWidth
+            });
+        });
     }
 
     function applyContentImageLayouts(container) {
@@ -1608,7 +1626,9 @@ function setupCommentStickerPicker() {
         event.preventDefault();
         if (!ensureBoardReady()) return;
         const title = document.getElementById('postTitle').value.trim();
-        const content = normalizeContentForStorage(document.getElementById('richEditor').innerHTML.trim());
+        const editor = document.getElementById('richEditor');
+        normalizeEditorImagesForSave(editor);
+        const content = normalizeContentForStorage(editor.innerHTML.trim());
         const isNotice = currentUser === 'admin' && document.getElementById('isNotice').checked;
         const category = document.getElementById('postCategory').value || activeCategory;
         if (!title || !content || content === '<p><br></p>') {

@@ -1078,11 +1078,11 @@ body {
 .rich-editor img,
 .post-detail-body img {
     max-width: min(100%, 860px) !important;
-    width: auto;
     height: auto;
     max-height: min(78vh, 860px);
     display: block;
-    margin: 18px auto;
+    margin-top: 18px;
+    margin-bottom: 18px;
     object-fit: contain;
 }
 
