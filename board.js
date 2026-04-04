@@ -469,15 +469,24 @@
         const attrWidth = Number.parseFloat(target.getAttribute('width') || '');
         const styleWidth = readPixelValue(target.style.width);
         const rectWidth = target.getBoundingClientRect ? target.getBoundingClientRect().width : NaN;
+        const naturalWidth = Number(target.naturalWidth || 0);
+        const naturalHeight = Number(target.naturalHeight || 0);
+        const inferredWidth = naturalWidth > 0 && naturalHeight > 0
+            ? naturalWidth >= naturalHeight
+                ? Math.min(containerWidth, 820)
+                : Math.min(containerWidth, 560)
+            : NaN;
         const width = Number.isFinite(dataWidth)
             ? dataWidth
             : Number.isFinite(attrWidth)
                 ? attrWidth
-            : Number.isFinite(styleWidth)
-                ? styleWidth
-                : Number.isFinite(rectWidth) && rectWidth > 0
-                    ? rectWidth
-                    : Math.min(containerWidth, fallbackWidth);
+                : Number.isFinite(styleWidth)
+                    ? styleWidth
+                    : Number.isFinite(inferredWidth)
+                        ? inferredWidth
+                        : Number.isFinite(rectWidth) && rectWidth > 0
+                            ? rectWidth
+                            : Math.min(containerWidth, fallbackWidth);
         return clampNumber(width, 140, containerWidth);
     }
 
@@ -597,6 +606,13 @@
             applyEditorImageLayout(img, {
                 containerWidth: container.clientWidth || getImageContainerWidth(img)
             });
+            if (!img.dataset.imageWidth && !img.complete) {
+                img.addEventListener('load', () => {
+                    applyEditorImageLayout(img, {
+                        containerWidth: container.clientWidth || getImageContainerWidth(img)
+                    });
+                }, { once: true });
+            }
             img.classList.remove('selected-editor-image');
             img.style.outline = '';
             img.style.boxShadow = '';

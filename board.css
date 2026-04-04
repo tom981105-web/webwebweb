@@ -681,8 +681,7 @@ body {
 }
 
 .write-form-shell,
-.comments-section,
-.post-detail-body {
+.comments-section {
     display: flex;
     flex-direction: column;
     gap: 18px;
@@ -1058,6 +1057,7 @@ body {
 }
 
 .post-detail-body {
+    display: block;
     padding: 24px 0;
     line-height: 1.9;
     color: #2b2019;
