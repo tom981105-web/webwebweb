@@ -1128,6 +1128,82 @@ function setupCommentStickerPicker() {
         return normalizePost(result.post);
     }
 
+    async function incrementPostViews(postId) {
+        const response = await fetch(getApiUrl(`/api/board/posts/${postId}/views`), {
+            method: 'POST'
+        });
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || !result.post) {
+            throw new Error(result.message || '조회수 반영에 실패했습니다.');
+        }
+
+        return normalizePost(result.post);
+    }
+
+    async function createCommentOnServer(postId, payload) {
+        const response = await fetch(getApiUrl(`/api/board/posts/${postId}/comments`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        });
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || !result.post) {
+            throw new Error(result.message || '댓글 저장에 실패했습니다.');
+        }
+
+        return normalizePost(result.post);
+    }
+
+    async function updateCommentOnServer(postId, commentId, payload) {
+        const response = await fetch(getApiUrl(`/api/board/posts/${postId}/comments/${encodeURIComponent(commentId)}`), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload || {})
+        });
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || !result.post) {
+            throw new Error(result.message || '댓글 수정에 실패했습니다.');
+        }
+
+        return normalizePost(result.post);
+    }
+
+    async function deleteCommentFromServer(postId, commentId) {
+        const response = await fetch(getApiUrl(`/api/board/posts/${postId}/comments/${encodeURIComponent(commentId)}`), {
+            method: 'DELETE'
+        });
+
+        let result = {};
+        try {
+            result = await response.json();
+        } catch (error) {
+        }
+
+        if (!response.ok || !result.post) {
+            throw new Error(result.message || '댓글 삭제에 실패했습니다.');
+        }
+
+        return normalizePost(result.post);
+    }
+
     async function deletePostFromServer(postId) {
         const response = await fetch(getApiUrl(`/api/board/posts/${postId}`), {
             method: 'DELETE'
@@ -2046,11 +2122,6 @@ function setupCommentStickerPicker() {
         const post = boardPosts.find((item) => item.id === currentOpenPostId);
         const targetComment = post ? findCommentNodeById(post.comments, commentId) : null;
         if (!post || !targetComment) return;
-        const previousPost = JSON.parse(JSON.stringify(post));
-
-        targetComment.replies = Array.isArray(targetComment.replies) ? targetComment.replies : [];
-        targetComment.replies.push(createCommentNode(currentUser, text));
-
         if (typeof window.createUserNotification === 'function' && targetComment.author && targetComment.author !== currentUser) {
             window.createUserNotification(targetComment.author, {
                 type: 'reply',
@@ -2061,9 +2132,12 @@ function setupCommentStickerPicker() {
         }
 
         try {
-            replaceBoardPost(await persistExistingPost(post));
+            replaceBoardPost(await createCommentOnServer(post.id, {
+                author: currentUser,
+                text,
+                parentId: commentId
+            }));
         } catch (error) {
-            replaceBoardPost(previousPost);
             alert(error.message || '답글 저장에 실패했습니다.');
             return;
         }
@@ -2084,13 +2158,9 @@ function setupCommentStickerPicker() {
         const input = document.getElementById(`commentEditInput-${getCommentDomKey(commentId)}`);
         const text = input ? input.value.trim() : '';
         if (!text) return;
-        const previousPost = JSON.parse(JSON.stringify(post));
-        targetComment.text = text;
-        targetComment.editedAt = new Date().toLocaleString('ko-KR');
         try {
-            replaceBoardPost(await persistExistingPost(post));
+            replaceBoardPost(await updateCommentOnServer(post.id, commentId, { text }));
         } catch (error) {
-            replaceBoardPost(previousPost);
             alert(error.message || '댓글 수정에 실패했습니다.');
             return;
         }
@@ -2109,12 +2179,9 @@ function setupCommentStickerPicker() {
         if (!post || !targetComment) return;
         if (currentUser !== 'admin' && currentUser !== targetComment.author) return;
         if (!confirm('이 댓글을 삭제하시겠습니까?')) return;
-        const previousPost = JSON.parse(JSON.stringify(post));
-        removeCommentNodeById(post.comments, commentId);
         try {
-            replaceBoardPost(await persistExistingPost(post));
+            replaceBoardPost(await deleteCommentFromServer(post.id, commentId));
         } catch (error) {
-            replaceBoardPost(previousPost);
             alert(error.message || '댓글 삭제에 실패했습니다.');
             return;
         }
@@ -2130,9 +2197,10 @@ function setupCommentStickerPicker() {
         if (!ensureBoardReady()) return;
         const post = boardPosts.find((item) => item.id === id);
         if (!post || !boardDetailView) return;
-        post.views = (post.views || 0) + 1;
+        const optimisticViews = (post.views || 0) + 1;
+        post.views = optimisticViews;
         savePosts();
-        persistExistingPost(post).then((savedPost) => {
+        incrementPostViews(post.id).then((savedPost) => {
             replaceBoardPost(savedPost);
             if (currentOpenPostId === savedPost.id) {
                 document.getElementById('detailViews').innerText = savedPost.views || 0;
@@ -2148,7 +2216,7 @@ function setupCommentStickerPicker() {
         document.getElementById('detailCommentMeta').innerText = `댓글 ${getCommentCount(post)}`;
         document.getElementById('detailAuthor').innerHTML = renderAuthorWithAvatar(post.author);
         document.getElementById('detailTime').innerText = formatDate(post.date);
-        document.getElementById('detailViews').innerText = post.views || 0;
+        document.getElementById('detailViews').innerText = optimisticViews || 0;
         if (boardListView) boardListView.classList.add('is-hidden');
         boardDetailView.style.display = 'block';
         boardDetailView.classList.add('is-active');
@@ -2296,21 +2364,20 @@ document.getElementById('commentForm').onsubmit = async function (event) {
     if (!text) return;
     const post = boardPosts.find((item) => item.id === currentOpenPostId);
     if (!post) return;
-    const previousPost = JSON.parse(JSON.stringify(post));
-    post.comments = normalizeCommentNodes(post.comments);
-    post.comments.push(createCommentNode(currentUser, text));
-        if (typeof window.createUserNotification === 'function' && post.author && post.author !== currentUser) {
-            window.createUserNotification(post.author, {
-                type: 'comment',
-                title: '내 글에 새 댓글이 달렸습니다.',
-                message: `"${post.title || '게시글'}"에 ${getAuthorDisplayName(currentUser)}님이 댓글을 남겼습니다.`,
-                link: `board.html?id=${post.id}`
-            });
-        }
+    if (typeof window.createUserNotification === 'function' && post.author && post.author !== currentUser) {
+        window.createUserNotification(post.author, {
+            type: 'comment',
+            title: '내 글에 새 댓글이 달렸습니다.',
+            message: `"${post.title || '게시글'}"에 ${getAuthorDisplayName(currentUser)}님이 댓글을 남겼습니다.`,
+            link: `board.html?id=${post.id}`
+        });
+    }
     try {
-        replaceBoardPost(await persistExistingPost(post));
+        replaceBoardPost(await createCommentOnServer(post.id, {
+            author: currentUser,
+            text
+        }));
     } catch (error) {
-        replaceBoardPost(previousPost);
         alert(error.message || '댓글 저장에 실패했습니다.');
         return;
     }

@@ -259,6 +259,39 @@ function normalizeBoardComments(value) {
     });
 }
 
+function findBoardCommentNodeById(comments, commentId) {
+    if (!Array.isArray(comments)) return null;
+    for (const comment of comments) {
+        if (String(comment.id) === String(commentId)) {
+            return comment;
+        }
+        const childMatch = findBoardCommentNodeById(comment.replies, commentId);
+        if (childMatch) return childMatch;
+    }
+    return null;
+}
+
+function removeBoardCommentNodeById(comments, commentId) {
+    if (!Array.isArray(comments)) return false;
+    const index = comments.findIndex((comment) => String(comment.id) === String(commentId));
+    if (index >= 0) {
+        comments.splice(index, 1);
+        return true;
+    }
+    return comments.some((comment) => removeBoardCommentNodeById(comment.replies, commentId));
+}
+
+function createBoardCommentNode(author, text) {
+    return {
+        id: createBoardCommentId(),
+        author: String(author || '익명').trim() || '익명',
+        text: String(text || ''),
+        date: new Date().toLocaleString('ko-KR'),
+        editedAt: '',
+        replies: []
+    };
+}
+
 function normalizeBoardImageLayouts(value) {
     const layouts = Array.isArray(value) ? value : [];
     return layouts.map((entry) => {
@@ -1660,6 +1693,26 @@ app.get('/api/board/posts/:id', (req, res) => {
     res.json({ post });
 });
 
+app.post('/api/board/posts/:id/views', async (req, res) => {
+    const id = Number(req.params.id);
+    const index = state.board.posts.findIndex((item) => Number(item.id) === id);
+    if (index < 0) {
+        return res.status(404).json({ success: false, message: '게시글을 찾을 수 없습니다.' });
+    }
+
+    state.board.posts[index] = normalizeBoardPosts([{
+        ...state.board.posts[index],
+        views: Number(state.board.posts[index].views || 0) + 1,
+        updatedAt: new Date().toISOString(),
+        id
+    }], state.board.categories)[0];
+
+    const savedPost = state.board.posts[index];
+    scheduleDeferredDbPersist();
+    await saveBoardPostSnapshot(savedPost);
+    res.json({ success: true, post: savedPost });
+});
+
 app.post('/api/board/posts', async (req, res) => {
     const payload = req.body || {};
     const nextId = state.board.posts.length ? Math.max(...state.board.posts.map((post) => Number(post.id || 0))) + 1 : 1;
@@ -1708,6 +1761,108 @@ app.put('/api/board/posts/:id', async (req, res) => {
     scheduleDeferredDbPersist();
     await saveBoardPostSnapshot(savedPost);
     deleteBoardDraftSnapshot(savedPost.author, id).catch(() => {});
+    res.json({ success: true, post: savedPost });
+});
+
+app.post('/api/board/posts/:id/comments', async (req, res) => {
+    const id = Number(req.params.id);
+    const index = state.board.posts.findIndex((item) => Number(item.id) === id);
+    if (index < 0) {
+        return res.status(404).json({ success: false, message: '게시글을 찾을 수 없습니다.' });
+    }
+
+    const post = state.board.posts[index];
+    const author = String(req.body?.author || '').trim();
+    const text = String(req.body?.text || '').trim();
+    const parentId = String(req.body?.parentId || '').trim();
+    if (!author || !text) {
+        return res.status(400).json({ success: false, message: '작성자와 내용을 입력해 주세요.' });
+    }
+
+    post.comments = normalizeBoardComments(post.comments);
+    const newComment = createBoardCommentNode(author, text);
+    if (parentId) {
+        const parentComment = findBoardCommentNodeById(post.comments, parentId);
+        if (!parentComment) {
+            return res.status(404).json({ success: false, message: '대상 댓글을 찾을 수 없습니다.' });
+        }
+        parentComment.replies = normalizeBoardComments(parentComment.replies);
+        parentComment.replies.push(newComment);
+    } else {
+        post.comments.push(newComment);
+    }
+
+    state.board.posts[index] = normalizeBoardPosts([{
+        ...post,
+        updatedAt: new Date().toISOString(),
+        id
+    }], state.board.categories)[0];
+
+    const savedPost = state.board.posts[index];
+    scheduleDeferredDbPersist();
+    await saveBoardPostSnapshot(savedPost);
+    res.json({ success: true, post: savedPost, comment: newComment });
+});
+
+app.put('/api/board/posts/:id/comments/:commentId', async (req, res) => {
+    const id = Number(req.params.id);
+    const commentId = String(req.params.commentId || '').trim();
+    const index = state.board.posts.findIndex((item) => Number(item.id) === id);
+    if (index < 0) {
+        return res.status(404).json({ success: false, message: '게시글을 찾을 수 없습니다.' });
+    }
+
+    const text = String(req.body?.text || '').trim();
+    if (!text) {
+        return res.status(400).json({ success: false, message: '댓글 내용을 입력해 주세요.' });
+    }
+
+    const post = state.board.posts[index];
+    post.comments = normalizeBoardComments(post.comments);
+    const targetComment = findBoardCommentNodeById(post.comments, commentId);
+    if (!targetComment) {
+        return res.status(404).json({ success: false, message: '댓글을 찾을 수 없습니다.' });
+    }
+
+    targetComment.text = text;
+    targetComment.editedAt = new Date().toLocaleString('ko-KR');
+
+    state.board.posts[index] = normalizeBoardPosts([{
+        ...post,
+        updatedAt: new Date().toISOString(),
+        id
+    }], state.board.categories)[0];
+
+    const savedPost = state.board.posts[index];
+    scheduleDeferredDbPersist();
+    await saveBoardPostSnapshot(savedPost);
+    res.json({ success: true, post: savedPost });
+});
+
+app.delete('/api/board/posts/:id/comments/:commentId', async (req, res) => {
+    const id = Number(req.params.id);
+    const commentId = String(req.params.commentId || '').trim();
+    const index = state.board.posts.findIndex((item) => Number(item.id) === id);
+    if (index < 0) {
+        return res.status(404).json({ success: false, message: '게시글을 찾을 수 없습니다.' });
+    }
+
+    const post = state.board.posts[index];
+    post.comments = normalizeBoardComments(post.comments);
+    const removed = removeBoardCommentNodeById(post.comments, commentId);
+    if (!removed) {
+        return res.status(404).json({ success: false, message: '댓글을 찾을 수 없습니다.' });
+    }
+
+    state.board.posts[index] = normalizeBoardPosts([{
+        ...post,
+        updatedAt: new Date().toISOString(),
+        id
+    }], state.board.categories)[0];
+
+    const savedPost = state.board.posts[index];
+    scheduleDeferredDbPersist();
+    await saveBoardPostSnapshot(savedPost);
     res.json({ success: true, post: savedPost });
 });
 
